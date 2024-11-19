@@ -57,4 +57,4 @@ def create_dataset_interactive(request):
 
 
 def my_view(request):
-    return render(request, 'base.html')
+    return render(request, 'dashboard.html')
