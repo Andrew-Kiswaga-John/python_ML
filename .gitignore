@@ -1,5 +1,5 @@
-<<<<<<< HEAD
 /node_modules
-=======
 /venv
->>>>>>> b5376eb824d9d32eef702f85a7e7717abe319f97
+./DataFlowDesk/__pycache__
+/DataFlowDesk/__pycache__
+
