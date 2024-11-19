@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Create Dataset</h1>
+
+<!-- Step 1: Define Columns and Rows -->
+<form id="define-table-form" method="POST">
+    {% csrf_token %}
+    <label for="name">Dataset Name:</label>
+    <input type="text" id="name" name="name" required><br>
+
+    <label for="description">Description:</label>
+    <textarea id="description" name="description"></textarea><br>
+
+    <label for="columns">Column Names (comma-separated):</label>
+    <input type="text" id="columns" name="columns" placeholder="col1, col2, col3" required><br>
+
+    <label for="rows">Number of Rows:</label>
+    <input type="number" id="rows" name="rows" min="1" required><br>
+
+    <button type="button" id="generate-table">Generate Table</button>
+</form>
+
+<!-- Step 2: Interactive Table -->
+<div id="table-container" style="display:none;">
+    <h2>Fill in the Data</h2>
+    <form id="finalize-dataset-form" method="POST">
+        {% csrf_token %}
+        <table id="data-table" border="1">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+        <button type="button" id="save-dataset">Save Dataset</button>
+    </form>
+</div>
+
+<script>
+    document.getElementById('generate-table').addEventListener('click', () => {
+        const columns = document.getElementById('columns').value.split(',');
+        const rows = document.getElementById('rows').value;
+
+        fetch('', {
+    method: 'POST',
+    headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+        'columns[]': columns, // Include [] for Django to parse lists
+        'rows': rows
+    })
+})
+
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                // Populate table
+                const thead = document.getElementById('data-table').querySelector('thead');
+                const tbody = document.getElementById('data-table').querySelector('tbody');
+                thead.innerHTML = `<tr>${data.columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
+                tbody.innerHTML = data.table.map(() => `<tr>${data.columns.map(() => `<td><input type="text" /></td>`).join('')}</tr>`).join('');
+                document.getElementById('table-container').style.display = 'block';
+            }
+        });
+    });
+
+    document.getElementById('save-dataset').addEventListener('click', () => {
+        const name = document.getElementById('name').value;
+        const description = document.getElementById('description').value;
+        const columns = Array.from(document.getElementById('data-table').querySelectorAll('thead th')).map(th => th.textContent);
+        const rows = Array.from(document.getElementById('data-table').querySelectorAll('tbody tr')).map(tr => Array.from(tr.querySelectorAll('td input')).map(input => input.value));
+
+        const final_data = rows.flat();
+        fetch('', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, description, columns, final_data })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert(data.success);
+                window.location.href = '/datasets/';
+            }
+        });
+    });
+</script>
+</body>
+</html>
