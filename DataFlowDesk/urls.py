@@ -21,4 +21,6 @@ from . import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.my_view, name='home'),
+    path('datasets/create/interactive/', views.create_dataset_interactive, name='create_dataset_interactive'),
+
 ]
