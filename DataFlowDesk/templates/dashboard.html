@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+
+{% block content %}
+<!-- Metrics Overview -->
+<div class="grid grid-cols-4 gap-4">
+    <div class="bg-white p-4 shadow rounded-lg text-center">
+        <h2 class="text-xl font-bold">Running</h2>
+        <p class="text-2xl text-blue-500">2</p>
+    </div>
+    <div class="bg-white p-4 shadow rounded-lg text-center">
+        <h2 class="text-xl font-bold">Completed</h2>
+        <p class="text-2xl text-green-500">32</p>
+    </div>
+    <div class="bg-white p-4 shadow rounded-lg text-center">
+        <h2 class="text-xl font-bold">Failed</h2>
+        <p class="text-2xl text-red-500">0</p>
+    </div>
+    <div class="bg-white p-4 shadow rounded-lg text-center">
+        <h2 class="text-xl font-bold">Other</h2>
+        <p class="text-2xl text-gray-500">1</p>
+    </div>
+</div>
+
+<!-- Visualization Chart -->
+<div class="bg-white p-4 shadow rounded-lg">
+    <h2 class="text-lg font-bold text-gray-800 mb-4">Median Absolute Error Statistic</h2>
+    <div class="h-48 bg-gradient-to-r from-yellow-200 to-red-400 rounded-lg"></div>
+</div>
+
+<!-- Data Overview Table -->
+<div class="bg-white p-4 shadow rounded-lg">
+    <h2 class="text-lg font-bold text-gray-800 mb-4">Overview Data</h2>
+    <table class="min-w-full table-auto text-left border-collapse border border-gray-300">
+        <thead>
+            <tr>
+                <th class="border border-gray-300 px-4 py-2">Run ID</th>
+                <th class="border border-gray-300 px-4 py-2">Properties</th>
+                <th class="border border-gray-300 px-4 py-2">Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="border border-gray-300 px-4 py-2">Example 1</td>
+                <td class="border border-gray-300 px-4 py-2">Feature Engineering</td>
+                <td class="border border-gray-300 px-4 py-2">42.8k</td>
+            </tr>
+            <!-- Add more rows here -->
+        </tbody>
+    </table>
+</div>
+{% endblock %}
