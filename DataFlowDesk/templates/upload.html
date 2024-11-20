@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Dataset{% endblock %}
+
+{% block header_title %}Upload Dataset{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-md p-6">
+    <h2 class="text-lg font-bold mb-4">Upload or Extract Your Dataset</h2>
+    <form id="upload-form" method="post" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Choose Data Source:</label>
+            <div class="flex space-x-4">
+                <label class="flex items-center">
+                    <input type="radio" name="source" value="local" class="mr-2" required>
+                    <span>From Computer</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="radio" name="source" value="kaggle" class="mr-2">
+                    <span>From Kaggle</span>
+                </label>
+            </div>
+        </div>
+
+        <div id="kaggle-input" class="hidden">
+            <label for="kaggle-link" class="block text-sm font-medium text-gray-700">Kaggle Dataset URL:</label>
+            <input type="url" id="kaggle-link" name="kaggle_link"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        </div>
+
+        <div>
+            <label for="dataset" id="file-label" class="block text-sm font-medium text-gray-700">Select Dataset (CSV/Excel):</label>
+            <input type="file" id="dataset" name="dataset" accept=".csv, .xls, .xlsx"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        </div>
+
+        <div>
+            <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name:</label>
+            <input type="text" id="name" name="name"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+        </div>
+
+        <div>
+            <label for="description" class="block text-sm font-medium text-gray-700">Dataset Description:</label>
+            <textarea id="description" name="description" rows="3"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required></textarea>
+        </div>
+
+        <button type="submit"
+            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+            Upload Dataset
+        </button>
+    </form>
+
+    <div id="response" class="mt-4">
+        <!-- Response messages will appear here -->
+    </div>
+</div>
+
+<script>
+    // Toggle visibility of Kaggle input vs file input
+    document.querySelectorAll('input[name="source"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const kaggleInput = document.getElementById('kaggle-input');
+            const fileInput = document.getElementById('dataset');
+            const fileLabel = document.getElementById('file-label');
+            
+            if (e.target.value === 'kaggle') {
+                kaggleInput.classList.remove('hidden');
+                fileInput.classList.add('hidden');
+                fileLabel.classList.add('hidden');
+                fileInput.required = false;
+            } else {
+                kaggleInput.classList.add('hidden');
+                fileInput.classList.remove('hidden');
+                fileLabel.classList.remove('hidden');
+                fileInput.required = true;
+            }
+        });
+    });
+
+    // Handle form submission
+    const form = document.getElementById('upload-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            }
+        });
+
+        const result = await response.json();
+
+        const responseDiv = document.getElementById('response');
+        if (result.error) {
+            responseDiv.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+        } else {
+            responseDiv.innerHTML = `<p style="color: green;">Dataset uploaded successfully!</p>`;
+        }
+    });
+</script>
+{% endblock %}

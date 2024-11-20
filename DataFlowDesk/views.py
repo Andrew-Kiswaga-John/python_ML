@@ -129,6 +129,16 @@ def create_dataset_step2(request):
         'row_range': range(num_rows),
         'dataset_meta': dataset_meta,
     })
+from io import StringIO
+from django.core.files.base import ContentFile
+import uuid
+import os
+import openpyxl
+import pandas as pd
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.conf import settings
+from django.core.files.storage import default_storage
 
 
 def create_dataset_interactive(request):
@@ -139,4 +149,53 @@ def create_dataset_interactive(request):
 
 
 def my_view(request):
-    return render(request, 'base.html')
+    return render(request, 'dashboard.html')
+
+def upload_file(request):
+    if request.method == 'POST':
+        source = request.POST.get('source')
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+
+        if source == 'local':
+            dataset = request.FILES.get('dataset')
+            if not dataset:
+                return JsonResponse({'error': 'No file provided.'})
+            
+            # Save the dataset locally
+            file_path = default_storage.save(f"datasets/{dataset.name}", dataset)
+            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+
+            # Preview data
+            try:
+                if dataset.name.endswith('.csv'):
+                    df = pd.read_csv(full_path)
+                elif dataset.name.endswith(('.xls', '.xlsx')):
+                    if not openpyxl:
+                        return JsonResponse({'error': "Missing optional dependency 'openpyxl'. Please install it using 'pip install openpyxl'."})
+                    df = pd.read_excel(full_path)
+                else:
+                    return JsonResponse({'error': 'Unsupported file format.'})
+                preview = df.head().to_dict()
+                return JsonResponse({'message': 'File uploaded successfully.', 'data_preview': preview})
+            except Exception as e:
+                return JsonResponse({'error': f"Error processing file: {str(e)}"})
+
+        elif source == 'kaggle':
+            kaggle_link = request.POST.get('kaggle_link')
+            if not kaggle_link:
+                return JsonResponse({'error': 'No Kaggle link provided.'})
+
+            # Example: download dataset using Kaggle API
+            # Ensure the Kaggle API is configured on the server
+            try:
+                dataset_name = kaggle_link.split('/')[-1]  # Extract dataset name
+                os.system(f'kaggle datasets download -d {dataset_name} -p {settings.MEDIA_ROOT}/datasets')
+                return JsonResponse({'message': 'Kaggle dataset downloaded successfully.'})
+            except Exception as e:
+                return JsonResponse({'error': f"Error downloading from Kaggle: {str(e)}"})
+
+        else:
+            return JsonResponse({'error': 'Invalid source selection.'})
+
+    return render(request, 'upload.html')
