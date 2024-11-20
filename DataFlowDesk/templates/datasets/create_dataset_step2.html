@@ -1,0 +1,27 @@
+<form id="step2-form" method="POST">
+    {% csrf_token %}
+    <h2>Enter Data for {{ dataset_meta.name }}</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>  <!-- Always show the ID column -->
+                {% for column in columns %}
+                    <th>{{ column.name }} ({{ column.type }})</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in row_range %}
+                <tr>
+                    <td>{{ row|add:1 }}</td>  <!-- Add 1 to row index to start from 1 -->
+                    {% for column in columns %}
+                        <td>
+                            <input type="text" name="data" placeholder="{{ column.type }}" required>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Submit</button>
+</form>

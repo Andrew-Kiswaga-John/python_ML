@@ -123,6 +123,10 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+import os
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'datasets')  # Adjust BASE_DIR based on your project
+MEDIA_URL = '/datsets/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
