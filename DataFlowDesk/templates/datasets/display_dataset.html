@@ -1,0 +1,68 @@
+{% extends "../base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-8">
+    <h2 class="text-3xl font-semibold text-gray-900 mb-4">{{ dataset.name }}</h2>
+    <p class="text-lg text-gray-600 mb-6">{{ dataset.description }}</p>
+
+    <!-- Dataset Table -->
+    <div class="overflow-x-auto shadow-md rounded-lg bg-white mb-8">
+        <table class="min-w-full table-auto text-left">
+            <thead class="bg-gray-50 text-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-sm font-medium">ID</th>
+                    {% for column in columns %}
+                        <th class="px-6 py-3 text-sm font-medium">{{ column }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody class="text-sm text-gray-600">
+                {% for row in dataset_data %}
+                    <tr class="border-b hover:bg-gray-100">
+                        <td class="px-6 py-3">{{ forloop.counter }}</td>  <!-- ID column -->
+                        {% for value in row %}
+                            <td class="px-6 py-3">{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Dataset Stats -->
+    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Statistics</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for stat, values in stats.items %}
+                <div class="bg-gray-50 p-4 rounded-lg shadow-md">
+                    <h4 class="text-lg font-medium text-gray-800">{{ stat|title }}</h4>
+                    <ul class="text-sm text-gray-600">
+                        {% for key, value in values.items %}
+                            <li>{{ key|title }}: {{ value }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Graph Display -->
+    <div class="mb-8">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Graph</h3>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            {{ graph_html|safe }}  <!-- Render the Plotly graph -->
+        </div>
+    </div>
+
+    <!-- Clean Data Button -->
+    <div class="mt-6 text-center">
+        <button type="button" class="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all">
+            Clean Data
+        </button>
+    </div>
+</div>
+{% endblock %}
