@@ -203,13 +203,13 @@ def upload_file(request):
                     # init dataframe
                     df = pd.DataFrame(data=sheet_data[1:], columns=sheet_data[0])
 
-                    # Save dataset details to the database
-                    dataset_instance = Dataset.objects.create(
-                        name=name,
-                        description=description,
-                        file_path=file_path,  # Path relative to MEDIA_ROOT
-                        columns_info=df.columns.tolist(),  # Save column names as JSON
-                    )
+                # Save dataset details to the database
+                dataset_instance = Dataset.objects.create(
+                    name=name,
+                    description=description,
+                    file_path=file_path,  # Path relative to MEDIA_ROOT
+                    columns_info=df.columns.tolist(),  # Save column names as JSON
+                )
 
                 # Get the first five rows as HTML
                 first_five_rows = df.head().to_html(classes='table table-bordered')
