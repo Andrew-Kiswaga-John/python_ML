@@ -17,6 +17,7 @@ urlpatterns = [
     path('upload/', views.upload_file, name='upload_file'),
     path('dataset/<int:id>/', views.display_dataset, name='display_dataset'),
 
+    # path('upload/', views.upload_file, name='upload_file'),
 
 ]
 
