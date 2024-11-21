@@ -8,9 +8,10 @@ from io import StringIO
 from django.core.files.base import ContentFile
 import uuid
 import os
-import openpyxl
+import pylightxl
 import pandas as pd
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -67,51 +68,71 @@ def create_dataset_interactive(request):
 def my_view(request):
     return render(request, 'dashboard.html')
 
+@csrf_exempt  # Optional, depending on your CSRF configuration
 def upload_file(request):
     if request.method == 'POST':
-        source = request.POST.get('source')
-        name = request.POST.get('name')
-        description = request.POST.get('description')
+        try:
+            # Handling local file uploads
+            if request.POST.get('source') == 'local':
+                file = request.FILES.get('dataset')
+                if not file:
+                    return JsonResponse({'error': 'No file uploaded.'})
 
-        if source == 'local':
-            dataset = request.FILES.get('dataset')
-            if not dataset:
-                return JsonResponse({'error': 'No file provided.'})
-            
-            # Save the dataset locally
-            file_path = default_storage.save(f"datasets/{dataset.name}", dataset)
-            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+                # Ensure it's a CSV or Excel file
+                if not (file.name.endswith('.csv') or file.name.endswith(('.xls', '.xlsx'))):
+                    return JsonResponse({'error': 'Invalid file type. Please upload a CSV or Excel file.'})
 
-            # Preview data
-            try:
-                if dataset.name.endswith('.csv'):
-                    df = pd.read_csv(full_path)
-                elif dataset.name.endswith(('.xls', '.xlsx')):
-                    if not openpyxl:
-                        return JsonResponse({'error': "Missing optional dependency 'openpyxl'. Please install it using 'pip install openpyxl'."})
-                    df = pd.read_excel(full_path)
+                # Save the file to the datasets folder
+                datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
+                os.makedirs(datasets_dir, exist_ok=True)
+                file_path = os.path.join(datasets_dir, file.name)
+
+                with open(file_path, 'wb') as f:
+                    for chunk in file.chunks():
+                        f.write(chunk)
+
+                # Load the file using pandas
+                if file.name.endswith('.csv'):
+                    try:
+                        df = pd.read_csv(file_path, on_bad_lines='skip')  # Skip problematic lines
+                    except pd.errors.ParserError as e:
+                        return JsonResponse({'error': f'CSV Parsing Error: {str(e)}'})
+
+                    # Handle cases where the delimiter isn't a comma
+                    if df.empty or len(df.columns) == 1:  # Single-column issue
+                        try:
+                            df = pd.read_csv(file_path, delimiter=';')  # Try a semicolon
+                        except Exception as e:
+                            return JsonResponse({'error': f'CSV Parsing Error with fallback delimiter: {str(e)}'})
                 else:
-                    return JsonResponse({'error': 'Unsupported file format.'})
-                preview = df.head().to_dict()
-                return JsonResponse({'message': 'File uploaded successfully.', 'data_preview': preview})
-            except Exception as e:
-                return JsonResponse({'error': f"Error processing file: {str(e)}"})
+                    # read excel
+                    db = pylightxl.readxl(file_path)
 
-        elif source == 'kaggle':
-            kaggle_link = request.POST.get('kaggle_link')
-            if not kaggle_link:
-                return JsonResponse({'error': 'No Kaggle link provided.'})
+                    # data sheet
+                    name_first_sheet = db.ws_names[0]
+                    sheet_data = list(db.ws(ws=name_first_sheet).rows)
 
-            # Example: download dataset using Kaggle API
-            # Ensure the Kaggle API is configured on the server
-            try:
-                dataset_name = kaggle_link.split('/')[-1]  # Extract dataset name
-                os.system(f'kaggle datasets download -d {dataset_name} -p {settings.MEDIA_ROOT}/datasets')
-                return JsonResponse({'message': 'Kaggle dataset downloaded successfully.'})
-            except Exception as e:
-                return JsonResponse({'error': f"Error downloading from Kaggle: {str(e)}"})
+                    # init dataframe
+                    df = pd.DataFrame(data=sheet_data[1:], columns=sheet_data[0])
 
-        else:
-            return JsonResponse({'error': 'Invalid source selection.'})
+                # Get the first five rows as HTML
+                first_five_rows = df.head().to_html(classes='table table-bordered')
 
+                return JsonResponse({
+                    'message': 'Dataset uploaded successfully!',
+                    'preview': first_five_rows
+                })
+
+            # Handling Kaggle dataset URL (future implementation)
+            elif request.POST.get('source') == 'kaggle':
+                return JsonResponse({'error': 'Kaggle source is not implemented yet.'})
+
+            else:
+                return JsonResponse({'error': 'Invalid data source selected.'})
+        except Exception as e:
+            return JsonResponse({'error': f'An error occurred: {str(e)}'})
+
+    return JsonResponse({'error': 'Invalid request method.'})
+# Function to render the upload.html page
+def upload_page(request):
     return render(request, 'upload.html')

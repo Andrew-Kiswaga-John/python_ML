@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.my_view, name='home'),
     path('datasets/create/interactive/', views.create_dataset_interactive, name='create_dataset_interactive'),
-    path('upload/', views.upload_file, name='upload_file'),
+    path('upload/', views.upload_page, name='upload_page'),
+    path('upload-file/', views.upload_file, name='upload_file'),
 
 ]

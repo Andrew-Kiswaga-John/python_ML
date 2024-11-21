@@ -7,13 +7,13 @@
 {% block content %}
 <div class="bg-white shadow rounded-md p-6">
     <h2 class="text-lg font-bold mb-4">Upload or Extract Your Dataset</h2>
-    <form id="upload-form" method="post" enctype="multipart/form-data" class="space-y-4">
+    <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_file' %}" class="space-y-4">
         {% csrf_token %}
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Choose Data Source:</label>
             <div class="flex space-x-4">
                 <label class="flex items-center">
-                    <input type="radio" name="source" value="local" class="mr-2" required>
+                    <input type="radio" name="source" value="local" class="mr-2" required checked>
                     <span>From Computer</span>
                 </label>
                 <label class="flex items-center">
@@ -99,10 +99,14 @@
 
         const responseDiv = document.getElementById('response');
         if (result.error) {
-            responseDiv.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
-        } else {
-            responseDiv.innerHTML = `<p style="color: green;">Dataset uploaded successfully!</p>`;
-        }
+                responseDiv.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+            } else {
+                responseDiv.innerHTML = `
+                    <p style="color: green;">${result.message}</p>
+                    <h3>Preview of Uploaded Dataset:</h3>
+                    ${result.preview}
+                `;
+            }
     });
 </script>
 {% endblock %}
