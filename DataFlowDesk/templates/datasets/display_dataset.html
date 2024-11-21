@@ -11,7 +11,7 @@
 
     <!-- Dataset Table -->
     <div class="overflow-x-auto shadow-md rounded-lg bg-white mb-8">
-        <table class="min-w-full table-auto text-left">
+        <table class="min-w-full table-auto text-left" id="dataset-table">
             <thead class="bg-gray-50 text-gray-700">
                 <tr>
                     <th class="px-6 py-3 text-sm font-medium">ID</th>
@@ -20,7 +20,7 @@
                     {% endfor %}
                 </tr>
             </thead>
-            <tbody class="text-sm text-gray-600">
+            <tbody class="text-sm text-gray-600" id="dataset-body">
                 {% for row in dataset_data %}
                     <tr class="border-b hover:bg-gray-100">
                         <td class="px-6 py-3">{{ forloop.counter }}</td>  <!-- ID column -->
@@ -31,6 +31,13 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <!-- "Show More" Button -->
+    <div class="text-center">
+        <button id="show-more-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+            Show More
+        </button>
     </div>
 
     <!-- Dataset Stats -->
@@ -65,4 +72,56 @@
         </button>
     </div>
 </div>
+
+<script>
+    // JavaScript for "Show More" Button
+    var displayedRows = 5;  // Initial number of rows displayed
+
+    document.getElementById('show-more-btn').addEventListener('click', function() {
+        fetch("{% url 'display_dataset' dataset.id %}?displayed_rows=" + displayedRows, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Get the next 5 rows from the response
+            var nextRows = data.next_rows;
+            var tbody = document.getElementById('dataset-body');
+            
+            // Loop through the next rows and add them to the table
+            nextRows.forEach(function(row, index) {
+                var tr = document.createElement('tr');
+                tr.classList.add('border-b', 'hover:bg-gray-100');
+
+                // Add the ID column (index + 1 for 1-based index)
+                var td = document.createElement('td');
+                td.classList.add('px-6', 'py-3');
+                td.textContent = displayedRows + index + 1;  // Start from the next row
+                tr.appendChild(td);
+
+                // Add the rest of the data columns
+                row.forEach(function(value) {
+                    var td = document.createElement('td');
+                    td.classList.add('px-6', 'py-3');
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                // Append the row to the table body
+                tbody.appendChild(tr);
+            });
+
+            // Update the number of displayed rows
+            displayedRows += 5;
+
+            // If there are no more rows to display, hide the "Show More" button
+            if (nextRows.length < 5) {
+                document.getElementById('show-more-btn').style.display = 'none';
+            }
+        });
+    });
+</script>
+
 {% endblock %}

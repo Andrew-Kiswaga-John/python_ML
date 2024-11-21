@@ -140,27 +140,77 @@ from .models import Dataset
 from django.http import JsonResponse
 import plotly.express as px
 
+from django.http import JsonResponse
+import pandas as pd
+from .models import Dataset
+
+from django.http import JsonResponse
+import plotly.express as px
+import pandas as pd
+from .models import Dataset
+
+
+
 def display_dataset(request, id):
-    # Fetch the dataset from the database
+    # Fetch the dataset from the database using the 'id' (default primary key)
     dataset = Dataset.objects.get(id=id)
     data = pd.read_csv(dataset.file_path)  # Load the dataset from CSV
+
+    # Get the first 5 rows for initial display
+    data_head = data.head()
 
     # Basic statistics of the dataset
     stats = data.describe().to_dict()
 
-    # Create a graph using Plotly (example: scatter plot of two columns)
+    # Create a graph using Plotly with custom styling
     fig = px.scatter(data_frame=data, x=data.columns[0], y=data.columns[1], title="Dataset Scatter Plot")
-    graph_html = fig.to_html(full_html=False)
+    fig.update_layout(
+        title="Dataset Scatter Plot",
+        title_x=0.5,
+        plot_bgcolor='white',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title=data.columns[0],
+            title_font=dict(size=14),
+            showgrid=True,
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title=data.columns[1],
+            title_font=dict(size=14),
+            showgrid=True,
+            zeroline=False,
+        ),
+        font=dict(
+            family="Arial, sans-serif",
+            size=12,
+            color="gray"
+        ),
+        margin=dict(l=40, r=40, t=40, b=40),
+        hovermode="closest",
+    )
 
-    # Convert the dataset rows to a list of lists
-    dataset_data = data.values.tolist()
+    # Convert the dataset rows to a list of lists (for the first 5 rows)
+    dataset_data = data_head.values.tolist()
 
+    # Handle the "Show More" request via AJAX
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' and request.method == "GET":
+        # Get the number of rows already displayed (stored in the session or via URL)
+        displayed_rows = int(request.GET.get('displayed_rows', 5))
+
+        # Fetch the next 5 rows
+        next_rows = data.iloc[displayed_rows:displayed_rows+5].values.tolist()
+
+        # Return the next rows as JSON
+        return JsonResponse({'next_rows': next_rows})
+
+    # Render the template with dataset and graph data
     return render(request, 'datasets/display_dataset.html', {
         'dataset': dataset,
-        'dataset_data': dataset_data,
-        'table_html': data.to_html(classes='table table-striped', index=False),
+        'dataset_data': dataset_data,  # First 5 rows for display
+        'table_html': data_head.to_html(classes='table table-striped', index=False),
         'stats': stats,
-        'graph_html': graph_html,  # Pass the graph HTML to the template
+        'graph_html': fig.to_html(full_html=False),
         'columns': data.columns,
     })
 
