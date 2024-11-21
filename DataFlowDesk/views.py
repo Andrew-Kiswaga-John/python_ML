@@ -41,6 +41,9 @@ from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Dataset
+from django.shortcuts import render, redirect
+from django.urls import reverse  # For generating URLs
+
 def create_dataset_step2(request):
     dataset_meta = request.session.get('dataset_meta')
     if not dataset_meta:
@@ -112,7 +115,7 @@ def create_dataset_step2(request):
                 writer.writerow(row_data)
 
         # Save the dataset information to the database
-        Dataset.objects.create(
+        new_dataset = Dataset.objects.create(
             name=dataset_meta['name'],
             description=dataset_meta['description'],
             file_path=file_path,
@@ -120,8 +123,8 @@ def create_dataset_step2(request):
             status="uploaded"
         )
 
-        # Return a success response
-        return JsonResponse({"success": True, "message": "Dataset created successfully!"})
+        # Redirect to the "Display Dataset" page
+        return redirect(reverse('display_dataset', args=[new_dataset.id]))
 
     # Render the template with column details
     return render(request, 'datasets/create_dataset_step2.html', {
@@ -129,6 +132,38 @@ def create_dataset_step2(request):
         'row_range': range(num_rows),
         'dataset_meta': dataset_meta,
     })
+
+
+import pandas as pd
+from django.shortcuts import render, redirect
+from .models import Dataset
+from django.http import JsonResponse
+import plotly.express as px
+
+def display_dataset(request, id):
+    # Fetch the dataset from the database
+    dataset = Dataset.objects.get(id=id)
+    data = pd.read_csv(dataset.file_path)  # Load the dataset from CSV
+
+    # Basic statistics of the dataset
+    stats = data.describe().to_dict()
+
+    # Create a graph using Plotly (example: scatter plot of two columns)
+    fig = px.scatter(data_frame=data, x=data.columns[0], y=data.columns[1], title="Dataset Scatter Plot")
+    graph_html = fig.to_html(full_html=False)
+
+    # Convert the dataset rows to a list of lists
+    dataset_data = data.values.tolist()
+
+    return render(request, 'datasets/display_dataset.html', {
+        'dataset': dataset,
+        'dataset_data': dataset_data,
+        'table_html': data.to_html(classes='table table-striped', index=False),
+        'stats': stats,
+        'graph_html': graph_html,  # Pass the graph HTML to the template
+        'columns': data.columns,
+    })
+
 from io import StringIO
 from django.core.files.base import ContentFile
 import uuid
@@ -140,12 +175,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.files.storage import default_storage
-
-
-def create_dataset_interactive(request):
-   
-    return render(request, 'datasets/create_dataset_interactive.html')
-
 
 
 
