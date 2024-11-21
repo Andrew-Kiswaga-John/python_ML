@@ -1,0 +1,46 @@
+{% extends "../base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+
+{% block content %}
+<form id="step2-form" method="POST" class="bg-white p-6 rounded-xl shadow-lg max-w-3xl mx-auto border border-gray-300">
+    {% csrf_token %}
+    
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Enter Data for {{ dataset_meta.name }}</h2>
+    
+    <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse border border-gray-300">
+            <thead>
+                <tr class="bg-gray-100 text-left">
+                    <th class="px-4 py-2 border-b">ID</th> <!-- Always show the ID column -->
+                    {% for column in columns %}
+                        <th class="px-4 py-2 border-b">{{ column.name }} ({{ column.type }})</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in row_range %}
+                    <tr class="border-b">
+                        <td class="px-4 py-2">{{ row|add:1 }}</td> <!-- Add 1 to row index to start from 1 -->
+                        {% for column in columns %}
+                            <td class="px-4 py-2">
+                                <input 
+                                    type="text" 
+                                    name="data" 
+                                    placeholder="{{ column.type }}" 
+                                    required 
+                                    class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <button type="submit" class="mt-6 bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">Submit</button>
+</form>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "../base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+
+{% block content %}
+
+<form id="step1-form" method="POST" class="bg-white p-6 rounded-xl shadow-lg max-w-3xl mx-auto border border-gray-300">
+    {% csrf_token %}
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Dataset Details</h2>
+    
+    <div class="mb-6">
+        <div class="mb-4">
+            {{ form.as_p }}
+        </div>
+    </div>
+    
+    <button type="button" id="generate-columns" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">Define Columns</button>
+    
+    <div id="column-details-container" class="mt-6"></div>
+    
+    <button type="submit" id="submit-form" style="display:none;" class="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 transition mt-4">Next</button>
+</form>
+
+<script>
+    document.getElementById('generate-columns').addEventListener('click', function () {
+        const numColumns = document.getElementById('id_num_columns').value;
+        const container = document.getElementById('column-details-container');
+        container.innerHTML = ''; // Clear previous column details
+
+        for (let i = 0; i < numColumns; i++) {
+            const div = document.createElement('div');
+            div.classList.add('mb-6', 'p-6', 'border', 'border-gray-300', 'rounded-lg', 'bg-gray-50');
+            div.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Column ${i + 1}</h3>
+                <div class="mb-4">
+                    <label for="col_name_${i}" class="block text-sm font-medium text-gray-700">Column Name:</label>
+                    <input type="text" id="col_name_${i}" name="col_name_${i}" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="col_type_${i}" class="block text-sm font-medium text-gray-700">Data Type:</label>
+                    <select id="col_type_${i}" name="col_type_${i}" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="int">Integer</option>
+                        <option value="float">Float</option>
+                        <option value="string">String</option>
+                        <option value="date">Date</option>
+                        <option value="time">Time</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        document.getElementById('submit-form').style.display = 'block'; // Show the submit button
+    });
+</script>
+
+{% endblock %}
