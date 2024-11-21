@@ -139,7 +139,9 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
+from .models import *
 from django.core.files.storage import default_storage
+from datetime import datetime
 
 
 def create_dataset_interactive(request):
@@ -155,6 +157,8 @@ def my_view(request):
 @csrf_exempt  # Optional, depending on your CSRF configuration
 def upload_file(request):
     if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description')
         try:
             # Handling local file uploads
             if request.POST.get('source') == 'local':
@@ -199,13 +203,25 @@ def upload_file(request):
                     # init dataframe
                     df = pd.DataFrame(data=sheet_data[1:], columns=sheet_data[0])
 
+                    # Save dataset details to the database
+                    dataset_instance = Dataset.objects.create(
+                        name=name,
+                        description=description,
+                        file_path=file_path,  # Path relative to MEDIA_ROOT
+                        columns_info=df.columns.tolist(),  # Save column names as JSON
+                    )
+
                 # Get the first five rows as HTML
                 first_five_rows = df.head().to_html(classes='table table-bordered')
+                print(f"dataset_id: {dataset_instance.id}")
 
                 return JsonResponse({
                     'message': 'Dataset uploaded successfully!',
-                    'preview': first_five_rows
+                    'preview': first_five_rows,
+                    'dataset_id': dataset_instance.id
                 })
+            
+                
 
             # Handling Kaggle dataset URL (future implementation)
             elif request.POST.get('source') == 'kaggle':
