@@ -15,6 +15,9 @@ urlpatterns = [
     path('create-dataset/step1/', views.create_dataset_step1, name='create_dataset_step1'),
     path('create-dataset/step2/', views.create_dataset_step2, name='create_dataset_step2'),
     path('dataset/<int:id>/', views.display_dataset, name='display_dataset'),
+    path('dataset/<int:dataset_id>/cleaning_preview/', views.data_cleaning_preview, name='data_cleaning_preview'),
+    path('dataset/<int:dataset_id>/perform_cleaning/', views.perform_data_cleaning, name='perform_data_cleaning'),
+
 
 ]
 

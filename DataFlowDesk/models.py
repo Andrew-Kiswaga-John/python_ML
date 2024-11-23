@@ -19,6 +19,7 @@ class Dataset(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     file_path = models.FileField(upload_to='datasets/')
     columns_info = models.JSONField(blank=True, null=True)  # JSON format for column details
+    cleaned_file = models.FileField(upload_to='datasets/cleaned/', null=True, blank=True)
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('processed', 'Processed')], default='pending')
 
     def __str__(self):
