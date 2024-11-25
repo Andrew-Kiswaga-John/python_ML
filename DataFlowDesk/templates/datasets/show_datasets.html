@@ -1,0 +1,19 @@
+{% extends "../base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+
+{% block content %}
+
+<h1>Dataset List</h1>
+    <ul>
+        {% for data in dataset %}
+        <li>
+            ID: {{ data.id }} - 
+            <a href="{% url 'display_dataset' data.id %}">{{ data.name }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+
+{% endblock %}

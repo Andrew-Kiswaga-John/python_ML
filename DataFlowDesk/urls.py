@@ -17,7 +17,7 @@ urlpatterns = [
     path('dataset/<int:id>/', views.display_dataset, name='display_dataset'),
     path('dataset/<int:dataset_id>/cleaning_preview/', views.data_cleaning_preview, name='data_cleaning_preview'),
     path('dataset/<int:dataset_id>/perform_cleaning/', views.perform_data_cleaning, name='perform_data_cleaning'),
-
+    path('dataset/show_all/', views.all_datasets, name='all_datasets')
 
 ]
 

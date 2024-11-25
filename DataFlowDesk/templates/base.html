@@ -9,6 +9,8 @@
     <link href="{% static 'css/output.css' %}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal">
     <div class="flex h-screen overflow-hidden">
@@ -37,6 +39,16 @@
                         <li>
                             <a href="{% url 'upload_page' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
                                 <span>Upload Dataset</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'all_datasets' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
+                                <span>Show all dataset</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'create_dataset_step1' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
+                                <span>Create Dataset</span>
                             </a>
                         </li>
                     </ul>
