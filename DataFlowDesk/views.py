@@ -156,6 +156,12 @@ import pandas as pd
 from .models import Dataset
 import json
 
+from django.http import JsonResponse
+from django.shortcuts import render
+import pandas as pd
+import json
+from .models import Dataset
+
 def display_dataset(request, id):
     try:
         dataset = Dataset.objects.get(id=id)
@@ -168,31 +174,90 @@ def display_dataset(request, id):
     else:
         data = pd.read_csv(dataset.file_path)
 
-    # Prepare Chart.js data
-    chart_data = {
-        "labels": data[data.columns[0]].tolist(),  # Assume the first column is X-axis labels
-        "datasets": [
+    # Separate numerical and categorical columns
+    numerical_cols = data.select_dtypes(include=['number']).columns
+    categorical_cols = data.select_dtypes(exclude=['number']).columns
+
+    # Visualization logic
+    if data.shape[1] == 2:  # Two columns: scatter or classification
+        chart_type = 'scatter'
+        labels = data[data.columns[0]].tolist()
+        datasets = [
             {
-                "label": f"{data.columns[1]} (Y-axis)",  # Second column is Y-axis
-                "data": data[data.columns[1]].tolist(),  # Y-axis values
+                "label": data.columns[1],
+                "data": data[data.columns[1]].tolist(),
                 "backgroundColor": "rgba(75, 192, 192, 0.2)",
                 "borderColor": "rgba(75, 192, 192, 1)",
                 "borderWidth": 1,
             }
-        ],
-    }
+        ]
+    elif not numerical_cols.empty:  # Focus on numerical data for bar charts
+        chart_type = 'bar'
 
-    # Pass the chart data as JSON to the template
-    chart_data_json = json.dumps(chart_data)
+        # Handle categorical grouping and normalize numerical data
+        if 'Platform' in categorical_cols:  # Example: Group by 'Platform'
+            numeric_data = data[numerical_cols]
+            grouped_data = data.groupby('Platform')[numerical_cols].mean().reset_index()
+            grouped_data[numerical_cols] = grouped_data[numerical_cols].apply(lambda x: x / x.max())  # Normalize data
+            labels = grouped_data['Platform'].tolist()[:10]  # Limit to top 10 categories
+            datasets = [
+                {
+                    "label": col,
+                    "data": grouped_data[col].tolist()[:10],
+                    "backgroundColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 0.6)",
+                    "borderColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 1)",
+                    "borderWidth": 1,
+                }
+                for i, col in enumerate(numerical_cols, start=1)
+            ]
+        else:
+            # Normalize numerical data for individual columns
+            data[numerical_cols] = data[numerical_cols].apply(lambda x: x / x.max())
+            labels = data[data.columns[0]].tolist()[:10]
+            datasets = [
+                {
+                    "label": col,
+                    "data": data[col].tolist()[:10],
+                    "backgroundColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 0.6)",
+                    "borderColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 1)",
+                    "borderWidth": 1,
+                }
+                for i, col in enumerate(numerical_cols[:5], start=1)  # Limit to top 5 numerical columns
+            ]
+    else:  # Fallback to line chart
+        chart_type = 'line'
+        labels = data[data.columns[0]].tolist()[:10]
+        datasets = [
+            {
+                "label": col,
+                "data": data[col].tolist()[:10],
+                "backgroundColor": "rgba(75, 192, 192, 0.2)",
+                "borderColor": "rgba(75, 192, 192, 1)",
+                "borderWidth": 1,
+            }
+            for col in numerical_cols[:5]
+        ]
+
+    # Prepare Chart.js data
+    chart_data = {
+        "type": chart_type,
+        "labels": labels,
+        "datasets": datasets,
+        "x_label": data.columns[0] if not data.columns.empty else "X-Axis",
+        "y_label": "Normalized Values" if 'Platform' in categorical_cols else "Values",
+    }
 
     # Render the template
     return render(request, 'datasets/display_dataset.html', {
         'dataset': dataset,
-        'dataset_data': data.head().values.tolist(),  # Pass the first 5 rows for the table
-        'stats': data.describe().to_dict(),  # Statistics
-        'chart_data': chart_data_json,  # Pass the chart data as JSON
+        'dataset_data': data.head().values.tolist(),
+        'stats': data.describe().to_dict(),
+        'chart_data': json.dumps(chart_data),
         'columns': data.columns,
     })
+
+
+
 
 
 from io import StringIO

@@ -95,30 +95,35 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // Parse the chart data from the view
     const chartData = JSON.parse('{{ chart_data|safe }}');
 
-    // Create the chart
     const ctx = document.getElementById('datasetChart').getContext('2d');
+    const chartType = chartData.type; // Use the chart type from the backend
+
     new Chart(ctx, {
-        type: 'bar',  // Customize the chart type
+        type: chartType,
         data: {
             labels: chartData.labels,
             datasets: chartData.datasets,
         },
         options: {
             responsive: true,
+            plugins: {
+                legend: {
+                    display: chartData.datasets.length > 1,
+                },
+            },
             scales: {
                 x: {
                     title: {
                         display: true,
-                        text: "X-Axis Label",
+                        text: chartData.x_label || "X-Axis",
                     },
                 },
                 y: {
                     title: {
                         display: true,
-                        text: "Y-Axis Label",
+                        text: chartData.y_label || "Y-Axis",
                     },
                 },
             },
@@ -126,7 +131,7 @@
     });
 
     // JavaScript for "Show More" Button
-    var displayedRows = 5;
+    let displayedRows = 5;
 
     document.getElementById('show-more-btn').addEventListener('click', function () {
         fetch("{% url 'display_dataset' dataset.id %}?displayed_rows=" + displayedRows, {
@@ -164,6 +169,10 @@
                 if (nextRows.length < 5) {
                     document.getElementById('show-more-btn').style.display = 'none';
                 }
+            })
+            .catch(error => {
+                console.error('Error fetching additional rows:', error);
+                alert('An error occurred while fetching more rows.');
             });
     });
 
@@ -177,18 +186,16 @@
         })
             .then(response => response.json())
             .then(data => {
-                // Populate cleaning tasks
                 const tasksList = document.getElementById('cleaning-tasks');
                 const proceedButton = document.getElementById('proceed-cleaning-btn');
 
-                tasksList.innerHTML = ''; // Clear previous tasks
+                tasksList.innerHTML = '';
                 data.tasks.forEach(task => {
                     const li = document.createElement('li');
                     li.textContent = task;
                     tasksList.appendChild(li);
                 });
 
-                // Show the popup
                 document.getElementById('clean-data-popup').classList.remove('hidden');
             })
             .catch(error => {
