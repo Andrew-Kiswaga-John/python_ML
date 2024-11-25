@@ -416,7 +416,7 @@ def perform_data_cleaning(request, dataset_id):
             print(f"Dataset with ID {dataset_id} does not exist.")
             return JsonResponse({'error': f"Dataset with ID {dataset_id} does not exist."}, status=404)
 
-        file_path = dataset.file_path.path  # Get the actual file path
+        file_path = dataset.file_path # Get the actual file path
         print(f"File path of the dataset: {file_path}")
 
         try:
