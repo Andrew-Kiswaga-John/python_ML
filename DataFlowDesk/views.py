@@ -386,8 +386,8 @@ def perform_data_cleaning(request, dataset_id):
         # Correctly access the file path for FileField
         file_path = dataset.file_path.path  # This ensures you get the actual file path
 
-        # Debugging: Log the file path and dataset status
-        print(f"Dataset: {dataset.name}, Status: {dataset.status}, File Path: {file_path}")
+        file_path = dataset.file_path # Get the actual file path
+        print(f"File path of the dataset: {file_path}")
 
         # Parse JSON payload
         body = json.loads(request.body)
