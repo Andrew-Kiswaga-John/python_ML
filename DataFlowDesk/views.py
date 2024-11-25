@@ -151,24 +151,20 @@ from .models import Dataset
 
 
 
-def display_dataset(request, id):
-    # Fetch the dataset from the database using the 'id' (default primary key)
-    # dataset = Dataset.objects.get(id=id)
-    # data = pd.read_csv(dataset.file_path)  # Load the dataset from CSV
+from django.http import JsonResponse
+import pandas as pd
+from .models import Dataset
+import json
 
-    # Fetch the dataset from the database using the 'id' (default primary key)
+def display_dataset(request, id):
     try:
         dataset = Dataset.objects.get(id=id)
-        print(f"Dataset fetched successfully: {dataset.name}")
     except Dataset.DoesNotExist:
-        print(f"Dataset with ID {id} does not exist.")
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
 
-    # Check the status of the dataset and fetch the appropriate file path
+    # Load dataset file
     if dataset.status == 'processed':
-        # file_path = os.path.join(settings.MEDIA_ROOT, dataset.cleaned_file)
         data = pd.read_csv(dataset.cleaned_file)
-        print(f"Using cleaned file for dataset: {dataset.cleaned_file}")
     else:
         # data = pd.read_csv(dataset.file_path)
         try:
@@ -178,73 +174,33 @@ def display_dataset(request, id):
                 data = pd.read_csv(dataset.file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
             except Exception as e:
                 return JsonResponse({'error': f'File reading error: {str(e)}'})
-        print(f"Using original file for dataset: {dataset.file_path}")
 
-    # # Load the dataset
-    # try:
-    #     data = pd.read_csv(file_path)
-    #     print(f"Dataset loaded successfully. Shape: {data.shape}")
-    # except Exception as e:
-    #     print(f"Error loading dataset: {str(e)}")
-    #     return JsonResponse({'error': f"Error loading dataset: {str(e)}"}, status=500)
+    # Prepare Chart.js data
+    chart_data = {
+        "labels": data[data.columns[0]].tolist(),  # Assume the first column is X-axis labels
+        "datasets": [
+            {
+                "label": f"{data.columns[1]} (Y-axis)",  # Second column is Y-axis
+                "data": data[data.columns[1]].tolist(),  # Y-axis values
+                "backgroundColor": "rgba(75, 192, 192, 0.2)",
+                "borderColor": "rgba(75, 192, 192, 1)",
+                "borderWidth": 1,
+            }
+        ],
+    }
 
-    # Get the first 5 rows for initial display
-    data_head = data.head()
+    # Pass the chart data as JSON to the template
+    chart_data_json = json.dumps(chart_data)
 
-    # Basic statistics of the dataset
-    stats = data.describe().to_dict()
-
-    # Create a graph using Plotly with custom styling
-    fig = px.scatter(data_frame=data, x=data.columns[0], y=data.columns[1], title="Dataset Scatter Plot")
-    fig.update_layout(
-        title="Dataset Scatter Plot",
-        title_x=0.5,
-        plot_bgcolor='white',
-        paper_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(
-            title=data.columns[0],
-            title_font=dict(size=14),
-            showgrid=True,
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title=data.columns[1],
-            title_font=dict(size=14),
-            showgrid=True,
-            zeroline=False,
-        ),
-        font=dict(
-            family="Arial, sans-serif",
-            size=12,
-            color="gray"
-        ),
-        margin=dict(l=40, r=40, t=40, b=40),
-        hovermode="closest",
-    )
-
-    # Convert the dataset rows to a list of lists (for the first 5 rows)
-    dataset_data = data_head.values.tolist()
-
-    # Handle the "Show More" request via AJAX
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest' and request.method == "GET":
-        # Get the number of rows already displayed (stored in the session or via URL)
-        displayed_rows = int(request.GET.get('displayed_rows', 5))
-
-        # Fetch the next 5 rows
-        next_rows = data.iloc[displayed_rows:displayed_rows+5].values.tolist()
-
-        # Return the next rows as JSON
-        return JsonResponse({'next_rows': next_rows})
-
-    # Render the template with dataset and graph data
+    # Render the template
     return render(request, 'datasets/display_dataset.html', {
         'dataset': dataset,
-        'dataset_data': dataset_data,  # First 5 rows for display
-        'table_html': data_head.to_html(classes='table table-striped', index=False),
-        'stats': stats,
-        'graph_html': fig.to_html(full_html=False),
+        'dataset_data': data.head().values.tolist(),  # Pass the first 5 rows for the table
+        'stats': data.describe().to_dict(),  # Statistics
+        'chart_data': chart_data_json,  # Pass the chart data as JSON
         'columns': data.columns,
     })
+
 
 from io import StringIO
 from django.core.files.base import ContentFile
@@ -350,36 +306,39 @@ def upload_file(request):
 
     return JsonResponse({'error': 'Invalid request method.'})
 
-# Preview the tasks for data cleaning
 def data_cleaning_preview(request, dataset_id):
-    # Fetch dataset from the database (mock example below)
-    dataset = Dataset.objects.get(id=dataset_id)
-    # Check the status of the dataset
-    if dataset.status == 'processed':
-        print("Dataset is already processed. Skipping cleaning tasks.")
-        return JsonResponse({'tasks': ["Dataset already processed"]})
-
-
-    file_path = dataset.file_path
-
+    """
+    Generates a preview of tasks needed for cleaning the dataset.
+    """
     try:
-        # Load the dataset
+        # Fetch dataset from the database
+        dataset = Dataset.objects.get(id=dataset_id)
+
+        # Check if dataset is already processed
+        if dataset.status == 'processed':
+            return JsonResponse({'tasks': ["Dataset already processed"]})
+
+        file_path = dataset.file_path  # Path to the dataset
+
+        # Load dataset
         df = pd.read_csv(file_path, on_bad_lines='skip')
 
-        # Generate cleaning tasks
+        # Identify cleaning tasks
         tasks = []
         if df.isnull().values.any():
             tasks.append(f"Found {df.isnull().sum().sum()} missing values. These will be handled.")
         if df.duplicated().sum() > 0:
             tasks.append(f"Found {df.duplicated().sum()} duplicate rows. These will be removed.")
-        tasks.append(f"Columns with incorrect data types will be converted.")
-        tasks.append(f"Outliers in numerical columns will be treated.")
+        tasks.append("Columns with incorrect data types will be converted.")
+        tasks.append("Outliers in numerical columns will be treated.")
 
         return JsonResponse({'tasks': tasks})
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
     except Exception as e:
         return JsonResponse({'error': f"Error processing file: {str(e)}"}, status=500)
 
-# Perform the actual cleaning
+
 def clean_dataset(df):
     """
     Cleans the dataset:
@@ -388,114 +347,112 @@ def clean_dataset(df):
     - Fills missing categorical values with 'Unknown'.
     - Ensures proper data types for numerical and categorical columns.
     """
-    print("Cleaning dataset...")
-    
+    print("Starting dataset cleaning...")
+
     # Remove duplicates
     initial_rows = df.shape[0]
     df = df.drop_duplicates()
     removed_duplicates = initial_rows - df.shape[0]
     print(f"Removed {removed_duplicates} duplicate rows.")
-    
-    # Fill missing numerical values with mean
-    num_missing_numerical = df.select_dtypes(include=['number']).isnull().sum().sum()
-    print(f"Numerical missing values before filling: {num_missing_numerical}")
-    df.fillna(df.mean(numeric_only=True), inplace=True)
 
-    # Fill missing categorical values with 'Unknown'
-    num_missing_categorical = df.select_dtypes(include=['object']).isnull().sum().sum()
-    print(f"Categorical missing values before filling: {num_missing_categorical}")
-    for col in df.select_dtypes(include=['object']).columns:
-        df.loc[:, col] = df[col].fillna('Unknown').astype(str)  # Explicit use of loc
+    # Handle missing values
+    for col in df.columns:
+        # Debug: Log column name and type
+        print(f"Processing column: {col} (Type: {df[col].dtype})")
 
-    print("Dataset cleaning complete.")
+        # Handle numeric columns
+        if pd.api.types.is_numeric_dtype(df[col]):
+            num_missing = df[col].isnull().sum()
+            if num_missing > 0:
+                print(f"Filling {num_missing} missing values in numerical column '{col}' with mean.")
+                df[col].fillna(df[col].mean(), inplace=True)
+
+        # Handle object/categorical columns
+        elif pd.api.types.is_object_dtype(df[col]):
+            num_missing = df[col].isnull().sum()
+            if num_missing > 0:
+                print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
+                df[col].fillna('Unknown', inplace=True)
+
+        # Handle columns that don't match numeric or object types
+        else:
+            print(f"Skipping column '{col}' as it does not fit numeric or categorical types.")
+
+    print("Dataset cleaning completed.")
     return df
 
 
 def perform_data_cleaning(request, dataset_id):
     """
-    Handles the cleaning of a dataset, including an option to remove the first row.
+    Cleans a dataset, with an option to remove the first row as the header.
     """
-    if request.method == 'POST':
-        print(f"Received POST request for data cleaning. Dataset ID: {dataset_id}")
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
+    try:
         # Fetch the dataset
-        try:
-            dataset = Dataset.objects.get(id=dataset_id)
-            print(f"Dataset fetched successfully: {dataset.name}")
-        except Dataset.DoesNotExist:
-            print(f"Dataset with ID {dataset_id} does not exist.")
-            return JsonResponse({'error': f"Dataset with ID {dataset_id} does not exist."}, status=404)
+        dataset = Dataset.objects.get(id=dataset_id)
 
-        file_path = dataset.file_path # Get the actual file path
+        # Ensure the file path is a string
+        file_path = dataset.file_path.path  # Correctly get the actual file path string
         print(f"File path of the dataset: {file_path}")
 
-        try:
-            # Parse the JSON body to get the user's choice
-            # body = json.loads(request.body)
-            # remove_first_row = body.get('remove_first_row', False)  # Default to False
-            # print(f"Remove first row: {remove_first_row}")
-            try:
-                # Debug: Log the raw body content
-                print(f"Raw request body: {request.body}")
+        # Parse JSON payload
+        body = json.loads(request.body)
+        remove_first_row = body.get('remove_first_row', False)
 
-                # Parse JSON from the request body
-                body = json.loads(request.body)
-                remove_first_row = body.get('remove_first_row', False)
-                print(f"Remove first row: {remove_first_row}")
+        # Debugging: Log the user's choice
+        print(f"Remove first row: {remove_first_row}")
 
-                # (Continue with the rest of the function...)
-                
-            except json.JSONDecodeError as e:
-                print(f"JSON Decode Error: {str(e)}")
-                return JsonResponse({'error': 'Invalid JSON payload received.'}, status=400)
+        # Load dataset
+        df = pd.read_csv(file_path, on_bad_lines='skip')  # Load dataset with error handling
+        print(f"Dataset loaded successfully. Shape: {df.shape}")
 
-            # Load the dataset
-            print("Attempting to load dataset...")
-            df = pd.read_csv(file_path, on_bad_lines='skip')
-            print(f"Dataset loaded successfully. Shape: {df.shape}")
+        # Handle first row as header if requested
+        if remove_first_row:
+            print("Using the first row as column headers and removing it.")
+            df.columns = df.iloc[0]  # Make first row the header
+            df = df[1:].reset_index(drop=True)  # Drop the first row and reset index
 
-            # Remove the first row if requested
-            if remove_first_row:
-                print("Making the first row the header of the dataset.")
-                df.columns = df.iloc[0]  # Set the first row as column names
-                df = df[1:]  # Drop the first row
-                df.reset_index(drop=True, inplace=True)  # Reset the index
-                print("First row has been made the header successfully.")
+        # Perform cleaning
+        cleaned_df = clean_dataset(df)
 
-            # Perform cleaning
-            print("Starting data cleaning process...")
-            cleaned_df = clean_dataset(df)
-            print(f"Data cleaning completed. Cleaned DataFrame shape: {cleaned_df.shape}")
+        # Save the cleaned dataset
+        cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
+        os.makedirs(cleaned_datasets_dir, exist_ok=True)
+        cleaned_file_name = os.path.basename(file_path).replace('.csv', '_cleaned.csv')
+        cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
+        cleaned_df.to_csv(cleaned_file_path, index=False)
 
-            # Create the cleaned datasets folder if it doesn't exist
-            cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
-            os.makedirs(cleaned_datasets_dir, exist_ok=True)
+        # Update the dataset record
+        dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+        dataset.status = 'processed'
+        dataset.save()
 
-            # Generate the path for the cleaned dataset
-            cleaned_file_name = os.path.basename(file_path).replace('.csv', '_cleaned.csv')
-            cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
-            print(f"Saving cleaned dataset to: {cleaned_file_path}")
+        print(f"Cleaned dataset saved successfully. File Path: {cleaned_file_path}")
+        return JsonResponse({'message': 'Data cleaned and saved successfully!'})
 
-            # Save the cleaned dataset
-            cleaned_df.to_csv(cleaned_file_path, index=False)
-
-            # Update the dataset record
-            dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)  # Path relative to MEDIA_ROOT
-            dataset.status = 'processed'  # Update the status
-            dataset.save()
-            print("Cleaned dataset saved successfully and dataset record updated.")
-
-            return JsonResponse({'message': 'Data cleaned and saved successfully!'})
-        except Exception as e:
-            print(f"Error during data cleaning: {str(e)}")
-            return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
-
-    print("Invalid request method. Only POST is allowed.")
-    return JsonResponse({'error': 'Invalid request method.'}, status=400)
-
-
-
+    except Dataset.DoesNotExist:
+        print(f"Dataset with ID {dataset_id} not found.")
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
+    except pd.errors.ParserError as e:
+        print(f"Error parsing CSV: {e}")
+        return JsonResponse({'error': f"Error parsing CSV: {e}"}, status=500)
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error: {str(e)}")
+        return JsonResponse({'error': 'Invalid JSON payload received.'}, status=400)
+    except Exception as e:
+        print(f"Unexpected error during cleaning: {str(e)}")
+        return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
 
 # Function to render the upload.html page
 def upload_page(request):
     return render(request, 'upload.html')
+
+
+
+def all_datasets(request) :
+    dataset = Dataset.objects.all()
+
+    return render(request, "datasets/show_datasets.html", {'dataset' : dataset})
+

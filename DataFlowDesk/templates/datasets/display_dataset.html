@@ -33,37 +33,37 @@
         </table>
     </div>
 
-        <!-- "Show More" Button -->
-        <div class="text-center">
-            <button id="show-more-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-                Show More
-            </button>
+    <!-- "Show More" Button -->
+    <div class="text-center">
+        <button id="show-more-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+            Show More
+        </button>
+    </div>
+
+    <!-- Dataset Stats -->
+    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Statistics</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for stat, values in stats.items %}
+                <div class="bg-gray-50 p-4 rounded-lg shadow-md">
+                    <h4 class="text-lg font-medium text-gray-800">{{ stat|title }}</h4>
+                    <ul class="text-sm text-gray-600">
+                        {% for key, value in values.items %}
+                            <li>{{ key|title }}: {{ value }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
         </div>
-    
-        <!-- Dataset Stats -->
-        <div class="bg-white shadow-md rounded-lg p-6 mb-8">
-            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Statistics</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {% for stat, values in stats.items %}
-                    <div class="bg-gray-50 p-4 rounded-lg shadow-md">
-                        <h4 class="text-lg font-medium text-gray-800">{{ stat|title }}</h4>
-                        <ul class="text-sm text-gray-600">
-                            {% for key, value in values.items %}
-                                <li>{{ key|title }}: {{ value }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                {% endfor %}
-            </div>
+    </div>
+
+    <!-- Chart.js Visualization -->
+    <div class="mb-8">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Visualization</h3>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <canvas id="datasetChart" width="400" height="200"></canvas>
         </div>
-    
-        <!-- Graph Display -->
-        <div class="mb-8">
-            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Graph</h3>
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                {{ graph_html|safe }}  <!-- Render the Plotly graph -->
-            </div>
-        </div>
+    </div>
 
     <!-- Clean Data Button -->
     <div class="mt-6 text-center">
@@ -91,8 +91,83 @@
     </div>
 </div>
 
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-    // Show popup when "Clean Data" button is clicked
+    // Parse the chart data from the view
+    const chartData = JSON.parse('{{ chart_data|safe }}');
+
+    // Create the chart
+    const ctx = document.getElementById('datasetChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',  // Customize the chart type
+        data: {
+            labels: chartData.labels,
+            datasets: chartData.datasets,
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "X-Axis Label",
+                    },
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: "Y-Axis Label",
+                    },
+                },
+            },
+        },
+    });
+
+    // JavaScript for "Show More" Button
+    var displayedRows = 5;
+
+    document.getElementById('show-more-btn').addEventListener('click', function () {
+        fetch("{% url 'display_dataset' dataset.id %}?displayed_rows=" + displayedRows, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                const nextRows = data.next_rows;
+                const tbody = document.getElementById('dataset-body');
+
+                nextRows.forEach(function (row, index) {
+                    const tr = document.createElement('tr');
+                    tr.classList.add('border-b', 'hover:bg-gray-100');
+
+                    const td = document.createElement('td');
+                    td.classList.add('px-6', 'py-3');
+                    td.textContent = displayedRows + index + 1;
+                    tr.appendChild(td);
+
+                    row.forEach(function (value) {
+                        const td = document.createElement('td');
+                        td.classList.add('px-6', 'py-3');
+                        td.textContent = value;
+                        tr.appendChild(td);
+                    });
+
+                    tbody.appendChild(tr);
+                });
+
+                displayedRows += 5;
+
+                if (nextRows.length < 5) {
+                    document.getElementById('show-more-btn').style.display = 'none';
+                }
+            });
+    });
+
+    // JavaScript for "Clean Data" Popup and Proceed Button
     document.getElementById('clean-data-btn').addEventListener('click', function () {
         fetch("{% url 'data_cleaning_preview' dataset.id %}", {
             method: 'GET',
@@ -100,65 +175,54 @@
                 'X-Requested-With': 'XMLHttpRequest',
             }
         })
-        .then(response => response.json())
-        .then(data => {
-            // Populate cleaning tasks
-            const tasksList = document.getElementById('cleaning-tasks');
-            const proceedButton = document.getElementById('proceed-cleaning-btn');
+            .then(response => response.json())
+            .then(data => {
+                // Populate cleaning tasks
+                const tasksList = document.getElementById('cleaning-tasks');
+                const proceedButton = document.getElementById('proceed-cleaning-btn');
 
-            tasksList.innerHTML = ''; // Clear previous tasks
-            data.tasks.forEach(task => {
-                const li = document.createElement('li');
-                li.textContent = task;
-                tasksList.appendChild(li);
+                tasksList.innerHTML = ''; // Clear previous tasks
+                data.tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.textContent = task;
+                    tasksList.appendChild(li);
+                });
+
+                // Show the popup
+                document.getElementById('clean-data-popup').classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Error fetching cleaning tasks:', error);
+                alert('An error occurred while fetching cleaning tasks.');
             });
-
-            // Check if the only task is "Dataset already processed"
-            if (data.tasks.length === 1 && data.tasks[0] === "Dataset already processed") {
-                // Disable the proceed button if already processed
-                proceedButton.disabled = true;
-                proceedButton.title = "Cleaning cannot proceed because the dataset is already processed.";
-                proceedButton.style.backgroundColor = 'grey';
-                proceedButton.style.cursor = 'not-allowed';
-            } else {
-                // Enable the proceed button otherwise
-                proceedButton.disabled = false;
-                proceedButton.title = ""; // Remove any title
-            }
-
-            // Show the popup
-            document.getElementById('clean-data-popup').classList.remove('hidden');
-        })
-        .catch(error => {
-            console.error('Error fetching cleaning tasks:', error);
-            alert('An error occurred while fetching cleaning tasks.');
-        });
     });
 
-    // Proceed with cleaning when "Proceed" button is clicked
     document.getElementById('proceed-cleaning-btn').addEventListener('click', function () {
-        // Ask the user if they want to remove the first row
         const removeFirstRow = confirm("Do you want to remove the first row of the dataset?");
+        
+        const data = JSON.stringify({
+            remove_first_row: removeFirstRow
+        });
 
-        // Proceed with data cleaning
         fetch("{% url 'perform_data_cleaning' dataset.id %}", {
             method: 'POST',
             headers: {
-                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}',
             },
-            body: JSON.stringify({
-            remove_first_row: removeFirstRow // Send user's choice
-            }),
-            })
+            body: data
+        })
             .then(response => response.json())
             .then(data => {
-                alert(data.message); // Show a success message
-                document.getElementById('clean-data-popup').classList.add('hidden'); // Close the popup
-                location.reload(); // Reload the page to show cleaned data
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('An error occurred during data cleaning.');
+                }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error during cleaning:', error);
                 alert('An error occurred during data cleaning.');
             });
     });
@@ -166,55 +230,6 @@
     // Close the popup
     document.getElementById('close-popup-btn').addEventListener('click', function () {
         document.getElementById('clean-data-popup').classList.add('hidden');
-    });
-
-    // JavaScript for "Show More" Button
-    var displayedRows = 5;  // Initial number of rows displayed
-
-    document.getElementById('show-more-btn').addEventListener('click', function() {
-        fetch("{% url 'display_dataset' dataset.id %}?displayed_rows=" + displayedRows, {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Get the next 5 rows from the response
-            var nextRows = data.next_rows;
-            var tbody = document.getElementById('dataset-body');
-            
-            // Loop through the next rows and add them to the table
-            nextRows.forEach(function(row, index) {
-                var tr = document.createElement('tr');
-                tr.classList.add('border-b', 'hover:bg-gray-100');
-
-                // Add the ID column (index + 1 for 1-based index)
-                var td = document.createElement('td');
-                td.classList.add('px-6', 'py-3');
-                td.textContent = displayedRows + index + 1;  // Start from the next row
-                tr.appendChild(td);
-
-                // Add the rest of the data columns
-                row.forEach(function(value) {
-                    var td = document.createElement('td');
-                    td.classList.add('px-6', 'py-3');
-                    td.textContent = value;
-                    tr.appendChild(td);
-                });
-
-                // Append the row to the table body
-                tbody.appendChild(tr);
-            });
-
-            // Update the number of displayed rows
-            displayedRows += 5;
-
-            // If there are no more rows to display, hide the "Show More" button
-            if (nextRows.length < 5) {
-                document.getElementById('show-more-btn').style.display = 'none';
-            }
-        });
     });
 </script>
 {% endblock %}
