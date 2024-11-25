@@ -170,7 +170,14 @@ def display_dataset(request, id):
         data = pd.read_csv(dataset.cleaned_file)
         print(f"Using cleaned file for dataset: {dataset.cleaned_file}")
     else:
-        data = pd.read_csv(dataset.file_path)
+        # data = pd.read_csv(dataset.file_path)
+        try:
+            data = pd.read_csv(dataset.file_path, on_bad_lines='skip')  # Default UTF-8
+        except UnicodeDecodeError:
+            try:
+                data = pd.read_csv(dataset.file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+            except Exception as e:
+                return JsonResponse({'error': f'File reading error: {str(e)}'})
         print(f"Using original file for dataset: {dataset.file_path}")
 
     # # Load the dataset
@@ -286,11 +293,14 @@ def upload_file(request):
                         f.write(chunk)
 
                 # Load the file using pandas
-                if file.name.endswith('.csv'):
+                if file.name.endswith('.csv'):                   
                     try:
-                        df = pd.read_csv(file_path, on_bad_lines='skip')  # Skip problematic lines
-                    except pd.errors.ParserError as e:
-                        return JsonResponse({'error': f'CSV Parsing Error: {str(e)}'})
+                        df = pd.read_csv(file_path, on_bad_lines='skip')  # Default UTF-8
+                    except UnicodeDecodeError:
+                        try:
+                            df = pd.read_csv(file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+                        except Exception as e:
+                            return JsonResponse({'error': f'File reading error: {str(e)}'})
 
                     # Handle cases where the delimiter isn't a comma
                     if df.empty or len(df.columns) == 1:  # Single-column issue
