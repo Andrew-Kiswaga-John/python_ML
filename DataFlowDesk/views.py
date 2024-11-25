@@ -328,6 +328,7 @@ def data_cleaning_preview(request, dataset_id):
     except Exception as e:
         return JsonResponse({'error': f"Error processing file: {str(e)}"}, status=500)
 
+
 def clean_dataset(df):
     """
     Cleans the dataset:
@@ -346,28 +347,26 @@ def clean_dataset(df):
 
     # Handle missing values
     for col in df.columns:
-        # Ensure we are processing a single column (Series)
-        column_series = df[col]
-        
-        # Print column type for debugging
-        print(f"Processing column: {col} (Type: {column_series.dtype})")
+        # Debug: Log column name and type
+        print(f"Processing column: {col} (Type: {df[col].dtype})")
 
-        # Ensure column is treated as a Series before accessing dtype
-        if isinstance(column_series, pd.Series):
-            # Handle numerical columns (int, float)
-            if column_series.dtype in ['int64', 'float64']:  # Numerical columns
-                num_missing = column_series.isnull().sum()
-                if num_missing > 0:
-                    print(f"Filling {num_missing} missing values in numerical column '{col}' with mean.")
-                    df[col].fillna(df[col].mean(), inplace=True)
-            # Handle categorical columns (object type)
-            elif column_series.dtype == 'object':  # Categorical columns
-                num_missing = column_series.isnull().sum()
-                if num_missing > 0:
-                    print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
-                    df[col].fillna('Unknown', inplace=True)
+        # Handle numeric columns
+        if pd.api.types.is_numeric_dtype(df[col]):
+            num_missing = df[col].isnull().sum()
+            if num_missing > 0:
+                print(f"Filling {num_missing} missing values in numerical column '{col}' with mean.")
+                df[col].fillna(df[col].mean(), inplace=True)
+
+        # Handle object/categorical columns
+        elif pd.api.types.is_object_dtype(df[col]):
+            num_missing = df[col].isnull().sum()
+            if num_missing > 0:
+                print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
+                df[col].fillna('Unknown', inplace=True)
+
+        # Handle columns that don't match numeric or object types
         else:
-            print(f"Error: Column {col} is not a valid Series!")
+            print(f"Skipping column '{col}' as it does not fit numeric or categorical types.")
 
     print("Dataset cleaning completed.")
     return df
@@ -383,10 +382,9 @@ def perform_data_cleaning(request, dataset_id):
     try:
         # Fetch the dataset
         dataset = Dataset.objects.get(id=dataset_id)
-        # Correctly access the file path for FileField
-        file_path = dataset.file_path.path  # This ensures you get the actual file path
 
-        file_path = dataset.file_path # Get the actual file path
+        # Ensure the file path is a string
+        file_path = dataset.file_path.path  # Correctly get the actual file path string
         print(f"File path of the dataset: {file_path}")
 
         # Parse JSON payload
@@ -402,6 +400,7 @@ def perform_data_cleaning(request, dataset_id):
 
         # Handle first row as header if requested
         if remove_first_row:
+            print("Using the first row as column headers and removing it.")
             df.columns = df.iloc[0]  # Make first row the header
             df = df[1:].reset_index(drop=True)  # Drop the first row and reset index
 
@@ -435,7 +434,6 @@ def perform_data_cleaning(request, dataset_id):
     except Exception as e:
         print(f"Unexpected error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
-
 
 # Function to render the upload.html page
 def upload_page(request):
