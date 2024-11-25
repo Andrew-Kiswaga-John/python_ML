@@ -57,14 +57,6 @@
         </div>
     </div>
 
-    <!-- Chart.js Visualization -->
-    <div class="mb-8">
-        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Visualization</h3>
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <canvas id="datasetChart" width="400" height="200"></canvas>
-        </div>
-    </div>
-
     <!-- Clean Data Button -->
     <div class="mt-6 text-center">
         <button id="clean-data-btn" class="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all">
@@ -72,7 +64,14 @@
         </button>
     </div>
 
-    <!-- Clean Data Popup -->
+    <!-- Normalize Data Button -->
+    <div class="mt-6 text-center">
+        <button id="normalize-data-btn" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
+            Normalize Data
+        </button>
+    </div>
+
+    <!-- Data Cleaning Popup -->
     <div id="clean-data-popup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
         <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-2/3 lg:w-1/2">
             <h3 class="text-2xl font-semibold text-gray-900 mb-4">Data Cleaning & Preprocessing</h3>
@@ -89,47 +88,27 @@
             </div>
         </div>
     </div>
+
+    <!-- Normalize Data Popup -->
+    <div id="normalize-data-popup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-2/3 lg:w-1/2">
+            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Data Normalization</h3>
+            <p class="text-sm text-gray-700 mb-6">Do you want to normalize the dataset? You can choose from Min-Max or Z-Score normalization.</p>
+            <div class="text-center">
+                <button id="proceed-normalization-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+                    Proceed
+                </button>
+                <button id="close-normalization-popup-btn" class="ml-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Include Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    const chartData = JSON.parse('{{ chart_data|safe }}');
-
-    const ctx = document.getElementById('datasetChart').getContext('2d');
-    const chartType = chartData.type; // Use the chart type from the backend
-
-    new Chart(ctx, {
-        type: chartType,
-        data: {
-            labels: chartData.labels,
-            datasets: chartData.datasets,
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: chartData.datasets.length > 1,
-                },
-            },
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: chartData.x_label || "X-Axis",
-                    },
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: chartData.y_label || "Y-Axis",
-                    },
-                },
-            },
-        },
-    });
-
     // JavaScript for "Show More" Button
     let displayedRows = 5;
 
@@ -229,14 +208,44 @@
                 }
             })
             .catch(error => {
-                console.error('Error during cleaning:', error);
+                console.error('Error cleaning data:', error);
                 alert('An error occurred during data cleaning.');
             });
     });
 
-    // Close the popup
     document.getElementById('close-popup-btn').addEventListener('click', function () {
         document.getElementById('clean-data-popup').classList.add('hidden');
+    });
+
+    // JavaScript for "Normalize Data" Popup
+    document.getElementById('normalize-data-btn').addEventListener('click', function () {
+        document.getElementById('normalize-data-popup').classList.remove('hidden');
+    });
+
+    document.getElementById('close-normalization-popup-btn').addEventListener('click', function () {
+        document.getElementById('normalize-data-popup').classList.add('hidden');
+    });
+
+    document.getElementById('proceed-normalization-btn').addEventListener('click', function () {
+        fetch("{% url 'perform_data_normalization' dataset.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('An error occurred during data normalization.');
+                }
+            })
+            .catch(error => {
+                console.error('Error normalizing data:', error);
+                alert('An error occurred during data normalization.');
+            });
     });
 </script>
 {% endblock %}

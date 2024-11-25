@@ -174,89 +174,17 @@ def display_dataset(request, id):
     else:
         data = pd.read_csv(dataset.file_path)
 
-    # Separate numerical and categorical columns
-    numerical_cols = data.select_dtypes(include=['number']).columns
-    categorical_cols = data.select_dtypes(exclude=['number']).columns
-
-    # Visualization logic
-    if data.shape[1] == 2:  # Two columns: scatter or classification
-        chart_type = 'scatter'
-        labels = data[data.columns[0]].tolist()
-        datasets = [
-            {
-                "label": data.columns[1],
-                "data": data[data.columns[1]].tolist(),
-                "backgroundColor": "rgba(75, 192, 192, 0.2)",
-                "borderColor": "rgba(75, 192, 192, 1)",
-                "borderWidth": 1,
-            }
-        ]
-    elif not numerical_cols.empty:  # Focus on numerical data for bar charts
-        chart_type = 'bar'
-
-        # Handle categorical grouping and normalize numerical data
-        if 'Platform' in categorical_cols:  # Example: Group by 'Platform'
-            numeric_data = data[numerical_cols]
-            grouped_data = data.groupby('Platform')[numerical_cols].mean().reset_index()
-            grouped_data[numerical_cols] = grouped_data[numerical_cols].apply(lambda x: x / x.max())  # Normalize data
-            labels = grouped_data['Platform'].tolist()[:10]  # Limit to top 10 categories
-            datasets = [
-                {
-                    "label": col,
-                    "data": grouped_data[col].tolist()[:10],
-                    "backgroundColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 0.6)",
-                    "borderColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 1)",
-                    "borderWidth": 1,
-                }
-                for i, col in enumerate(numerical_cols, start=1)
-            ]
-        else:
-            # Normalize numerical data for individual columns
-            data[numerical_cols] = data[numerical_cols].apply(lambda x: x / x.max())
-            labels = data[data.columns[0]].tolist()[:10]
-            datasets = [
-                {
-                    "label": col,
-                    "data": data[col].tolist()[:10],
-                    "backgroundColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 0.6)",
-                    "borderColor": f"rgba({i * 30}, {i * 50}, {i * 70}, 1)",
-                    "borderWidth": 1,
-                }
-                for i, col in enumerate(numerical_cols[:5], start=1)  # Limit to top 5 numerical columns
-            ]
-    else:  # Fallback to line chart
-        chart_type = 'line'
-        labels = data[data.columns[0]].tolist()[:10]
-        datasets = [
-            {
-                "label": col,
-                "data": data[col].tolist()[:10],
-                "backgroundColor": "rgba(75, 192, 192, 0.2)",
-                "borderColor": "rgba(75, 192, 192, 1)",
-                "borderWidth": 1,
-            }
-            for col in numerical_cols[:5]
-        ]
-
-    # Prepare Chart.js data
-    chart_data = {
-        "type": chart_type,
-        "labels": labels,
-        "datasets": datasets,
-        "x_label": data.columns[0] if not data.columns.empty else "X-Axis",
-        "y_label": "Normalized Values" if 'Platform' in categorical_cols else "Values",
-    }
+    # Prepare data for display
+    dataset_preview = data.head(10).values.tolist()  # Show the first 10 rows
+    columns = data.columns.tolist()
 
     # Render the template
     return render(request, 'datasets/display_dataset.html', {
         'dataset': dataset,
-        'dataset_data': data.head().values.tolist(),
-        'stats': data.describe().to_dict(),
-        'chart_data': json.dumps(chart_data),
-        'columns': data.columns,
+        'dataset_data': dataset_preview,
+        'columns': columns,
+        'stats': data.describe().to_dict(),  # Optional summary statistics
     })
-
-
 
 
 
@@ -499,6 +427,51 @@ def perform_data_cleaning(request, dataset_id):
     except Exception as e:
         print(f"Unexpected error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
+
+
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from .models import Dataset
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from django.utils.timezone import now
+from django.utils.timezone import now
+
+from sklearn.preprocessing import MinMaxScaler
+from django.utils.timezone import now
+
+def perform_data_normalization(request, dataset_id):
+    # Ensure only POST requests are allowed for normalization
+    if request.method == 'POST':
+        dataset = Dataset.objects.get(id=dataset_id)
+        
+        # Access the actual file path using .path
+        file_path = dataset.file_path.path
+        
+        # Load the dataset
+        df = pd.read_csv(file_path)  # Adjust this line based on how your dataset is stored
+        
+        # Assuming you want to normalize all numerical columns
+        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+        
+        # Perform Min-Max normalization (scale values between 0 and 1)
+        scaler = MinMaxScaler()
+        df[numeric_columns] = scaler.fit_transform(df[numeric_columns])
+        
+        # Save to a new file with a timestamp to avoid overwriting
+        new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
+        df.to_csv(new_file_path, index=False)  # Save with a new name
+        
+        # Optionally, you can update the dataset object with the new file path
+        dataset.file_path = new_file_path
+        dataset.save()
+        
+        # Optionally, return a message to the frontend
+        return JsonResponse({'message': f'Data normalized successfully. Saved as {new_file_path}'})
+    else:
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+
 
 # Function to render the upload.html page
 def upload_page(request):
