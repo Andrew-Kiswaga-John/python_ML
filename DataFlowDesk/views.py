@@ -452,11 +452,10 @@ import json
 import pandas as pd
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset
-
-import json
 import pandas as pd
+import json
 from django.shortcuts import render, get_object_or_404
-from .models import Dataset
+from .models import Dataset  # Adjust based on your actual model import
 
 def create_graphs(request, dataset_id):
     # Fetch the dataset
@@ -474,12 +473,19 @@ def create_graphs(request, dataset_id):
             data_values = df[col].dropna()
             if len(data_values) > 10:  # Avoid charts for too small datasets
                 bin_count = min(10, len(data_values) // 5)  # Dynamically adjust bin count
+                # Create dynamic bins based on data range
+                bins = pd.cut(data_values, bins=bin_count)
+                bin_labels = [f"{int(bin.left)}-{int(bin.right)}" for bin in bins.cat.categories]
+                
+                # Group by bins and count occurrences
+                binned_data = data_values.groupby(bins).size().tolist()
+
                 chart_data = {
                     'type': 'bar',  # Could also use 'histogram' or 'line' based on dataset
                     'data': json.dumps({
-                        'labels': [str(i) for i in range(1, bin_count + 1)],  # Example bins
+                        'labels': bin_labels,  # Label bins dynamically
                         'datasets': [{
-                            'data': data_values.groupby(pd.cut(data_values, bins=bin_count)).size().tolist(),
+                            'data': binned_data,
                             'backgroundColor': 'rgba(54, 162, 235, 0.2)',
                             'borderColor': 'rgba(54, 162, 235, 1)',
                             'borderWidth': 1,
