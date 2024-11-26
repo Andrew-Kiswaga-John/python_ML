@@ -57,6 +57,8 @@
         </div>
     </div>
 
+    <a href="{% url 'create_graph' dataset.id %}" class="btn btn-primary">Create Graphs</a>
+
     <!-- Clean Data Button -->
     <div class="mt-6 text-center">
         <button id="clean-data-btn" class="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all">
@@ -69,6 +71,7 @@
         <button id="normalize-data-btn" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
             Normalize Data
         </button>
+
     </div>
 
     <!-- Data Cleaning Popup -->
@@ -85,7 +88,9 @@
                 <button id="close-popup-btn" class="ml-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
                     Cancel
                 </button>
+
             </div>
+
         </div>
     </div>
 
@@ -107,6 +112,7 @@
 </div>
 
 <!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     // JavaScript for "Show More" Button

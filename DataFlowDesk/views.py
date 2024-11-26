@@ -366,9 +366,6 @@ def clean_dataset(df):
 
 
 def perform_data_cleaning(request, dataset_id):
-    """
-    Cleans a dataset, with an option to remove the first row as the header.
-    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
@@ -376,57 +373,34 @@ def perform_data_cleaning(request, dataset_id):
         # Fetch the dataset
         dataset = Dataset.objects.get(id=dataset_id)
 
-        # Ensure the file path is a string
-        file_path = dataset.file_path.path  # Correctly get the actual file path string
-        print(f"File path of the dataset: {file_path}")
-
-        # Parse JSON payload
-        body = json.loads(request.body)
-        remove_first_row = body.get('remove_first_row', False)
-
-        # Debugging: Log the user's choice
-        print(f"Remove first row: {remove_first_row}")
+        file_path = dataset.file_path.path  # Get the file path
 
         # Load dataset
-        df = pd.read_csv(file_path, on_bad_lines='skip')  # Load dataset with error handling
-        print(f"Dataset loaded successfully. Shape: {df.shape}")
-
-        # Handle first row as header if requested
-        if remove_first_row:
-            print("Using the first row as column headers and removing it.")
-            df.columns = df.iloc[0]  # Make first row the header
-            df = df[1:].reset_index(drop=True)  # Drop the first row and reset index
+        df = pd.read_csv(file_path, on_bad_lines='skip')
 
         # Perform cleaning
         cleaned_df = clean_dataset(df)
 
-        # Save the cleaned dataset
+        # Save the cleaned dataset with a new name
         cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
         os.makedirs(cleaned_datasets_dir, exist_ok=True)
         cleaned_file_name = os.path.basename(file_path).replace('.csv', '_cleaned.csv')
         cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
         cleaned_df.to_csv(cleaned_file_path, index=False)
 
-        # Update the dataset record
+        # Update the dataset object to reflect the cleaned dataset
         dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
         dataset.status = 'processed'
         dataset.save()
 
-        print(f"Cleaned dataset saved successfully. File Path: {cleaned_file_path}")
         return JsonResponse({'message': 'Data cleaned and saved successfully!'})
 
     except Dataset.DoesNotExist:
-        print(f"Dataset with ID {dataset_id} not found.")
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
-    except pd.errors.ParserError as e:
-        print(f"Error parsing CSV: {e}")
-        return JsonResponse({'error': f"Error parsing CSV: {e}"}, status=500)
-    except json.JSONDecodeError as e:
-        print(f"JSON Decode Error: {str(e)}")
-        return JsonResponse({'error': 'Invalid JSON payload received.'}, status=400)
     except Exception as e:
-        print(f"Unexpected error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
+
+
 
 
 from django.shortcuts import render, redirect
@@ -471,6 +445,71 @@ def perform_data_normalization(request, dataset_id):
     else:
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
+from django.shortcuts import render, get_object_or_404
+
+
+import json
+import pandas as pd
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
+
+import json
+import pandas as pd
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
+
+def create_graphs(request, dataset_id):
+    # Fetch the dataset
+    dataset = get_object_or_404(Dataset, id=dataset_id)
+    file_path = dataset.file_path.path
+    df = pd.read_csv(file_path)
+
+    charts = []
+
+    # Line chart for numeric columns (using histograms or bar charts for numerical columns)
+    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+    if not numeric_columns.empty:
+        for col in numeric_columns:
+            # Generate a histogram for numerical data
+            data_values = df[col].dropna()
+            if len(data_values) > 10:  # Avoid charts for too small datasets
+                bin_count = min(10, len(data_values) // 5)  # Dynamically adjust bin count
+                chart_data = {
+                    'type': 'bar',  # Could also use 'histogram' or 'line' based on dataset
+                    'data': json.dumps({
+                        'labels': [str(i) for i in range(1, bin_count + 1)],  # Example bins
+                        'datasets': [{
+                            'data': data_values.groupby(pd.cut(data_values, bins=bin_count)).size().tolist(),
+                            'backgroundColor': 'rgba(54, 162, 235, 0.2)',
+                            'borderColor': 'rgba(54, 162, 235, 1)',
+                            'borderWidth': 1,
+                        }],
+                    }),
+                    'title': f'Numeric Distribution: {col}',
+                }
+                charts.append(chart_data)
+
+    # Pie charts for categorical columns (excluding columns with too many unique values or message columns)
+    categorical_columns = df.select_dtypes(include=['object']).columns
+    for col in categorical_columns:
+        unique_count = df[col].nunique()
+        # Skip columns with too many unique values (e.g., a message column with unique text per row)
+        if unique_count > 1 and unique_count < 30:  # Set a threshold for unique categories
+            value_counts = df[col].value_counts()
+            charts.append({
+                'type': 'pie',
+                'data': json.dumps({
+                    'labels': value_counts.index.tolist(),
+                    'datasets': [{
+                        'data': value_counts.values.tolist(),
+                        'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56'] * (len(value_counts) // 3 + 1),
+                    }]
+                }),
+                'title': f'Category Distribution: {col}',
+            })
+
+    # Render the template with the charts
+    return render(request, 'graphs.html', {'charts': charts})
 
 
 # Function to render the upload.html page
