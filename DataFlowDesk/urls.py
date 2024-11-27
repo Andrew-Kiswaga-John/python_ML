@@ -18,9 +18,7 @@ urlpatterns = [
     path('dataset/<int:dataset_id>/cleaning_preview/', views.data_cleaning_preview, name='data_cleaning_preview'),
     path('dataset/<int:dataset_id>/perform_cleaning/', views.perform_data_cleaning, name='perform_data_cleaning'),
     path('perform_data_normalization/<int:dataset_id>/', views.perform_data_normalization, name='perform_data_normalization'),
-    path('perform_data_normalization/<int:dataset_id>/', views.perform_data_normalization, name='perform_data_normalization'),
-    path('create_graphs/<int:dataset_id>/', views.create_graphs, name='create_graph'),
-    path('graphs/<int:dataset_id>/', views.create_graphs, name='create_graph'),
+    path('dataset/<int:id>/graphs/', views.display_graphs, name='display_graphs'),
 
     path('dataset/show_all/', views.all_datasets, name='all_datasets')
 

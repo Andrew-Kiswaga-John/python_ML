@@ -402,7 +402,6 @@ def perform_data_cleaning(request, dataset_id):
 
 
 
-
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Dataset
@@ -457,65 +456,61 @@ import json
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset  # Adjust based on your actual model import
 
-def create_graphs(request, dataset_id):
-    # Fetch the dataset
-    dataset = get_object_or_404(Dataset, id=dataset_id)
-    file_path = dataset.file_path.path
-    df = pd.read_csv(file_path)
+from django.shortcuts import render, get_object_or_404
+import pandas as pd
+import json
+from collections import defaultdict
 
-    charts = []
+import matplotlib.pyplot as plt
 
-    # Line chart for numeric columns (using histograms or bar charts for numerical columns)
-    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
-    if not numeric_columns.empty:
-        for col in numeric_columns:
-            # Generate a histogram for numerical data
-            data_values = df[col].dropna()
-            if len(data_values) > 10:  # Avoid charts for too small datasets
-                bin_count = min(10, len(data_values) // 5)  # Dynamically adjust bin count
-                # Create dynamic bins based on data range
-                bins = pd.cut(data_values, bins=bin_count)
-                bin_labels = [f"{int(bin.left)}-{int(bin.right)}" for bin in bins.cat.categories]
-                
-                # Group by bins and count occurrences
-                binned_data = data_values.groupby(bins).size().tolist()
+from django.shortcuts import render, get_object_or_404
+import pandas as pd
+import json
+import numpy as np
+from collections import Counter
 
-                chart_data = {
-                    'type': 'bar',  # Could also use 'histogram' or 'line' based on dataset
-                    'data': json.dumps({
-                        'labels': bin_labels,  # Label bins dynamically
-                        'datasets': [{
-                            'data': binned_data,
-                            'backgroundColor': 'rgba(54, 162, 235, 0.2)',
-                            'borderColor': 'rgba(54, 162, 235, 1)',
-                            'borderWidth': 1,
-                        }],
-                    }),
-                    'title': f'Numeric Distribution: {col}',
-                }
-                charts.append(chart_data)
+def generate_colors(n):
+    """Generates a list of n visually distinct colors."""
+    import numpy as np
+    import matplotlib.colors as mcolors
+    colors = list(mcolors.CSS4_COLORS.values())
+    if n > len(colors):  # Repeat colors if necessary
+        colors *= (n // len(colors)) + 1
+    np.random.shuffle(colors)
+    return colors[:n]
 
-    # Pie charts for categorical columns (excluding columns with too many unique values or message columns)
-    categorical_columns = df.select_dtypes(include=['object']).columns
-    for col in categorical_columns:
-        unique_count = df[col].nunique()
-        # Skip columns with too many unique values (e.g., a message column with unique text per row)
-        if unique_count > 1 and unique_count < 30:  # Set a threshold for unique categories
-            value_counts = df[col].value_counts()
-            charts.append({
-                'type': 'pie',
-                'data': json.dumps({
-                    'labels': value_counts.index.tolist(),
-                    'datasets': [{
-                        'data': value_counts.values.tolist(),
-                        'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56'] * (len(value_counts) // 3 + 1),
-                    }]
-                }),
-                'title': f'Category Distribution: {col}',
-            })
+def display_graphs(request, id):
+    try:
+        dataset = Dataset.objects.get(id=id)
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
 
-    # Render the template with the charts
-    return render(request, 'graphs.html', {'charts': charts})
+    if dataset.status == 'processed':
+        data = pd.read_csv(dataset.cleaned_file)
+    else:
+        data = pd.read_csv(dataset.file_path)
+
+    # Determine column types
+    column_types = {}
+    for column in data.columns:
+        if pd.api.types.is_numeric_dtype(data[column]):
+            if data[column].dtype == 'int64':
+                column_types[column] = 'discrete'
+            else:
+                column_types[column] = 'continuous'
+        else:
+            column_types[column] = 'categorical'
+
+    dataset_data = data.head(100).values.tolist()
+    columns = data.columns.tolist()
+
+    return render(request, 'graphs.html', {
+        'dataset': dataset,
+        'dataset_data': json.dumps(dataset_data),
+        'columns': json.dumps(columns),
+        'column_types': json.dumps(column_types),
+    })
+
 
 
 # Function to render the upload.html page
