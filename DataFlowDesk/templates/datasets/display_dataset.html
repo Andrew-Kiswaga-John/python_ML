@@ -74,7 +74,25 @@
     </div>
 
 
+    <!-- Data Cleaning Popup -->
+    <div id="clean-data-popup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-2/3 lg:w-1/2">
+            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Data Cleaning & Preprocessing</h3>
+            <ul id="cleaning-tasks" class="text-sm text-gray-700 mb-6">
+                <!-- Tasks will be dynamically populated -->
+            </ul>
+            <div class="text-center">
+                <button id="proceed-cleaning-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+                    Proceed
+                </button>
+                <button id="close-popup-btn" class="ml-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
+                    Cancel
+                </button>
 
+            </div>
+
+        </div>
+    </div>
 
 
     <!-- Normalize Data Button -->
@@ -94,31 +112,52 @@
 
     // JavaScript for "Clean Data" Popup and Proceed Button
     document.getElementById('clean-data-btn').addEventListener('click', function () {
-        fetch("{% url 'data_cleaning_preview' dataset.id %}", {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                const tasksList = document.getElementById('cleaning-tasks');
-                const proceedButton = document.getElementById('proceed-cleaning-btn');
+    fetch("{% url 'data_cleaning_preview' dataset.id %}", {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Populate cleaning tasks
+        const tasksList = document.getElementById('cleaning-tasks');
+        const proceedButton = document.getElementById('proceed-cleaning-btn');
 
-                tasksList.innerHTML = '';
-                data.tasks.forEach(task => {
-                    const li = document.createElement('li');
-                    li.textContent = task;
-                    tasksList.appendChild(li);
-                });
+        tasksList.innerHTML = ''; // Clear previous tasks
+        data.tasks.forEach(task => {
+            const li = document.createElement('li');
+            li.textContent = task;
+            tasksList.appendChild(li);
+        });
 
-                document.getElementById('clean-data-popup').classList.remove('hidden');
-            })
-            .catch(error => {
-                console.error('Error fetching cleaning tasks:', error);
-                alert('An error occurred while fetching cleaning tasks.');
-            });
+        // Check if the only task is "Dataset already processed"
+        if (data.tasks.length === 1 && data.tasks[0] === "Dataset already processed") {
+            // Disable the proceed button if already processed
+            proceedButton.disabled = true;
+            proceedButton.title = "Cleaning cannot proceed because the dataset is already processed.";
+
+            // Change the button color to grey when disabled
+            proceedButton.style.backgroundColor = 'grey';
+            proceedButton.style.cursor = 'not-allowed'; // Change the cursor to indicate it's disabled
+        } else {
+            // Enable the proceed button otherwise
+            proceedButton.disabled = false;
+            proceedButton.title = ""; // Remove any title
+
+            // Reset the button color and cursor
+            proceedButton.style.backgroundColor = ''; // Reset to default button color
+            proceedButton.style.cursor = ''; // Reset cursor
+        }
+
+        // Show the popup
+        document.getElementById('clean-data-popup').classList.remove('hidden');
+    })
+    .catch(error => {
+        console.error('Error fetching cleaning tasks:', error);
+        alert('An error occurred while fetching cleaning tasks.');
     });
+});
 
     document.getElementById('proceed-cleaning-btn').addEventListener('click', function () {
         const removeFirstRow = confirm("Do you want to remove the first row of the dataset?");
