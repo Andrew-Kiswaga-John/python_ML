@@ -156,6 +156,12 @@ import pandas as pd
 from .models import Dataset
 import json
 
+from django.http import JsonResponse
+from django.shortcuts import render
+import pandas as pd
+import json
+from .models import Dataset
+
 def display_dataset(request, id):
     try:
         dataset = Dataset.objects.get(id=id)
@@ -175,31 +181,18 @@ def display_dataset(request, id):
             except Exception as e:
                 return JsonResponse({'error': f'File reading error: {str(e)}'})
 
-    # Prepare Chart.js data
-    chart_data = {
-        "labels": data[data.columns[0]].tolist(),  # Assume the first column is X-axis labels
-        "datasets": [
-            {
-                "label": f"{data.columns[1]} (Y-axis)",  # Second column is Y-axis
-                "data": data[data.columns[1]].tolist(),  # Y-axis values
-                "backgroundColor": "rgba(75, 192, 192, 0.2)",
-                "borderColor": "rgba(75, 192, 192, 1)",
-                "borderWidth": 1,
-            }
-        ],
-    }
-
-    # Pass the chart data as JSON to the template
-    chart_data_json = json.dumps(chart_data)
+    # Prepare data for display
+    dataset_preview = data.head(10).values.tolist()  # Show the first 10 rows
+    columns = data.columns.tolist()
 
     # Render the template
     return render(request, 'datasets/display_dataset.html', {
         'dataset': dataset,
-        'dataset_data': data.head().values.tolist(),  # Pass the first 5 rows for the table
-        'stats': data.describe().to_dict(),  # Statistics
-        'chart_data': chart_data_json,  # Pass the chart data as JSON
-        'columns': data.columns,
+        'dataset_data': dataset_preview,
+        'columns': columns,
+        'stats': data.describe().to_dict(),  # Optional summary statistics
     })
+
 
 
 from io import StringIO
@@ -383,9 +376,6 @@ def clean_dataset(df):
 
 
 def perform_data_cleaning(request, dataset_id):
-    """
-    Cleans a dataset, with an option to remove the first row as the header.
-    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
@@ -393,57 +383,145 @@ def perform_data_cleaning(request, dataset_id):
         # Fetch the dataset
         dataset = Dataset.objects.get(id=dataset_id)
 
-        # Ensure the file path is a string
-        file_path = dataset.file_path.path  # Correctly get the actual file path string
-        print(f"File path of the dataset: {file_path}")
-
-        # Parse JSON payload
-        body = json.loads(request.body)
-        remove_first_row = body.get('remove_first_row', False)
-
-        # Debugging: Log the user's choice
-        print(f"Remove first row: {remove_first_row}")
+        file_path = dataset.file_path.path  # Get the file path
 
         # Load dataset
-        df = pd.read_csv(file_path, on_bad_lines='skip')  # Load dataset with error handling
-        print(f"Dataset loaded successfully. Shape: {df.shape}")
-
-        # Handle first row as header if requested
-        if remove_first_row:
-            print("Using the first row as column headers and removing it.")
-            df.columns = df.iloc[0]  # Make first row the header
-            df = df[1:].reset_index(drop=True)  # Drop the first row and reset index
+        df = pd.read_csv(file_path, on_bad_lines='skip')
 
         # Perform cleaning
         cleaned_df = clean_dataset(df)
 
-        # Save the cleaned dataset
+        # Save the cleaned dataset with a new name
         cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
         os.makedirs(cleaned_datasets_dir, exist_ok=True)
         cleaned_file_name = os.path.basename(file_path).replace('.csv', '_cleaned.csv')
         cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
         cleaned_df.to_csv(cleaned_file_path, index=False)
 
-        # Update the dataset record
+        # Update the dataset object to reflect the cleaned dataset
         dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
         dataset.status = 'processed'
         dataset.save()
 
-        print(f"Cleaned dataset saved successfully. File Path: {cleaned_file_path}")
         return JsonResponse({'message': 'Data cleaned and saved successfully!'})
 
     except Dataset.DoesNotExist:
-        print(f"Dataset with ID {dataset_id} not found.")
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
-    except pd.errors.ParserError as e:
-        print(f"Error parsing CSV: {e}")
-        return JsonResponse({'error': f"Error parsing CSV: {e}"}, status=500)
-    except json.JSONDecodeError as e:
-        print(f"JSON Decode Error: {str(e)}")
-        return JsonResponse({'error': 'Invalid JSON payload received.'}, status=400)
     except Exception as e:
-        print(f"Unexpected error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
+
+
+
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from .models import Dataset
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from django.utils.timezone import now
+from django.utils.timezone import now
+
+from sklearn.preprocessing import MinMaxScaler
+from django.utils.timezone import now
+
+def perform_data_normalization(request, dataset_id):
+    # Ensure only POST requests are allowed for normalization
+    if request.method == 'POST':
+        dataset = Dataset.objects.get(id=dataset_id)
+        
+        # Access the actual file path using .path
+        file_path = dataset.file_path.path
+        
+        # Load the dataset
+        df = pd.read_csv(file_path)  # Adjust this line based on how your dataset is stored
+        
+        # Assuming you want to normalize all numerical columns
+        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+        
+        # Perform Min-Max normalization (scale values between 0 and 1)
+        scaler = MinMaxScaler()
+        df[numeric_columns] = scaler.fit_transform(df[numeric_columns])
+        
+        # Save to a new file with a timestamp to avoid overwriting
+        new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
+        df.to_csv(new_file_path, index=False)  # Save with a new name
+        
+        # Optionally, you can update the dataset object with the new file path
+        dataset.file_path = new_file_path
+        dataset.save()
+        
+        # Optionally, return a message to the frontend
+        return JsonResponse({'message': f'Data normalized successfully. Saved as {new_file_path}'})
+    else:
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+from django.shortcuts import render, get_object_or_404
+
+
+import json
+import pandas as pd
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
+import pandas as pd
+import json
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset  # Adjust based on your actual model import
+
+from django.shortcuts import render, get_object_or_404
+import pandas as pd
+import json
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
+
+from django.shortcuts import render, get_object_or_404
+import pandas as pd
+import json
+import numpy as np
+from collections import Counter
+
+def generate_colors(n):
+    """Generates a list of n visually distinct colors."""
+    import numpy as np
+    import matplotlib.colors as mcolors
+    colors = list(mcolors.CSS4_COLORS.values())
+    if n > len(colors):  # Repeat colors if necessary
+        colors *= (n // len(colors)) + 1
+    np.random.shuffle(colors)
+    return colors[:n]
+
+def display_graphs(request, id):
+    try:
+        dataset = Dataset.objects.get(id=id)
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
+
+    if dataset.status == 'processed':
+        data = pd.read_csv(dataset.cleaned_file)
+    else:
+        data = pd.read_csv(dataset.file_path)
+
+    # Determine column types
+    column_types = {}
+    for column in data.columns:
+        if pd.api.types.is_numeric_dtype(data[column]):
+            if data[column].dtype == 'int64':
+                column_types[column] = 'discrete'
+            else:
+                column_types[column] = 'continuous'
+        else:
+            column_types[column] = 'categorical'
+
+    dataset_data = data.head(100).values.tolist()
+    columns = data.columns.tolist()
+
+    return render(request, 'graphs.html', {
+        'dataset': dataset,
+        'dataset_data': json.dumps(dataset_data),
+        'columns': json.dumps(columns),
+        'column_types': json.dumps(column_types),
+    })
+
+
 
 # Function to render the upload.html page
 def upload_page(request):

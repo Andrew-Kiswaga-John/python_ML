@@ -57,13 +57,14 @@
         </div>
     </div>
 
-    <!-- Chart.js Visualization -->
-    <div class="mb-8">
-        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Visualization</h3>
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <canvas id="datasetChart" width="400" height="200"></canvas>
-        </div>
+
+    <!-- "Create Graphs" Button -->
+    <div class="text-center">
+        <a href="{% url 'display_graphs' dataset.id %}" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+            Create Graphs
+        </a>
     </div>
+
 
     <!-- Clean Data Button -->
     <div class="mt-6 text-center">
@@ -72,61 +73,92 @@
         </button>
     </div>
 
-    <!-- Clean Data Popup -->
-    <div id="clean-data-popup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-2/3 lg:w-1/2">
-            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Data Cleaning & Preprocessing</h3>
-            <ul id="cleaning-tasks" class="text-sm text-gray-700 mb-6">
-                <!-- Tasks will be dynamically populated -->
-            </ul>
-            <div class="text-center">
-                <button id="proceed-cleaning-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-                    Proceed
-                </button>
-                <button id="close-popup-btn" class="ml-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
-                    Cancel
-                </button>
-            </div>
-        </div>
+
+
+
+
+    <!-- Normalize Data Button -->
+    <div class="mt-6 text-center">
+        <button id="normalize-data-btn" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
+            Normalize Data
+        </button>
     </div>
+
 </div>
 
 <!-- Include Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script>
-    // Parse the chart data from the view
-    const chartData = JSON.parse('{{ chart_data|safe }}');
 
-    // Create the chart
-    const ctx = document.getElementById('datasetChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',  // Customize the chart type
-        data: {
-            labels: chartData.labels,
-            datasets: chartData.datasets,
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: "X-Axis Label",
-                    },
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: "Y-Axis Label",
-                    },
-                },
-            },
-        },
+<script>
+
+    // JavaScript for "Clean Data" Popup and Proceed Button
+    document.getElementById('clean-data-btn').addEventListener('click', function () {
+        fetch("{% url 'data_cleaning_preview' dataset.id %}", {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                const tasksList = document.getElementById('cleaning-tasks');
+                const proceedButton = document.getElementById('proceed-cleaning-btn');
+
+                tasksList.innerHTML = '';
+                data.tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.textContent = task;
+                    tasksList.appendChild(li);
+                });
+
+                document.getElementById('clean-data-popup').classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Error fetching cleaning tasks:', error);
+                alert('An error occurred while fetching cleaning tasks.');
+            });
     });
 
+    document.getElementById('proceed-cleaning-btn').addEventListener('click', function () {
+        const removeFirstRow = confirm("Do you want to remove the first row of the dataset?");
+        
+        const data = JSON.stringify({
+            remove_first_row: removeFirstRow
+        });
+
+        fetch("{% url 'perform_data_cleaning' dataset.id %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: data
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('An error occurred during data cleaning.');
+                }
+            })
+            .catch(error => {
+                console.error('Error cleaning data:', error);
+                alert('An error occurred during data cleaning.');
+            });
+    });
+
+    document.getElementById('close-popup-btn').addEventListener('click', function () {
+        document.getElementById('clean-data-popup').classList.add('hidden');
+    });
+
+
+
+
     // JavaScript for "Show More" Button
-    var displayedRows = 5;
+    let displayedRows = 5;
 
     document.getElementById('show-more-btn').addEventListener('click', function () {
         fetch("{% url 'display_dataset' dataset.id %}?displayed_rows=" + displayedRows, {
@@ -164,53 +196,28 @@
                 if (nextRows.length < 5) {
                     document.getElementById('show-more-btn').style.display = 'none';
                 }
-            });
-    });
-
-    // JavaScript for "Clean Data" Popup and Proceed Button
-    document.getElementById('clean-data-btn').addEventListener('click', function () {
-        fetch("{% url 'data_cleaning_preview' dataset.id %}", {
-            method: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                // Populate cleaning tasks
-                const tasksList = document.getElementById('cleaning-tasks');
-                const proceedButton = document.getElementById('proceed-cleaning-btn');
-
-                tasksList.innerHTML = ''; // Clear previous tasks
-                data.tasks.forEach(task => {
-                    const li = document.createElement('li');
-                    li.textContent = task;
-                    tasksList.appendChild(li);
-                });
-
-                // Show the popup
-                document.getElementById('clean-data-popup').classList.remove('hidden');
             })
             .catch(error => {
-                console.error('Error fetching cleaning tasks:', error);
-                alert('An error occurred while fetching cleaning tasks.');
+                console.error('Error fetching additional rows:', error);
+                alert('An error occurred while fetching more rows.');
             });
     });
 
-    document.getElementById('proceed-cleaning-btn').addEventListener('click', function () {
-        const removeFirstRow = confirm("Do you want to remove the first row of the dataset?");
-        
-        const data = JSON.stringify({
-            remove_first_row: removeFirstRow
-        });
+    // JavaScript for "Normalize Data" Popup
+    document.getElementById('normalize-data-btn').addEventListener('click', function () {
+        document.getElementById('normalize-data-popup').classList.remove('hidden');
+    });
 
-        fetch("{% url 'perform_data_cleaning' dataset.id %}", {
+    document.getElementById('close-normalization-popup-btn').addEventListener('click', function () {
+        document.getElementById('normalize-data-popup').classList.add('hidden');
+    });
+
+    document.getElementById('proceed-normalization-btn').addEventListener('click', function () {
+        fetch("{% url 'perform_data_normalization' dataset.id %}", {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}',
-            },
-            body: data
+            }
         })
             .then(response => response.json())
             .then(data => {
@@ -218,18 +225,14 @@
                     alert(data.message);
                     location.reload();
                 } else {
-                    alert('An error occurred during data cleaning.');
+                    alert('An error occurred during data normalization.');
                 }
             })
             .catch(error => {
-                console.error('Error during cleaning:', error);
-                alert('An error occurred during data cleaning.');
+                console.error('Error normalizing data:', error);
+                alert('An error occurred during data normalization.');
             });
     });
-
-    // Close the popup
-    document.getElementById('close-popup-btn').addEventListener('click', function () {
-        document.getElementById('clean-data-popup').classList.add('hidden');
-    });
 </script>
+
 {% endblock %}

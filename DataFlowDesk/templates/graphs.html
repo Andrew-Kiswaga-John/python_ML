@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-8">
+    <h1 class="text-4xl font-semibold text-gray-900 mb-8">Data Visualizations</h1>
+
+    <!-- Graph Type Selector -->
+    <div class="mb-6">
+        <label for="graph-type" class="block text-lg font-medium text-gray-700">Select Graph Type</label>
+        <select id="graph-type" class="mt-2 block w-full px-4 py-2 border rounded-lg">
+            <!-- Options will be dynamically populated based on compatibility -->
+        </select>
+    </div>
+
+    <!-- X-Axis and Y-Axis Column Selector -->
+    <div class="grid grid-cols-2 gap-6 mb-6">
+        <div>
+            <label for="x-axis" class="block text-lg font-medium text-gray-700">Select X-Axis</label>
+            <select id="x-axis" class="mt-2 block w-full px-4 py-2 border rounded-lg">
+                <!-- Options will be dynamically populated based on dataset columns -->
+            </select>
+        </div>
+        <div>
+            <label for="y-axis" class="block text-lg font-medium text-gray-700">Select Y-Axis</label>
+            <select id="y-axis" class="mt-2 block w-full px-4 py-2 border rounded-lg">
+                <!-- Options will be dynamically populated based on dataset columns -->
+            </select>
+        </div>
+    </div>
+
+    <!-- Filter Options (Optional) -->
+    <div class="mb-6">
+        <label for="grouping-column" class="block text-lg font-medium text-gray-700">Group By (Optional)</label>
+        <select id="grouping-column" class="mt-2 block w-full px-4 py-2 border rounded-lg">
+            <option value="">None</option>
+            <!-- Options will be dynamically populated based on dataset columns -->
+        </select>
+    </div>
+
+    <!-- Generate Graph Button -->
+    <div class="text-center">
+        <button id="generate-graph" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+            Generate Graph
+        </button>
+    </div>
+
+    <!-- Save Graph Button -->
+    <div class="text-center mt-4">
+        <button id="save-graph" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
+            Save Graph
+        </button>
+    </div>
+
+    <!-- Saved Graphs -->
+    <div class="mt-8">
+        <h2 class="text-2xl font-semibold text-gray-800">Saved Graphs</h2>
+        <div id="saved-graphs" class="mt-4">
+            <!-- Saved graphs will be displayed here -->
+        </div>
+    </div>
+
+    <!-- Graph Display Area -->
+    <div class="mt-8">
+        <canvas id="chartCanvas" style="height: 500px;"></canvas>
+    </div>
+</div>
+
+
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="application/json" id="dataset-data">
+    {{ dataset_data|safe }}
+</script>
+<script type="application/json" id="dataset-columns">
+    {{ columns|safe }}
+</script>
+<script type="application/json" id="column-types">
+    {{ column_types|safe }}
+</script>
+
+<script>
+    // Parse serialized data
+    const dataset = JSON.parse(document.getElementById('dataset-data').textContent);
+    const datasetColumns = JSON.parse(document.getElementById('dataset-columns').textContent);
+    const columnTypes = JSON.parse(document.getElementById('column-types').textContent);
+    
+    const xAxisSelect = document.getElementById('x-axis');
+    const yAxisSelect = document.getElementById('y-axis');
+    const groupingSelect = document.getElementById('grouping-column');
+    const graphTypeSelect = document.getElementById('graph-type');
+    const savedGraphsContainer = document.getElementById('saved-graphs');
+    
+    let chartInstance; // To store the current chart instance
+    
+    // Define compatible graphs for each data type
+    const graphCompatibility = {
+        categorical: ['bar', 'histogram', 'pie'],
+        continuous: ['scatter', 'line', 'histogram'],
+        discrete: ['bar', 'scatter', 'line']
+    };
+    
+    // Filter out irrelevant columns (like 'ID') when populating the axis selectors
+    const relevantColumns = datasetColumns.filter(column => column !== "ID"); // Exclude "ID" column
+    
+    // Populate axis selectors with relevant columns
+    relevantColumns.forEach(column => {
+        const option = document.createElement('option');
+        option.value = column;
+        option.textContent = column;
+    
+        xAxisSelect.appendChild(option.cloneNode(true));
+        yAxisSelect.appendChild(option.cloneNode(true));
+        groupingSelect.appendChild(option.cloneNode(true));
+    });
+    
+    // Update graph type options based on selected X-axis
+    xAxisSelect.addEventListener('change', () => {
+        const selectedColumn = xAxisSelect.value;
+        const columnType = columnTypes[selectedColumn];
+    
+        // Clear and populate graph type selector
+        graphTypeSelect.innerHTML = '';
+        if (columnType && graphCompatibility[columnType]) {
+            graphCompatibility[columnType].forEach(graph => {
+                const option = document.createElement('option');
+                option.value = graph;
+                option.textContent = graph.replace(/^\w/, c => c.toUpperCase());
+                graphTypeSelect.appendChild(option);
+            });
+        }
+    });
+    
+    // Disable Y-axis for Pie Chart
+    graphTypeSelect.addEventListener('change', () => {
+        const selectedType = graphTypeSelect.value;
+        yAxisSelect.disabled = selectedType === 'pie'; // Disable Y-axis for pie charts
+    });
+    
+    // Save graph configuration to localStorage
+    document.getElementById('save-graph').addEventListener('click', () => {
+        const graphType = graphTypeSelect.value;
+        const xAxis = xAxisSelect.value;
+        const yAxis = yAxisSelect.value;
+        const grouping = groupingSelect.value;
+    
+        if (!xAxis || (!yAxis && graphType !== 'pie') || !graphType) {
+            alert('Please select valid X-Axis, Y-Axis, and Graph Type.');
+            return;
+        }
+    
+        const graphConfig = {
+            graphType,
+            xAxis,
+            yAxis,
+            grouping,
+            dataset: dataset, // You could also store only the necessary data for the graph
+        };
+    
+        // Save to localStorage (can use a unique identifier for each graph)
+        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
+        savedGraphs.push(graphConfig);
+        localStorage.setItem('savedGraphs', JSON.stringify(savedGraphs));
+    
+        // Reload saved graphs
+        loadSavedGraphs();
+    });
+    
+    // Load saved graphs from localStorage and display
+    function loadSavedGraphs() {
+        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
+        savedGraphsContainer.innerHTML = '';
+    
+        savedGraphs.forEach((graph, index) => {
+            const graphElement = document.createElement('div');
+            graphElement.classList.add('mb-4', 'border', 'p-4', 'rounded-lg');
+            graphElement.innerHTML = `
+                <p><strong>Graph ${index + 1}:</strong> ${graph.xAxis} vs ${graph.yAxis} (${graph.graphType})</p>
+                <button class="px-4 py-2 bg-blue-500 text-white rounded-lg" onclick="viewSavedGraph(${index})">View</button>
+                <button class="px-4 py-2 bg-red-500 text-white rounded-lg" onclick="deleteGraph(${index})">Delete</button>
+            `;
+            savedGraphsContainer.appendChild(graphElement);
+        });
+    }
+    
+    // View saved graph by loading it into the canvas
+    function viewSavedGraph(index) {
+        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
+        const graphConfig = savedGraphs[index];
+    
+        xAxisSelect.value = graphConfig.xAxis;
+        yAxisSelect.value = graphConfig.yAxis;
+        graphTypeSelect.value = graphConfig.graphType;
+        groupingSelect.value = graphConfig.grouping;
+    
+        generateGraph(graphConfig);
+    }
+    
+    // Delete a saved graph
+    function deleteGraph(index) {
+        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
+        savedGraphs.splice(index, 1);
+        localStorage.setItem('savedGraphs', JSON.stringify(savedGraphs));
+        loadSavedGraphs(); // Reload the saved graphs after deletion
+    }
+    
+    // Generate graph based on selected options
+    document.getElementById('generate-graph').addEventListener('click', () => {
+        const graphType = graphTypeSelect.value;
+        const xAxis = xAxisSelect.value;
+        const yAxis = yAxisSelect.value;
+        const grouping = groupingSelect.value;
+    
+        if (!xAxis || (!yAxis && graphType !== 'pie') || !graphType) {
+            alert('Please select valid X-Axis, Y-Axis, and Graph Type.');
+            return;
+        }
+    
+        generateGraph({ graphType, xAxis, yAxis, grouping });
+    });
+    
+// Helper function to generate the graph
+function generateGraph(config) {
+    const xAxis = config.xAxis;
+    const yAxis = config.yAxis;
+    const grouping = config.grouping;
+    const graphType = config.graphType;
+
+    // Combine values if same X-Axis category is repeated
+    const groupedData = dataset.reduce((acc, row) => {
+        const xValue = row[datasetColumns.indexOf(xAxis)];
+        const yValue = graphType === 'pie' ? 1 : row[datasetColumns.indexOf(yAxis)];
+
+        // Initialize or update data aggregation
+        if (!acc[xValue]) {
+            acc[xValue] = { x: xValue, y: 0 }; // Initialize accumulator for this category
+        }
+        acc[xValue].y += yValue; // Add the Y-axis values or 1 for pie chart
+
+        return acc;
+    }, {});
+
+    const groupedDataArray = Object.values(groupedData);
+
+    let chartData;
+    let chartOptions = { responsive: true, maintainAspectRatio: false };
+
+    // Check for Pie Chart specifically
+    if (graphType === 'pie') {
+        chartData = {
+            labels: groupedDataArray.map(item => item.x),
+            datasets: [{
+                data: groupedDataArray.map(item => item.y),
+                backgroundColor: groupedDataArray.map(() => `hsl(${Math.random() * 360}, 70%, 70%)`), // Random colors
+                hoverOffset: 4
+            }]
+        };
+        chartOptions.plugins = {
+            legend: { position: 'top' },
+        };
+    } else {
+        // Handle other graph types
+        chartData = {
+            labels: groupedDataArray.map(item => item.x),
+            datasets: [{
+                label: yAxis,
+                data: groupedDataArray.map(item => item.y),
+                backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                borderColor: 'rgba(0, 123, 255, 1)',
+                borderWidth: 1
+            }]
+        };
+    }
+
+    // Create or update the chart
+    const ctx = document.getElementById('chartCanvas').getContext('2d');
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    chartInstance = new Chart(ctx, {
+        type: graphType,
+        data: chartData,
+        options: chartOptions
+    });
+}
+
+    // Load saved graphs when the page is loaded
+    loadSavedGraphs();
+    
+    </script>
+    
+
+{% endblock %}
