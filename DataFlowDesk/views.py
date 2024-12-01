@@ -471,7 +471,7 @@ import pandas as pd
 import json
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
@@ -534,3 +534,255 @@ def all_datasets(request) :
 
     return render(request, "datasets/show_datasets.html", {'dataset' : dataset})
 
+
+### MODEL TRAINING PART ###
+
+import json
+import pandas as pd
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+import matplotlib
+matplotlib.use('Agg')  # Use the non-GUI backend
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.cluster import KMeans
+import joblib
+import os
+
+# Model Training View
+def train_model(request):
+    if request.method == 'POST':
+        try:
+            # Fetch form data
+            dataset_id = request.POST.get('datasetId')
+            target_column = request.POST.get('targetColumn')
+            model_name = request.POST.get('model')
+            train_test_split_ratio = int(request.POST.get('trainTestSplit', 80)) / 100
+
+            # Fetch dataset
+            dataset = get_object_or_404(Dataset, id=dataset_id)
+
+            # Check if the dataset is processed
+            if dataset.status != 'processed':
+                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
+
+            # Load dataset
+            df = pd.read_csv(dataset.cleaned_file.path)
+
+            # Validate target column
+            if target_column not in df.columns:
+                return JsonResponse({'error': f"Target column '{target_column}' does not exist in the dataset."}, status=400)
+
+            # Separate features and target
+            X = df.drop(columns=[target_column])
+            y = df[target_column]
+
+            # Preprocess categorical features
+            categorical_columns = X.select_dtypes(include=['object']).columns
+            if not categorical_columns.empty:
+                X = pd.get_dummies(X, columns=categorical_columns)
+
+            # Encode target column if it is categorical
+            if y.dtype == 'object':
+                le = LabelEncoder()
+                y = le.fit_transform(y)
+
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+
+            # Convert to NumPy arrays
+            X = np.array(X_scaled)
+            y = np.array(y)
+
+            # Split data
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1 - train_test_split_ratio, random_state=42)
+
+            # Initialize model variable
+            model = None
+
+            # Handle model selection and parameters
+            if model_name == 'linear_regression':
+                # Fetch parameters for Linear Regression
+                fit_intercept = request.POST.get('fitIntercept', 'true').lower() == 'true'
+                model = LinearRegression(fit_intercept=fit_intercept)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                mse = mean_squared_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
+                metrics = {'Mean Squared Error': mse, 'R² Score': r2}
+
+            elif model_name == 'decision_tree':
+                # Fetch parameters for Decision Tree
+                max_depth = request.POST.get('maxDepth', None)
+                model = DecisionTreeClassifier(max_depth=int(max_depth) if max_depth else None)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'svm':
+                # Fetch parameters for SVM
+                kernel = request.POST.get('kernel', 'rbf')
+                model = SVC(kernel=kernel)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                
+                try:
+                    # Attempt to calculate accuracy
+                    accuracy = accuracy_score(y_test, y_pred)
+                    metrics = {'Model Accuracy': accuracy}
+                except Exception as e:
+                    # If an exception occurs, calculate alternative metrics
+                    print(f"Accuracy score could not be calculated: {str(e)}")
+                    mse = mean_squared_error(y_test, y_pred)
+                    r2 = r2_score(y_test, y_pred)
+                    metrics = {
+                        'Error': f"Accuracy score could not be calculated: {str(e)}",
+                        'Mean Squared Error': mse,
+                        'R² Score': r2
+                    }
+
+            elif model_name == 'random_forest':
+                # Fetch parameters for Random Forest
+                n_estimators = int(request.POST.get('nEstimators', 100))
+                model = RandomForestClassifier(n_estimators=n_estimators)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'knn':
+                # Fetch parameters for k-Nearest Neighbors
+                n_neighbors = int(request.POST.get('nNeighbors', 5))
+                print('neighbors:', n_neighbors)
+                model = KNeighborsClassifier(n_neighbors=n_neighbors)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'polynomial_regression':
+                degree = int(request.POST.get('degree', 2))
+                poly = PolynomialFeatures(degree=degree)
+                X_train_poly = poly.fit_transform(X_train)
+                X_test_poly = poly.transform(X_test)
+                model = LinearRegression()
+                model.fit(X_train_poly, y_train)
+                y_pred = model.predict(X_test_poly)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'logistic_regression':
+                solver = request.POST.get('solver', 'lbfgs')
+                max_iter = int(request.POST.get('maxIter', 100))
+                model = LogisticRegression(solver=solver, max_iter=max_iter)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'naive_bayes':
+                var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
+                model = GaussianNB(var_smoothing=var_smoothing)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
+
+            elif model_name == 'kmeans':
+                n_clusters = int(request.POST.get('nClusters', 3))
+                model = KMeans(n_clusters=n_clusters, random_state=42)
+                model.fit(X_train)
+                y_pred = model.predict(X_test)
+                
+                try:
+                    # Attempt to calculate accuracy
+                    accuracy = accuracy_score(y_test, y_pred)
+                    metrics = {'Model Accuracy': accuracy}
+                except Exception as e:
+                    # If an exception occurs, calculate regression metrics instead
+                    print(f"Accuracy score could not be calculated: {str(e)}")
+                    mse = mean_squared_error(y_test, y_pred)
+                    r2 = r2_score(y_test, y_pred)
+                    metrics = {
+                        'Error': f"Accuracy score could not be calculated: {str(e)}",
+                        'Mean Squared Error': mse,
+                        'R² Score': r2
+                    }
+
+            else:
+                return JsonResponse({'error': 'Invalid model selected.'}, status=400)
+
+            # Train model
+            # model.fit(X_train, y_train)
+            # y_pred = model.predict(X_test)
+            # accuracy = accuracy_score(y_test, y_pred)
+            
+            # Save model
+            model_path = os.path.join('media/models', f"{model_name}_{dataset_id}.joblib")
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            joblib.dump(model, model_path)
+
+            # Generate metrics
+            score = model.score(X_test, y_test)
+            # metrics = {'Model Accuracy': accuracy}
+            # print(f"Model Accuracy: {metrics}")
+            # print(f"Accuracy: {accuracy:.4f}")
+
+            # Visualization
+            plt.figure(figsize=(8, 6))
+            if model_name == 'kmeans':
+                plt.scatter(X_test[:, 0], X_test[:, 1], c=model.predict(X_test), cmap='viridis')
+            else:
+                plt.plot(y_test[:50], label='True')  # Fixed
+                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
+            plt.legend()
+            plt.title(f"{model_name.capitalize()} Results")
+            visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
+            os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
+            plt.savefig(visualization_path)
+
+            return JsonResponse({
+                'metrics': metrics,
+                'visualization': visualization_path,
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+
+
+def training_page(request):
+    datasets = Dataset.objects.all()
+
+    return render(request, 'model_training.html', {'dataset': datasets})
+
+def get_columns(request):
+    if request.method == 'GET':
+        dataset_id = request.GET.get('datasetId')
+
+        # Assuming you have a Dataset model and a method to fetch the dataset file
+        dataset = Dataset.objects.get(id=dataset_id)
+        if dataset.status == 'processed':
+            dataset_path = dataset.cleaned_file.path  # Path to the dataset file
+        else:            
+            dataset_path = dataset.file_path.path
+
+        try:
+            # Load the dataset (e.g., CSV file)
+            data = pd.read_csv(dataset_path)
+            columns = list(data.columns)  # Get the list of columns
+            return JsonResponse({'columns': columns})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
