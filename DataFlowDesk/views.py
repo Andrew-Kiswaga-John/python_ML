@@ -305,49 +305,31 @@ def upload_file(request):
 
     return JsonResponse({'error': 'Invalid request method.'})
 
-def data_cleaning_preview(request, dataset_id):
-    """
-    Generates a preview of tasks needed for cleaning the dataset.
-    """
-    try:
-        # Fetch dataset from the database
-        dataset = Dataset.objects.get(id=dataset_id)
 
-        # Check if dataset is already processed
-        if dataset.status == 'processed':
-            return JsonResponse({'tasks': ["Dataset already processed"]})
-
-        file_path = dataset.file_path  # Path to the dataset
-
-        # Load dataset
-        df = pd.read_csv(file_path, on_bad_lines='skip')
-
-        # Identify cleaning tasks
-        tasks = []
-        if df.isnull().values.any():
-            tasks.append(f"Found {df.isnull().sum().sum()} missing values. These will be handled.")
-        if df.duplicated().sum() > 0:
-            tasks.append(f"Found {df.duplicated().sum()} duplicate rows. These will be removed.")
-        tasks.append("Columns with incorrect data types will be converted.")
-        tasks.append("Outliers in numerical columns will be treated.")
-
-        return JsonResponse({'tasks': tasks})
-    except Dataset.DoesNotExist:
-        return JsonResponse({'error': 'Dataset not found.'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': f"Error processing file: {str(e)}"}, status=500)
-
-
-def clean_dataset(df):
+def clean_dataset(df, delete_header=False):
     """
     Cleans the dataset:
-    - Removes duplicate rows.
-    - Fills missing numerical values with the column mean.
-    - Fills missing categorical values with 'Unknown'.
-    - Ensures proper data types for numerical and categorical columns.
+    - Optionally deletes the header and uses first data row as new header
+    - Removes duplicate rows
+    - Fills missing numerical values with the column mean
+    - Fills missing categorical values with 'Unknown'
+    - Ensures proper data types for numerical and categorical columns
     """
     print("Starting dataset cleaning...")
 
+    # If user wants to delete header
+    if delete_header:
+        print("Deleting header and using first data row as new header...")
+        # Store current column names
+        original_columns = df.columns.tolist()
+        # Get the first data row to use as new header
+        new_headers = df.iloc[0].values.tolist()
+        # Drop the first row and reset index
+        df = df.iloc[1:].reset_index(drop=True)
+        # Set the new headers
+        df.columns = new_headers
+        print("Header replaced with first data row.")
+    
     # Remove duplicates
     initial_rows = df.shape[0]
     df = df.drop_duplicates()
@@ -386,16 +368,19 @@ def perform_data_cleaning(request, dataset_id):
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
     try:
+        # Parse the JSON body
+        data = json.loads(request.body)
+        delete_header = data.get('remove_first_row', False)  # Get user's choice about header deletion
+
         # Fetch the dataset
         dataset = Dataset.objects.get(id=dataset_id)
+        file_path = dataset.file_path.path
 
-        file_path = dataset.file_path.path  # Get the file path
-
-        # Load dataset
+        # Load dataset with original headers
         df = pd.read_csv(file_path, on_bad_lines='skip')
 
-        # Perform cleaning
-        cleaned_df = clean_dataset(df)
+        # Perform cleaning with the delete_header parameter
+        cleaned_df = clean_dataset(df, delete_header=delete_header)
 
         # Save the cleaned dataset with a new name
         cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
@@ -409,12 +394,50 @@ def perform_data_cleaning(request, dataset_id):
         dataset.status = 'processed'
         dataset.save()
 
-        return JsonResponse({'message': 'Data cleaned and saved successfully!'})
+        return JsonResponse({
+            'message': 'Data cleaned and saved successfully!',
+            'rows_affected': len(df) - len(cleaned_df)
+        })
 
     except Dataset.DoesNotExist:
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
+
+def data_cleaning_preview(request, dataset_id):
+    """
+    Generates a preview of tasks needed for cleaning the dataset.
+    """
+    try:
+        # Fetch dataset from the database
+        dataset = Dataset.objects.get(id=dataset_id)
+
+        # Check if dataset is already processed
+        if dataset.status == 'processed':
+            return JsonResponse({'tasks': ["Dataset already processed"]})
+
+        file_path = dataset.file_path  # Path to the dataset
+
+        # Load dataset
+        df = pd.read_csv(file_path, on_bad_lines='skip')
+
+        # Identify cleaning tasks
+        tasks = []
+        tasks.append("You will have the option to delete the header and use the first data row as the new header.")
+        if df.isnull().values.any():
+            tasks.append(f"Found {df.isnull().sum().sum()} missing values. These will be handled.")
+        if df.duplicated().sum() > 0:
+            tasks.append(f"Found {df.duplicated().sum()} duplicate rows. These will be removed.")
+        tasks.append("Columns with incorrect data types will be converted.")
+        tasks.append("Outliers in numerical columns will be treated.")
+
+        return JsonResponse({'tasks': tasks})
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f"Error processing file: {str(e)}"}, status=500)
 
 
 

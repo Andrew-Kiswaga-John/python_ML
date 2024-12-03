@@ -1,74 +1,132 @@
 {% extends 'base.html' %}
 
+{% block title %}Data Visualizations{% endblock %}
+
 {% block content %}
-<div class="container mx-auto px-6 py-8">
-    <h1 class="text-4xl font-semibold text-gray-900 mb-8">Data Visualizations</h1>
-
-    <!-- Graph Type Selector -->
-    <div class="mb-6">
-        <label for="graph-type" class="block text-lg font-medium text-gray-700">Select Graph Type</label>
-        <select id="graph-type" class="mt-2 block w-full px-4 py-2 border rounded-lg">
-            <!-- Options will be dynamically populated based on compatibility -->
-        </select>
-    </div>
-
-    <!-- X-Axis and Y-Axis Column Selector -->
-    <div class="grid grid-cols-2 gap-6 mb-6">
-        <div>
-            <label for="x-axis" class="block text-lg font-medium text-gray-700">Select X-Axis</label>
-            <select id="x-axis" class="mt-2 block w-full px-4 py-2 border rounded-lg">
-                <!-- Options will be dynamically populated based on dataset columns -->
-            </select>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header Section -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Data Visualizations</h1>
+            <p class="mt-2 text-gray-600">Create and analyze visual representations of your dataset</p>
         </div>
-        <div>
-            <label for="y-axis" class="block text-lg font-medium text-gray-700">Select Y-Axis</label>
-            <select id="y-axis" class="mt-2 block w-full px-4 py-2 border rounded-lg">
-                <!-- Options will be dynamically populated based on dataset columns -->
-            </select>
+
+        <!-- Graph Configuration Card -->
+        <div class="bg-white rounded-xl shadow-sm mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900">Graph Configuration</h2>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Graph Type Selector -->
+                <div class="flex flex-col space-y-2">
+                    <label for="graph-type" class="text-sm font-medium text-gray-700">Graph Type</label>
+                    <div class="relative">
+                        <select id="graph-type" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                            <!-- Options will be dynamically populated -->
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Axis Selection -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col space-y-2">
+                        <label for="x-axis" class="text-sm font-medium text-gray-700">X-Axis</label>
+                        <div class="relative">
+                            <select id="x-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                                <!-- Options will be dynamically populated -->
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col space-y-2">
+                        <label for="y-axis" class="text-sm font-medium text-gray-700">Y-Axis</label>
+                        <div class="relative">
+                            <select id="y-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                                <!-- Options will be dynamically populated -->
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grouping Option -->
+                <div class="flex flex-col space-y-2">
+                    <label for="grouping-column" class="text-sm font-medium text-gray-700">Group By (Optional)</label>
+                    <div class="relative">
+                        <select id="grouping-column" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                            <option value="">None</option>
+                            <!-- Options will be dynamically populated -->
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    <button id="generate-graph" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Generate Graph
+                    </button>
+                    <button id="save-graph" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Save Graph
+                    </button>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- Filter Options (Optional) -->
-    <div class="mb-6">
-        <label for="grouping-column" class="block text-lg font-medium text-gray-700">Group By (Optional)</label>
-        <select id="grouping-column" class="mt-2 block w-full px-4 py-2 border rounded-lg">
-            <option value="">None</option>
-            <!-- Options will be dynamically populated based on dataset columns -->
-        </select>
-    </div>
-
-    <!-- Generate Graph Button -->
-    <div class="text-center">
-        <button id="generate-graph" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-            Generate Graph
-        </button>
-    </div>
-
-    <!-- Save Graph Button -->
-    <div class="text-center mt-4">
-        <button id="save-graph" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
-            Save Graph
-        </button>
-    </div>
-
-    <!-- Saved Graphs -->
-    <div class="mt-8">
-        <h2 class="text-2xl font-semibold text-gray-800">Saved Graphs</h2>
-        <div id="saved-graphs" class="mt-4">
-            <!-- Saved graphs will be displayed here -->
+        <!-- Graph Display Card -->
+        <div class="bg-white rounded-xl shadow-sm mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900">Graph Visualization</h2>
+            </div>
+            <div class="p-6">
+                <div class="bg-gray-50 rounded-lg p-4" style="height: 500px;">
+                    <canvas id="chartCanvas"></canvas>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- Graph Display Area -->
-    <div class="mt-8">
-        <canvas id="chartCanvas" style="height: 500px;"></canvas>
+        <!-- Saved Graphs Section -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900">Saved Graphs</h2>
+            </div>
+            <div class="p-6">
+                <div id="saved-graphs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Saved graphs will be dynamically populated here -->
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-
-
 <!-- Include Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Data Scripts -->
 <script type="application/json" id="dataset-data">
     {{ dataset_data|safe }}
 </script>
@@ -78,6 +136,8 @@
 <script type="application/json" id="column-types">
     {{ column_types|safe }}
 </script>
+
+
 
 <script>
     // Parse serialized data
