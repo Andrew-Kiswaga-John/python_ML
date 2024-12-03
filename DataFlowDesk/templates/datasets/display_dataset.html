@@ -5,103 +5,158 @@
 {% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-6 py-8">
-    <h2 class="text-3xl font-semibold text-gray-900 mb-4">{{ dataset.name }}</h2>
-    <p class="text-lg text-gray-600 mb-6">{{ dataset.description }}</p>
-
-    <!-- Dataset Table -->
-    <div class="overflow-x-auto shadow-md rounded-lg bg-white mb-8">
-        <table class="min-w-full table-auto text-left" id="dataset-table">
-            <thead class="bg-gray-50 text-gray-700">
-                <tr>
-                    <th class="px-6 py-3 text-sm font-medium">ID</th>
-                    {% for column in columns %}
-                        <th class="px-6 py-3 text-sm font-medium">{{ column }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody class="text-sm text-gray-600" id="dataset-body">
-                {% for row in dataset_data %}
-                    <tr class="border-b hover:bg-gray-100">
-                        <td class="px-6 py-3">{{ forloop.counter }}</td>
-                        {% for value in row %}
-                            <td class="px-6 py-3">{{ value }}</td>
-                        {% endfor %}
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- "Show More" Button -->
-    <div class="text-center">
-        <button id="show-more-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-            Show More
-        </button>
-    </div>
-
-    <!-- Dataset Stats -->
-    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
-        <h3 class="text-2xl font-semibold text-gray-900 mb-4">Dataset Statistics</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for stat, values in stats.items %}
-                <div class="bg-gray-50 p-4 rounded-lg shadow-md">
-                    <h4 class="text-lg font-medium text-gray-800">{{ stat|title }}</h4>
-                    <ul class="text-sm text-gray-600">
-                        {% for key, value in values.items %}
-                            <li>{{ key|title }}: {{ value }}</li>
-                        {% endfor %}
-                    </ul>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Dataset Header -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ dataset.name }}</h1>
+                    <p class="mt-2 text-gray-600">{{ dataset.description }}</p>
                 </div>
-            {% endfor %}
+                <div class="mt-4 md:mt-0 flex space-x-3">
+                    <a href="{% url 'display_graphs' dataset.id %}" 
+                       class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Create Graphs
+                    </a>
+                </div>
+            </div>
         </div>
-    </div>
 
-
-    <!-- "Create Graphs" Button -->
-    <div class="text-center">
-        <a href="{% url 'display_graphs' dataset.id %}" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-            Create Graphs
-        </a>
-    </div>
-
-
-    <!-- Clean Data Button -->
-    <div class="mt-6 text-center">
-        <button id="clean-data-btn" class="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all">
-            Clean Data
-        </button>
-    </div>
-
-
-    <!-- Data Cleaning Popup -->
-    <div id="clean-data-popup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-2/3 lg:w-1/2">
-            <h3 class="text-2xl font-semibold text-gray-900 mb-4">Data Cleaning & Preprocessing</h3>
-            <ul id="cleaning-tasks" class="text-sm text-gray-700 mb-6">
-                <!-- Tasks will be dynamically populated -->
-            </ul>
-            <div class="text-center">
-                <button id="proceed-cleaning-btn" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
-                    Proceed
-                </button>
-                <button id="close-popup-btn" class="ml-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
-                    Cancel
-                </button>
-
+        <!-- Action Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Data Cleaning Card -->
+            <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Data Cleaning</h3>
+                        <p class="mt-1 text-sm text-gray-500">Clean and preprocess your dataset</p>
+                    </div>
+                    <button id="clean-data-btn" 
+                            class="inline-flex items-center px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Clean Data
+                    </button>
+                </div>
             </div>
 
+            <!-- Data Normalization Card -->
+            <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Data Normalization</h3>
+                        <p class="mt-1 text-sm text-gray-500">Normalize your dataset values</p>
+                    </div>
+                    <button id="normalize-data-btn" 
+                            class="inline-flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        Normalize
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dataset Table -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h3 class="text-lg font-semibold text-gray-900">Dataset Preview</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200" id="dataset-table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            {% for column in columns %}
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="dataset-body">
+                        {% for row in dataset_data %}
+                            <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ forloop.counter }}</td>
+                                {% for value in row %}
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ value }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                <button id="show-more-btn" 
+                        class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200">
+                    Show More
+                </button>
+            </div>
+        </div>
+
+        <!-- Dataset Statistics -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Dataset Statistics</h3>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {% for stat, values in stats.items %}
+                        <div class="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                            <h4 class="text-base font-medium text-gray-900 mb-2">{{ stat|title }}</h4>
+                            <ul class="space-y-1">
+                                {% for key, value in values.items %}
+                                    <li class="text-sm">
+                                        <span class="text-gray-600">{{ key|title }}:</span>
+                                        <span class="text-gray-900 font-medium">{{ value }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
-
-    <!-- Normalize Data Button -->
-    <div class="mt-6 text-center">
-        <button id="normalize-data-btn" class="px-6 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all">
-            Normalize Data
-        </button>
+<!-- Data Cleaning Modal -->
+<div id="clean-data-popup" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="min-h-screen px-4 text-center">
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Data Cleaning & Preprocessing</h3>
+                        <div class="mt-2">
+                            <ul id="cleaning-tasks" class="text-sm text-gray-500 space-y-2">
+                                <!-- Tasks will be dynamically populated -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button id="proceed-cleaning-btn" 
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-yellow-600 text-base font-medium text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    Proceed
+                </button>
+                <button id="close-popup-btn"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Cancel
+                </button>
+            </div>
+        </div>
     </div>
-
 </div>
 
 <!-- Include Chart.js -->

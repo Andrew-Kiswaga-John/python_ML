@@ -24,7 +24,7 @@ def create_dataset_step1(request):
             return redirect('create_dataset_step2')  # Redirect to Step 2
     else:
         form = DatasetMetaForm()
-    return render(request, 'datasets/create_dataset_step1.html', {'form': form})
+    return render(request, 'home.html', {'form': form})
 
 from django.forms import modelform_factory
 from .models import Dataset
@@ -44,95 +44,101 @@ from .models import Dataset
 from django.shortcuts import render, redirect
 from django.urls import reverse  # For generating URLs
 
+
 def create_dataset_step2(request):
-    dataset_meta = request.session.get('dataset_meta')
-    if not dataset_meta:
-        return redirect('create_dataset_step1')  # Redirect back if meta is missing
-
-    columns = dataset_meta['columns']  # Retrieve column details
-    num_rows = dataset_meta['num_rows']
-
     if request.method == "POST":
-        data = request.POST.getlist('data')  # All user inputs
+        try:
+            # Get all the form data
+            data = request.POST.getlist('data')
+            dataset_meta = json.loads(request.POST.get('dataset_meta', '{}'))
+            
+            if not dataset_meta:
+                return JsonResponse({"error": "Missing dataset metadata"}, status=400)
 
-        # Validate the data based on column types
-        error_messages = []
-        validated_data = [[] for _ in range(len(columns))]  # Initialize empty lists for each column
+            columns = dataset_meta['columns']
+            num_rows = int(dataset_meta['num_rows'])
+            num_cols = len(columns)
 
-        # Group data by column
-        for i, column in enumerate(columns):
-            column_data = data[i::len(columns)]  # Split data by columns
-            for j, value in enumerate(column_data):
-                if column['type'] == 'int':
+            # Validate that we have the correct number of data points
+            if len(data) != num_rows * num_cols:
+                return JsonResponse({
+                    "error": f"Expected {num_rows * num_cols} data points, but received {len(data)}"
+                }, status=400)
+
+            # Initialize validated data structure
+            validated_data = []
+            error_messages = []
+
+            # Process data row by row
+            for row in range(num_rows):
+                row_data = []
+                for col in range(num_cols):
+                    value = data[row * num_cols + col]
+                    column = columns[col]
+                    
                     try:
-                        validated_value = int(value)
+                        # Validate based on column type
+                        if column['type'] == 'int':
+                            validated_value = int(value)
+                        elif column['type'] == 'float':
+                            validated_value = float(value)
+                        elif column['type'] == 'string':
+                            validated_value = str(value)
+                        elif column['type'] == 'date':
+                            validated_value = datetime.strptime(value, "%Y-%m-%d").date()
+                        elif column['type'] == 'time':
+                            validated_value = datetime.strptime(value, "%H:%M:%S").time()
+                        else:
+                            validated_value = str(value)
+                            
+                        row_data.append(validated_value)
                     except ValueError:
-                        error_messages.append(f"Row {j+1}, Column '{column['name']}': Value must be an integer.")
-                elif column['type'] == 'float':
-                    try:
-                        validated_value = float(value)
-                    except ValueError:
-                        error_messages.append(f"Row {j+1}, Column '{column['name']}': Value must be a float.")
-                elif column['type'] == 'string':
-                    validated_value = str(value)
-                elif column['type'] == 'date':
-                    try:
-                        validated_value = datetime.strptime(value, "%Y-%m-%d").date()
-                    except ValueError:
-                        error_messages.append(f"Row {j+1}, Column '{column['name']}': Value must be a date in YYYY-MM-DD format.")
-                elif column['type'] == 'time':
-                    try:
-                        validated_value = datetime.strptime(value, "%H:%M:%S").time()
-                    except ValueError:
-                        error_messages.append(f"Row {j+1}, Column '{column['name']}': Value must be a time in HH:MM:SS format.")
+                        error_messages.append(
+                            f"Row {row + 1}, Column '{column['name']}': Invalid {column['type']} value '{value}'"
+                        )
+
+                if not error_messages:  # Only add the row if there were no errors
+                    validated_data.append(row_data)
+
+            if error_messages:
+                return JsonResponse({"error": "\n".join(error_messages)}, status=400)
+
+            # Ensure the datasets directory exists
+            datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
+            os.makedirs(datasets_dir, exist_ok=True)
+
+            # Create the CSV file
+            file_path = os.path.join(datasets_dir, f"{dataset_meta['name']}.csv")
+            with open(file_path, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
                 
-                # Append validated value to the appropriate column's list
-                validated_data[i].append(validated_value)
+                # Write header
+                header = ['ID'] + [col['name'] for col in columns]
+                writer.writerow(header)
+                
+                # Write data rows
+                for row_index, row_data in enumerate(validated_data, 1):
+                    writer.writerow([row_index] + row_data)
 
-        # If there are validation errors, return them
-        if error_messages:
-            return JsonResponse({"errors": error_messages}, status=400)
+            # Save to database
+            new_dataset = Dataset.objects.create(
+                name=dataset_meta['name'],
+                description=dataset_meta.get('description', ''),
+                file_path=file_path,
+                columns_info=columns,
+                status="uploaded"
+            )
 
-        # Ensure the datasets directory exists
-        datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')  # Use MEDIA_ROOT as base
-        if not os.path.exists(datasets_dir):
-            os.makedirs(datasets_dir)
+            return JsonResponse({
+                "message": "Dataset created successfully",
+                "dataset_id": new_dataset.id
+            })
 
-        # Full file path for the CSV
-        file_path = os.path.join(datasets_dir, f"{dataset_meta['name']}.csv")
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
-        # Write the validated data to CSV, including the 'id' column
-        with open(file_path, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            header = ['ID'] + [column['name'] for column in columns]  # Add 'ID' to the header
-            writer.writerow(header)
-
-            # Write rows of data, including the automatically generated 'ID' column
-            for i in range(num_rows):
-                row_data = [i + 1]  # The ID column, starting from 1 and incrementing
-                for col_data in validated_data:
-                    row_data.append(col_data[i])  # Add the data from each column
-                writer.writerow(row_data)
-
-        # Save the dataset information to the database
-        new_dataset = Dataset.objects.create(
-            name=dataset_meta['name'],
-            description=dataset_meta['description'],
-            file_path=file_path,
-            columns_info=columns,
-            status="uploaded"
-        )
-
-        # Redirect to the "Display Dataset" page
-        return redirect(reverse('display_dataset', args=[new_dataset.id]))
-
-    # Render the template with column details
-    return render(request, 'datasets/create_dataset_step2.html', {
-        'columns': columns,
-        'row_range': range(num_rows),
-        'dataset_meta': dataset_meta,
-    })
-
+    # If not POST, redirect to step 1
+    return redirect('create_dataset_step1')
 
 import pandas as pd
 from django.shortcuts import render, redirect
@@ -214,7 +220,7 @@ import json
 
 
 def my_view(request):
-    return render(request, 'dashboard.html')
+    return render(request, 'home.html')
 
 @csrf_exempt  # Optional, depending on your CSRF configuration
 def upload_file(request):

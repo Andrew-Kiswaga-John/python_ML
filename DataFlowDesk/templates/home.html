@@ -1,0 +1,499 @@
+{% extends 'base.html' %}
+
+{% block title %}ML Analyzer - Home{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="relative overflow-hidden bg-white">
+    <div class="mx-auto max-w-7xl px-6 pt-24 pb-24 sm:pt-32 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center">
+            <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+                ML Analyzer Platform
+            </h1>
+            <p class="mt-6 text-lg leading-8 text-gray-600">
+                Empower your data analysis journey with our advanced machine learning platform. 
+                Seamlessly manage, analyze, and derive insights from your datasets with intuitive tools and powerful algorithms.
+            </p>
+            <div class="mt-10 flex items-center justify-center gap-x-6">
+                <a href="#get-started" class="rounded-full bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all duration-300 ease-in-out transform hover:scale-105">
+                    Get Started
+                </a>
+                <a href="#learn-more" class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600 transition-colors duration-300">
+                    Learn more <span aria-hidden="true">→</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <!-- Background pattern -->
+    <div class="absolute inset-x-0 top-0 -z-10 transform-gpu overflow-hidden blur-3xl" aria-hidden="true">
+        <div class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]" style="clip-path: polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)"></div>
+    </div>
+</section>
+
+<!-- Get Started Section -->
+<section id="get-started" class="py-24 bg-gray-50">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center mb-16">
+            <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Start Your Analysis Journey</h2>
+            <p class="mt-4 text-lg leading-8 text-gray-600">
+                Choose how you want to begin working with your data
+            </p>
+        </div>
+        
+        <div class="mx-auto grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-2">
+            <!-- Upload Dataset Card -->
+            <div class="relative group">
+                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+                     onclick="openModal('uploadModal')">
+                    <div class="flex flex-col items-center">
+                        <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold leading-7 text-gray-900">Upload Dataset</h3>
+                        <p class="mt-2 text-sm leading-6 text-gray-600 text-center">
+                            Import your existing dataset files for immediate analysis
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Dataset Card -->
+            <div class="relative group">
+                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+                     onclick="openModal('createModal')">
+                    <div class="flex flex-col items-center">
+                        <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold leading-7 text-gray-900">Create Dataset</h3>
+                        <p class="mt-2 text-sm leading-6 text-gray-600 text-center">
+                            Build your dataset from scratch with our intuitive interface
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Feature Cards -->
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+            <h3 class="text-xl font-semibold text-slate-800 mb-3">Data Analysis</h3>
+            <p class="text-gray-600">Comprehensive tools for data preprocessing, visualization, and analysis</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+            <h3 class="text-xl font-semibold text-slate-800 mb-3">ML Models</h3>
+            <p class="text-gray-600">Wide range of machine learning algorithms for various use cases</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+            <h3 class="text-xl font-semibold text-slate-800 mb-3">Visualization</h3>
+            <p class="text-gray-600">Interactive charts and graphs for better data understanding</p>
+        </div>
+    </div>
+
+    <!-- Algorithms Section -->
+    <div class="mt-16">
+        <h2 class="text-3xl font-bold text-center text-slate-800 mb-8">Available Algorithms</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Regression Analysis</h5>
+                    <p class="text-gray-600">Linear, Polynomial, Multiple, Logistic</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Tree-Based Models</h5>
+                    <p class="text-gray-600">Decision Trees, Random Forest</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Classification</h5>
+                    <p class="text-gray-600">Naive Bayes, SVM</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Clustering</h5>
+                    <p class="text-gray-600">K-means, Nearest Neighbor</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Deep Learning</h5>
+                    <p class="text-gray-600">Neural Networks</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <h5 class="font-semibold text-slate-800">Model Validation</h5>
+                    <p class="text-gray-600">Cross-validation, Metrics Analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Dataset Modal -->
+<div id="uploadModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white transform transition-all duration-300 ease-out scale-95 translate-y-4">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold">Upload Dataset</h3>
+            <button onclick="closeModal('uploadModal')" class="text-black close-modal hover:bg-gray-100 hover:text-gray-700 transition-colors duration-200 rounded-full p-1">&times;</button>
+        </div>
+        <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_file' %}" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Choose Data Source:</label>
+                <div class="flex space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="source" value="local" class="mr-2" required checked>
+                        <span>From Computer</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="source" value="kaggle" class="mr-2">
+                        <span>From Kaggle</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="kaggle-input" class="hidden">
+                <label for="kaggle-link" class="block text-sm font-medium text-gray-700">Kaggle Dataset URL:</label>
+                <input type="url" id="kaggle-link" name="kaggle_link"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="dataset" id="file-label" class="block text-sm font-medium text-gray-700">Select Dataset (CSV/Excel):</label>
+                <input type="file" id="dataset" name="dataset" accept=".csv, .xls, .xlsx"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name:</label>
+                <input type="text" id="name" name="name"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700">Dataset Description:</label>
+                <textarea id="description" name="description" rows="3"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required></textarea>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                Upload Dataset
+            </button>
+        </form>
+        <div id="upload-response" class="mt-4">
+            <!-- Response messages will appear here -->
+        </div>
+    </div>
+</div>
+
+<!-- Create Dataset Modal -->
+<div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white transform transition-all duration-300 ease-out scale-95 translate-y-4">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold">Create Dataset</h3>
+            <button onclick="closeModal('createModal')" class="text-black close-modal hover:bg-gray-100 hover:text-gray-700 transition-colors duration-200 rounded-full p-1">&times;</button>
+        </div>
+        <form id="step1-form" method="POST" action="{% url 'create_dataset_step1' %}" class="space-y-4">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name:</label>
+                <input type="text" id="create_name" name="name" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div class="mb-4">
+                <label for="description" class="block text-sm font-medium text-gray-700">Description:</label>
+                <textarea id="create_description" name="description" required rows="3"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+            </div>
+            <div class="mb-4">
+                <label for="num_columns" class="block text-sm font-medium text-gray-700">Number of Columns:</label>
+                <input type="number" id="num_columns" name="num_columns" required min="1"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div class="mb-4">
+                <label for="num_rows" class="block text-sm font-medium text-gray-700">Number of Rows:</label>
+                <input type="number" id="num_rows" name="num_rows" required min="1"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            
+            <button type="button" id="generate-columns" class="w-full bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">
+                Define Columns
+            </button>
+            
+            <div id="column-details-container" class="mt-6"></div>
+            
+            <button type="submit" id="submit-form" style="display:none;" 
+                class="w-full bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 transition mt-4">
+                Next
+            </button>
+        </form>
+    </div>
+</div>
+<!-- Create Dataset Step 2 Modal -->
+<div id="createStep2Modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white transform transition-all duration-300 ease-out scale-95 translate-y-4">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold">Enter Dataset Values</h3>
+            <button onclick="closeModal('createStep2Modal')" class="text-black close-modal hover:bg-gray-100 hover:text-gray-700 transition-colors duration-200 rounded-full p-1">&times;</button>
+        </div>
+        <form id="step2-form" method="POST" action="{% url 'create_dataset_step2' %}" class="space-y-4">
+            {% csrf_token %}
+            <div id="step2-content" class="overflow-x-auto">
+                <!-- Content will be dynamically populated -->
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">
+                Create Dataset
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Modal functions with animations
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        const modalContent = modal.querySelector('div');
+        
+        // First make the modal visible
+        modal.classList.remove('hidden');
+        
+        // Trigger a reflow to ensure the transitions work
+        void modal.offsetWidth;
+        
+        // Add the visible classes
+        modal.classList.add('opacity-100');
+        modalContent.classList.remove('scale-95', 'translate-y-4');
+        modalContent.classList.add('scale-100', 'translate-y-0');
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        const modalContent = modal.querySelector('div');
+        
+        // Start the closing animation
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        modalContent.classList.remove('scale-100', 'translate-y-0');
+        modalContent.classList.add('scale-95', 'translate-y-4');
+        
+        // Hide the modal after the animation completes
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300); // Match this with the duration in the CSS transitions
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target.classList.contains('fixed')) {
+            const modalId = event.target.id;
+            closeModal(modalId);
+        }
+    }
+
+    // Upload form handling
+    document.querySelectorAll('input[name="source"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const kaggleInput = document.getElementById('kaggle-input');
+            const fileInput = document.getElementById('dataset');
+            const fileLabel = document.getElementById('file-label');
+            
+            if (e.target.value === 'kaggle') {
+                kaggleInput.classList.remove('hidden');
+                fileInput.classList.add('hidden');
+                fileLabel.classList.add('hidden');
+                fileInput.required = false;
+            } else {
+                kaggleInput.classList.add('hidden');
+                fileInput.classList.remove('hidden');
+                fileLabel.classList.remove('hidden');
+                fileInput.required = true;
+            }
+        });
+    });
+
+    // Handle upload form submission
+    const uploadForm = document.getElementById('upload-form');
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(uploadForm);
+
+        const response = await fetch(uploadForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            }
+        });
+
+        const result = await response.json();
+        const responseDiv = document.getElementById('upload-response');
+        
+        if (result.error) {
+            responseDiv.innerHTML = `<p class="text-red-500">Error: ${result.error}</p>`;
+        } else {
+            responseDiv.innerHTML = `
+                <p class="text-green-500">${result.message}</p>
+                <h3 class="font-semibold mt-4">Preview of Uploaded Dataset:</h3>
+                <div class="overflow-x-auto">${result.preview}</div>
+            `;
+        }
+    });
+
+    // Create dataset form handling
+    document.getElementById('generate-columns').addEventListener('click', function () {
+        const numColumns = document.getElementById('num_columns').value;
+        const container = document.getElementById('column-details-container');
+        container.innerHTML = '';
+
+        for (let i = 0; i < numColumns; i++) {
+            const div = document.createElement('div');
+            div.classList.add('mb-6', 'p-6', 'border', 'border-gray-300', 'rounded-lg', 'bg-gray-50');
+            div.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Column ${i + 1}</h3>
+                <div class="mb-4">
+                    <label for="col_name_${i}" class="block text-sm font-medium text-gray-700">Column Name:</label>
+                    <input type="text" id="col_name_${i}" name="col_name_${i}" required 
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="col_type_${i}" class="block text-sm font-medium text-gray-700">Data Type:</label>
+                    <select id="col_type_${i}" name="col_type_${i}" required 
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="int">Integer</option>
+                        <option value="float">Float</option>
+                        <option value="string">String</option>
+                        <option value="date">Date</option>
+                        <option value="time">Time</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        document.getElementById('submit-form').style.display = 'block';
+    });
+
+// Handle step1 form submission
+document.getElementById('step1-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const columns = [];
+    
+    // Gather column information
+    const numColumns = document.getElementById('num_columns').value;
+    for (let i = 0; i < numColumns; i++) {
+        columns.push({
+            name: document.getElementById(`col_name_${i}`).value,
+            type: document.getElementById(`col_type_${i}`).value
+        });
+    }
+
+    // Store form data for step 2
+    const datasetMeta = {
+        name: document.getElementById('create_name').value,
+        description: document.getElementById('create_description').value,
+        num_rows: document.getElementById('num_rows').value,
+        columns: columns
+    };
+
+    // Generate step 2 table
+    const step2Content = document.getElementById('step2-content');
+    step2Content.innerHTML = `
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Enter Data for ${datasetMeta.name}</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full table-auto border-collapse border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-2 border-b">ID</th>
+                        ${columns.map(col => 
+                            `<th class="px-4 py-2 border-b">${col.name} (${col.type})</th>`
+                        ).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Array.from({length: datasetMeta.num_rows}, (_, rowIndex) => `
+                        <tr class="border-b">
+                            <td class="px-4 py-2">${rowIndex + 1}</td>
+                            ${columns.map((col, colIndex) => `
+                                <td class="px-4 py-2">
+                                    <input 
+                                        type="text" 
+                                        name="data" 
+                                        placeholder="${col.type}"
+                                        data-row="${rowIndex}"
+                                        data-col="${colIndex}"
+                                        required 
+                                        class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                </td>
+                            `).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Add hidden fields for metadata
+    const metadataInput = document.createElement('input');
+    metadataInput.type = 'hidden';
+    metadataInput.name = 'dataset_meta';
+    metadataInput.value = JSON.stringify(datasetMeta);
+    document.getElementById('step2-form').prepend(metadataInput);
+
+    // Close step 1 modal and open step 2
+    closeModal('createModal');
+    openModal('createStep2Modal');
+});
+// Handle step2 form submission
+document.getElementById('step2-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Get all input fields
+    const inputs = document.querySelectorAll('#step2-content input[name="data"]');
+    const formData = new FormData();
+    
+    // Add each input value to formData
+    inputs.forEach((input, index) => {
+        formData.append('data', input.value);
+    });
+
+    // Add the dataset metadata
+    const metadataInput = document.querySelector('input[name="dataset_meta"]');
+    if (metadataInput) {
+        formData.append('dataset_meta', metadataInput.value);
+    }
+
+    const response = await fetch(this.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        }
+    });
+
+    const result = await response.json();
+    if (result.error) {
+        alert(result.error);
+    } else {
+        // Close modal and show success message
+        closeModal('createStep2Modal');
+        alert('Dataset created successfully!');
+        // Redirect to the dataset view page
+        if (result.dataset_id) {
+            window.location.href = `/dataset/${result.dataset_id}/`;
+        }
+    }
+});
+</script>
+{% endblock %}

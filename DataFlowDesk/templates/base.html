@@ -12,76 +12,48 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
-    <div class="flex h-screen overflow-hidden">
-        <!-- Sidebar -->
-        <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0">
-            <div class="p-4">
-                <h1 class="text-xl font-bold text-gray-800">Project Assets</h1>
-                <nav class="mt-4">
-                    <ul class="space-y-2">
-                        <li>
-                            <a href="#" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Data Exploration</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Modeling</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Machine Learning</span>
-                            </a>
-                        </li>
-                        <!-- Upload Dataset Option -->
-                        <li>
-                            <a href="{% url 'upload_page' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Upload Dataset</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'all_datasets' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Show all dataset</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'create_dataset_step1' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Create Dataset</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'model_training' %}" class="flex items-center p-2 text-gray-700 hover:bg-gray-100 rounded-md">
-                                <span>Model Training</span>
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto">
-            <!-- Top Bar -->
-            <header class="bg-white shadow">
-                <div class="flex items-center justify-between p-4">
-                    <h1 class="text-lg font-semibold text-gray-800">
-                        {% block header_title %}{% endblock %}
-                    </h1>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Navigation -->
+    <nav class="bg-slate-800 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <a href="/" class="flex items-center text-white font-bold text-xl">
+                        ML Analyzer
+                    </a>
                 </div>
-            </header>
+                <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
+                    <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Documentation</a>
+                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">About</a>
+                </div>
+                <!-- Mobile menu button -->
+                <div class="flex items-center sm:hidden">
+                    <button type="button" class="text-gray-300 hover:text-white">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
 
-            <!-- Dynamic Content -->
-            <section class="p-4 space-y-6">
-                {% block content %}{% endblock %}
-            </section>
-        </main>
-    </div>
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}
+        {% endblock %}
+    </main>
 
     <!-- Footer -->
-    <footer class="p-4 bg-gray-800 text-white text-center">
-        <p>&copy; 2024 Your Company. All rights reserved.</p>
+    <footer class="bg-slate-800 text-white">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <p class="text-sm">© 2024 ML Analyzer. All rights reserved.</p>
+            </div>
+        </div>
     </footer>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
