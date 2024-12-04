@@ -3,18 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Data Flow Desk{% endblock %}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-    <link href="{% static 'css/output.css' %}" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <title>{% block title %}ML Analyzer{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- Navigation -->
-    <nav class="bg-slate-800 shadow-lg">
+    <nav id="main-nav" class="bg-slate-800 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex">
@@ -23,9 +18,9 @@
                     </a>
                 </div>
                 <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-                    <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Documentation</a>
-                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">About</a>
+                    <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Home</a>
+                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Documentation</a>
+                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">About</a>
                 </div>
                 <!-- Mobile menu button -->
                 <div class="flex items-center sm:hidden">
@@ -49,10 +44,61 @@
     <footer class="bg-slate-800 text-white">
         <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <div class="text-center">
-                <p class="text-sm">© 2024 ML Analyzer. All rights reserved.</p>
+                <p class="text-sm"> 2024 ML Analyzer. All rights reserved.</p>
             </div>
         </div>
     </footer>
+
+    <script>
+    // Smart navigation that hides when not scrolling
+    let lastScroll = 0;
+    let isScrolling;
+
+    // Function to handle scroll events
+    function handleScroll() {
+        const nav = document.getElementById('main-nav');
+        const currentScroll = window.scrollY;
+
+        // Show/hide navigation based on scroll position
+        if (currentScroll > lastScroll) {
+            // Scrolling down
+            nav.classList.add('nav-hidden');
+        } else {
+            // Scrolling up
+            nav.classList.remove('nav-hidden');
+        }
+
+        // Add sticky class if not at the top
+        if (currentScroll > 0) {
+            nav.classList.add('sticky-nav');
+        } else {
+            nav.classList.remove('sticky-nav');
+            nav.classList.remove('nav-hidden');
+        }
+
+        lastScroll = currentScroll;
+
+        // Clear the timeout
+        clearTimeout(isScrolling);
+
+        // Set a timeout to run after scrolling ends
+        isScrolling = setTimeout(() => {
+            // Show navigation when scrolling stops
+            nav.classList.remove('nav-hidden');
+        }, 1500); // Show after 1.5 seconds of no scrolling
+    }
+
+    // Add scroll event listener
+    window.addEventListener('scroll', handleScroll);
+
+    // Show navigation when mouse moves near the top of the screen
+    document.addEventListener('mousemove', (e) => {
+        const nav = document.getElementById('main-nav');
+        if (e.clientY <= 60) { // Mouse is near the top
+            nav.classList.remove('nav-hidden');
+        }
+    });
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

@@ -2,38 +2,150 @@
 
 {% block title %}ML Analyzer - Home{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Animation classes */
+    .fade-up {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .fade-up.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .stagger-fade > * {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .stagger-fade.visible > *:nth-child(1) { transition-delay: 0.1s; }
+    .stagger-fade.visible > *:nth-child(2) { transition-delay: 0.2s; }
+    .stagger-fade.visible > *:nth-child(3) { transition-delay: 0.3s; }
+
+    .stagger-fade.visible > * {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .scale-in {
+        opacity: 0;
+        transform: scale(0.95);
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .scale-in.visible {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    .slide-in-left {
+        opacity: 0;
+        transform: translateX(-30px);
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .slide-in-right {
+        opacity: 0;
+        transform: translateX(30px);
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .slide-in-left.visible,
+    .slide-in-right.visible {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    /* Floating animation for cards */
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+    }
+
+    .float-animation:hover {
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .sticky-nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 50;
+        backdrop-filter: blur(8px);
+        background-color: rgba(30, 41, 59, 0.95);
+        transition: all 0.3s ease-in-out;
+        transform: translateY(0);
+    }
+
+    .nav-hidden {
+        transform: translateY(-100%);
+    }
+
+    .gradient-text {
+        background: linear-gradient(135deg, #6366f1, #3b82f6, #2563eb);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: gradient 8s ease infinite;
+        background-size: 200% 200%;
+    }
+
+    @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .hero-gradient {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.1));
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section -->
-<section class="relative overflow-hidden bg-white">
-    <div class="mx-auto max-w-7xl px-6 pt-24 pb-24 sm:pt-32 lg:px-8">
+<section class="relative overflow-hidden hero-gradient min-h-screen flex items-center">
+    <div class="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
         <div class="mx-auto max-w-2xl text-center">
-            <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
-                ML Analyzer Platform
+            <div class="mb-8 inline-flex items-center justify-center px-6 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-gradient-to-r from-indigo-600 to-blue-600">
+                Welcome to ML Analyzer
+            </div>
+            <h1 class="text-4xl font-bold tracking-tight sm:text-6xl mb-6 gradient-text">
+                Machine Learning Analysis Platform
             </h1>
-            <p class="mt-6 text-lg leading-8 text-gray-600">
+            <p class="mt-6 text-lg leading-8 text-gray-700">
                 Empower your data analysis journey with our advanced machine learning platform. 
                 Seamlessly manage, analyze, and derive insights from your datasets with intuitive tools and powerful algorithms.
             </p>
             <div class="mt-10 flex items-center justify-center gap-x-6">
-                <a href="#get-started" class="rounded-full bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all duration-300 ease-in-out transform hover:scale-105">
+                <a href="#get-started" 
+                   class="rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-8 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 ease-in-out">
                     Get Started
                 </a>
-                <a href="#learn-more" class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600 transition-colors duration-300">
+                <a href="#learn-more" 
+                   class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600 transition-colors duration-300">
                     Learn more <span aria-hidden="true">→</span>
                 </a>
             </div>
         </div>
     </div>
     <!-- Background pattern -->
-    <div class="absolute inset-x-0 top-0 -z-10 transform-gpu overflow-hidden blur-3xl" aria-hidden="true">
-        <div class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]" style="clip-path: polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)"></div>
+    <div class="absolute inset-0 -z-10">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-blue-50"></div>
+        <div class="absolute inset-y-0 right-1/2 -z-10 mr-16 w-[200%] origin-bottom-left skew-x-[-30deg] bg-white shadow-xl shadow-indigo-600/10 ring-1 ring-indigo-50 sm:mr-28 lg:mr-0 xl:mr-16 xl:origin-center"></div>
+        <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-100/0 via-blue-100/50 to-blue-100/0"></div>
     </div>
 </section>
 
 <!-- Get Started Section -->
 <section id="get-started" class="py-24 bg-gray-50">
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center mb-16">
+        <div class="mx-auto max-w-2xl text-center mb-16 fade-up">
             <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Start Your Analysis Journey</h2>
             <p class="mt-4 text-lg leading-8 text-gray-600">
                 Choose how you want to begin working with your data
@@ -42,8 +154,8 @@
         
         <div class="mx-auto grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-2">
             <!-- Upload Dataset Card -->
-            <div class="relative group">
-                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+            <div class="relative group slide-in-left">
+                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer float-animation"
                      onclick="openModal('uploadModal')">
                     <div class="flex flex-col items-center">
                         <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
@@ -60,8 +172,8 @@
             </div>
 
             <!-- Create Dataset Card -->
-            <div class="relative group">
-                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+            <div class="relative group slide-in-right">
+                <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer float-animation"
                      onclick="openModal('createModal')">
                     <div class="flex flex-col items-center">
                         <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
@@ -84,15 +196,15 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Feature Cards -->
-        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2 scale-in">
             <h3 class="text-xl font-semibold text-slate-800 mb-3">Data Analysis</h3>
             <p class="text-gray-600">Comprehensive tools for data preprocessing, visualization, and analysis</p>
         </div>
-        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2 scale-in">
             <h3 class="text-xl font-semibold text-slate-800 mb-3">ML Models</h3>
             <p class="text-gray-600">Wide range of machine learning algorithms for various use cases</p>
         </div>
-        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2">
+        <div class="bg-white rounded-xl shadow-md p-6 transition-transform duration-300 hover:-translate-y-2 scale-in">
             <h3 class="text-xl font-semibold text-slate-800 mb-3">Visualization</h3>
             <p class="text-gray-600">Interactive charts and graphs for better data understanding</p>
         </div>
@@ -100,7 +212,7 @@
 
     <!-- Algorithms Section -->
     <div class="mt-16">
-        <h2 class="text-3xl font-bold text-center text-slate-800 mb-8">Available Algorithms</h2>
+        <h2 class="text-3xl font-bold text-center text-slate-800 mb-8 fade-up">Available Algorithms</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-4">
                 <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
@@ -182,7 +294,7 @@
             </div>
 
             <button type="submit"
-                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all duration-300 ease-in-out transform hover:scale-105">
                 Upload Dataset
             </button>
         </form>
@@ -363,7 +475,7 @@
                 <div class="mb-4">
                     <label for="col_name_${i}" class="block text-sm font-medium text-gray-700">Column Name:</label>
                     <input type="text" id="col_name_${i}" name="col_name_${i}" required 
-                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div class="mb-4">
                     <label for="col_type_${i}" class="block text-sm font-medium text-gray-700">Data Type:</label>
@@ -494,6 +606,29 @@ document.getElementById('step2-form').addEventListener('submit', async function(
             window.location.href = `/dataset/${result.dataset_id}/`;
         }
     }
+});
+
+// Intersection Observer for scroll animations
+const observerOptions = {
+    root: null,
+    rootMargin: '0px',
+    threshold: 0.1
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            // Unobserve after animation
+            observer.unobserve(entry.target);
+        }
+    });
+}, observerOptions);
+
+// Observe all animated elements
+document.addEventListener('DOMContentLoaded', () => {
+    const animatedElements = document.querySelectorAll('.fade-up, .stagger-fade, .scale-in, .slide-in-left, .slide-in-right');
+    animatedElements.forEach(el => observer.observe(el));
 });
 </script>
 {% endblock %}
