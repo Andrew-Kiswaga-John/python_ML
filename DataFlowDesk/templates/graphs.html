@@ -17,80 +17,45 @@
                 <h2 class="text-xl font-semibold text-gray-900">Graph Configuration</h2>
             </div>
             <div class="p-6 space-y-6">
-                <!-- Graph Type Selector -->
+                <!-- X-Axis Selection -->
                 <div class="flex flex-col space-y-2">
-                    <label for="graph-type" class="text-sm font-medium text-gray-700">Graph Type</label>
+                    <label for="x-axis" class="text-sm font-medium text-gray-700">Select Column to Analyze</label>
+                    <div class="relative">
+                        <select id="x-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                            <option value="">Select a column</option>
+                        </select>
+                    </div>
+                    <p id="x-axis-info" class="text-sm text-gray-500"></p>
+                </div>
+
+                <!-- Graph Type Selection -->
+                <div class="flex flex-col space-y-2">
+                    <label for="graph-type" class="text-sm font-medium text-gray-700">Recommended Graph Type</label>
                     <div class="relative">
                         <select id="graph-type" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
-                            <!-- Options will be dynamically populated -->
+                            <option value="">Select graph type</option>
                         </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
                     </div>
+                    <p id="graph-type-reason" class="text-sm text-gray-500"></p>
                 </div>
 
-                <!-- Axis Selection -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="flex flex-col space-y-2">
-                        <label for="x-axis" class="text-sm font-medium text-gray-700">X-Axis</label>
-                        <div class="relative">
-                            <select id="x-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
-                                <!-- Options will be dynamically populated -->
-                            </select>
-                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col space-y-2">
-                        <label for="y-axis" class="text-sm font-medium text-gray-700">Y-Axis</label>
-                        <div class="relative">
-                            <select id="y-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
-                                <!-- Options will be dynamically populated -->
-                            </select>
-                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Grouping Option -->
-                <div class="flex flex-col space-y-2">
-                    <label for="grouping-column" class="text-sm font-medium text-gray-700">Group By (Optional)</label>
+                <!-- Y-Axis Selection (Optional) -->
+                <div id="y-axis-container" class="flex flex-col space-y-2" style="display: none;">
+                    <label for="y-axis" class="text-sm font-medium text-gray-700">Y-Axis (Optional)</label>
                     <div class="relative">
-                        <select id="grouping-column" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
-                            <option value="">None</option>
-                            <!-- Options will be dynamically populated -->
+                        <select id="y-axis" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                            <option value="">Select Y-Axis</option>
                         </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
                     </div>
+                    <p id="y-axis-info" class="text-sm text-gray-500"></p>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                     <button id="generate-graph" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
                         Generate Graph
                     </button>
                     <button id="save-graph" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                        </svg>
                         Save Graph
                     </button>
                 </div>
@@ -108,18 +73,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Saved Graphs Section -->
-        <div class="bg-white rounded-xl shadow-sm">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Saved Graphs</h2>
-            </div>
-            <div class="p-6">
-                <div id="saved-graphs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Saved graphs will be dynamically populated here -->
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -133,221 +86,574 @@
 <script type="application/json" id="dataset-columns">
     {{ columns|safe }}
 </script>
-<script type="application/json" id="column-types">
-    {{ column_types|safe }}
+<script type="application/json" id="column-relationships">
+    {{ column_relationships|safe }}
 </script>
-
-
 
 <script>
     // Parse serialized data
     const dataset = JSON.parse(document.getElementById('dataset-data').textContent);
     const datasetColumns = JSON.parse(document.getElementById('dataset-columns').textContent);
-    const columnTypes = JSON.parse(document.getElementById('column-types').textContent);
+    const columnRelationships = JSON.parse(document.getElementById('column-relationships').textContent);
     
     const xAxisSelect = document.getElementById('x-axis');
     const yAxisSelect = document.getElementById('y-axis');
-    const groupingSelect = document.getElementById('grouping-column');
+    const yAxisContainer = document.getElementById('y-axis-container');
     const graphTypeSelect = document.getElementById('graph-type');
-    const savedGraphsContainer = document.getElementById('saved-graphs');
+    const graphTypeReason = document.getElementById('graph-type-reason');
     
-    let chartInstance; // To store the current chart instance
-    
-    // Define compatible graphs for each data type
-    const graphCompatibility = {
-        categorical: ['bar', 'histogram', 'pie'],
-        continuous: ['scatter', 'line', 'histogram'],
-        discrete: ['bar', 'scatter', 'line']
-    };
-    
-    // Filter out irrelevant columns (like 'ID') when populating the axis selectors
-    const relevantColumns = datasetColumns.filter(column => column !== "ID"); // Exclude "ID" column
-    
-    // Populate axis selectors with relevant columns
-    relevantColumns.forEach(column => {
-        const option = document.createElement('option');
-        option.value = column;
-        option.textContent = column;
-    
-        xAxisSelect.appendChild(option.cloneNode(true));
-        yAxisSelect.appendChild(option.cloneNode(true));
-        groupingSelect.appendChild(option.cloneNode(true));
-    });
-    
-    // Update graph type options based on selected X-axis
-    xAxisSelect.addEventListener('change', () => {
-        const selectedColumn = xAxisSelect.value;
-        const columnType = columnTypes[selectedColumn];
-    
-        // Clear and populate graph type selector
-        graphTypeSelect.innerHTML = '';
-        if (columnType && graphCompatibility[columnType]) {
-            graphCompatibility[columnType].forEach(graph => {
+    let chartInstance;
+
+    // Function to populate column selector
+    function populateColumnSelector() {
+        xAxisSelect.innerHTML = '<option value="">Select a column</option>';
+        yAxisSelect.innerHTML = '<option value="">Select Y-Axis</option>';
+        
+        // Add columns that can be analyzed
+        datasetColumns.forEach(column => {
+            const rel = columnRelationships[column];
+            if (!rel.is_text_heavy && !rel.is_identifier) {
                 const option = document.createElement('option');
-                option.value = graph;
-                option.textContent = graph.replace(/^\w/, c => c.toUpperCase());
-                graphTypeSelect.appendChild(option);
-            });
-        }
-    });
-    
-    // Disable Y-axis for Pie Chart
-    graphTypeSelect.addEventListener('change', () => {
-        const selectedType = graphTypeSelect.value;
-        yAxisSelect.disabled = selectedType === 'pie'; // Disable Y-axis for pie charts
-    });
-    
-    // Save graph configuration to localStorage
-    document.getElementById('save-graph').addEventListener('click', () => {
-        const graphType = graphTypeSelect.value;
-        const xAxis = xAxisSelect.value;
-        const yAxis = yAxisSelect.value;
-        const grouping = groupingSelect.value;
-    
-        if (!xAxis || (!yAxis && graphType !== 'pie') || !graphType) {
-            alert('Please select valid X-Axis, Y-Axis, and Graph Type.');
-            return;
-        }
-    
-        const graphConfig = {
-            graphType,
-            xAxis,
-            yAxis,
-            grouping,
-            dataset: dataset, // You could also store only the necessary data for the graph
-        };
-    
-        // Save to localStorage (can use a unique identifier for each graph)
-        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
-        savedGraphs.push(graphConfig);
-        localStorage.setItem('savedGraphs', JSON.stringify(savedGraphs));
-    
-        // Reload saved graphs
-        loadSavedGraphs();
-    });
-    
-    // Load saved graphs from localStorage and display
-    function loadSavedGraphs() {
-        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
-        savedGraphsContainer.innerHTML = '';
-    
-        savedGraphs.forEach((graph, index) => {
-            const graphElement = document.createElement('div');
-            graphElement.classList.add('mb-4', 'border', 'p-4', 'rounded-lg');
-            graphElement.innerHTML = `
-                <p><strong>Graph ${index + 1}:</strong> ${graph.xAxis} vs ${graph.yAxis} (${graph.graphType})</p>
-                <button class="px-4 py-2 bg-blue-500 text-white rounded-lg" onclick="viewSavedGraph(${index})">View</button>
-                <button class="px-4 py-2 bg-red-500 text-white rounded-lg" onclick="deleteGraph(${index})">Delete</button>
-            `;
-            savedGraphsContainer.appendChild(graphElement);
+                option.value = column;
+                option.textContent = `${column} (${rel.type})`;
+                xAxisSelect.appendChild(option);
+                
+                // Add numerical columns to y-axis selector
+                if (rel.recommended_as_y) {
+                    const yOption = document.createElement('option');
+                    yOption.value = column;
+                    yOption.textContent = `${column} (${rel.type})`;
+                    yAxisSelect.appendChild(yOption);
+                }
+            }
         });
     }
-    
-    // View saved graph by loading it into the canvas
-    function viewSavedGraph(index) {
-        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
-        const graphConfig = savedGraphs[index];
-    
-        xAxisSelect.value = graphConfig.xAxis;
-        yAxisSelect.value = graphConfig.yAxis;
-        graphTypeSelect.value = graphConfig.graphType;
-        groupingSelect.value = graphConfig.grouping;
-    
-        generateGraph(graphConfig);
+
+    // Function to update graph recommendations
+    function updateGraphRecommendations() {
+        const xColumn = xAxisSelect.value;
+        if (!xColumn) return;
+        
+        const xInfo = columnRelationships[xColumn];
+        const yColumn = yAxisSelect.value;
+        
+        // Clear previous options
+        graphTypeSelect.innerHTML = '<option value="">Select graph type</option>';
+        graphTypeReason.textContent = '';
+        
+        // Get recommendations
+        const recommendations = getRecommendedGraphs(xColumn, yColumn);
+        
+        // Show/hide y-axis selector based on selected graph type
+        const selectedGraphType = graphTypeSelect.value;
+        const selectedRecommendation = recommendations.find(r => r.type === selectedGraphType);
+        
+        if (xInfo.type === 'categorical') {
+            // For categorical columns, always show Y-axis selector with "Count" as an option
+            yAxisContainer.style.display = 'block';
+            
+            // Save current selection
+            const currentYAxis = yAxisSelect.value;
+            
+            // Clear and repopulate Y-axis options
+            yAxisSelect.innerHTML = '<option value="">Count</option>';
+            
+            // Add numerical columns as options
+            datasetColumns.forEach(column => {
+                const rel = columnRelationships[column];
+                if (rel.recommended_as_y && column !== xColumn) {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = `${column} (${rel.type})`;
+                    yAxisSelect.appendChild(option);
+                }
+            });
+            
+            // Restore previous selection if valid
+            if (currentYAxis) {
+                yAxisSelect.value = currentYAxis;
+            }
+        } else {
+            // For non-categorical columns, show Y-axis selector only when needed
+            yAxisContainer.style.display = selectedRecommendation?.requires_y ? 'block' : 'none';
+            if (!selectedRecommendation?.requires_y) {
+                yAxisSelect.value = '';
+            }
+        }
+        
+        // Populate graph type selector
+        recommendations.forEach(rec => {
+            const option = document.createElement('option');
+            option.value = rec.type;
+            option.textContent = `${rec.type.charAt(0).toUpperCase() + rec.type.slice(1)} (${Math.round(rec.confidence * 100)}% recommended)`;
+            option.dataset.reason = rec.reason;
+            option.dataset.requiresY = rec.requires_y;
+            graphTypeSelect.appendChild(option);
+        });
+        
+        // Select the highest confidence recommendation
+        if (recommendations.length > 0) {
+            graphTypeSelect.value = recommendations[0].type;
+            graphTypeReason.textContent = recommendations[0].reason;
+        }
     }
-    
-    // Delete a saved graph
-    function deleteGraph(index) {
-        const savedGraphs = JSON.parse(localStorage.getItem('savedGraphs')) || [];
-        savedGraphs.splice(index, 1);
-        localStorage.setItem('savedGraphs', JSON.stringify(savedGraphs));
-        loadSavedGraphs(); // Reload the saved graphs after deletion
+
+    // Function to get recommended graphs (frontend version)
+    function getRecommendedGraphs(xCol, yCol) {
+        const xInfo = columnRelationships[xCol];
+        const recommendations = [];
+        
+        if (xInfo.type === 'categorical') {
+            if (!yCol) {
+                // For categorical columns without y-axis
+                if (xInfo.unique_count <= 10) {
+                    recommendations.push({
+                        type: 'pie',
+                        confidence: 0.95,
+                        reason: 'Best for showing distribution of categories'
+                    });
+                }
+                recommendations.push({
+                    type: 'bar',
+                    confidence: 0.9,
+                    reason: 'Good for showing category counts'
+                });
+            } else {
+                // For categorical with numerical y-axis
+                const yInfo = columnRelationships[yCol];
+                if (yInfo.type === 'continuous' || yInfo.type === 'discrete') {
+                    recommendations.push({
+                        type: 'bar',
+                        confidence: 0.9,
+                        reason: 'Best for comparing numerical values across categories'
+                    });
+                }
+            }
+        } else if (xInfo.type === 'datetime' && yCol) {
+            recommendations.push({
+                type: 'line',
+                confidence: 0.95,
+                reason: 'Best for showing trends over time'
+            });
+            recommendations.push({
+                type: 'scatter',
+                confidence: 0.8,
+                reason: 'Alternative for showing detailed time-based patterns'
+            });
+        } else if ((xInfo.type === 'continuous' || xInfo.type === 'discrete') && yCol) {
+            const yInfo = columnRelationships[yCol];
+            if (yInfo.type === 'continuous' || yInfo.type === 'discrete') {
+                recommendations.push({
+                    type: 'scatter',
+                    confidence: 0.9,
+                    reason: 'Best for showing relationships between numerical variables'
+                });
+                if (xInfo.type === 'discrete' || yInfo.type === 'discrete') {
+                    recommendations.push({
+                        type: 'bar',
+                        confidence: 0.85,
+                        reason: 'Good for comparing discrete values'
+                    });
+                }
+                recommendations.push({
+                    type: 'distribution',
+                    confidence: 0.8,
+                    reason: 'Alternative for showing distribution of values'
+                });
+                recommendations.push({
+                    type: 'box',
+                    confidence: 0.8,
+                    reason: 'Alternative for showing distribution of values'
+                });
+            }
+        }
+        
+        return recommendations;
     }
-    
-    // Generate graph based on selected options
-    document.getElementById('generate-graph').addEventListener('click', () => {
+
+    // Function to generate the graph
+    function generateGraph() {
+        const xColumn = xAxisSelect.value;
+        const yColumn = yAxisSelect.value;
         const graphType = graphTypeSelect.value;
-        const xAxis = xAxisSelect.value;
-        const yAxis = yAxisSelect.value;
-        const grouping = groupingSelect.value;
-    
-        if (!xAxis || (!yAxis && graphType !== 'pie') || !graphType) {
-            alert('Please select valid X-Axis, Y-Axis, and Graph Type.');
+        
+        if (!xColumn || !graphType) {
+            alert('Please select both a column and a graph type');
             return;
         }
-    
-        generateGraph({ graphType, xAxis, yAxis, grouping });
-    });
-    
-// Helper function to generate the graph
-function generateGraph(config) {
-    const xAxis = config.xAxis;
-    const yAxis = config.yAxis;
-    const grouping = config.grouping;
-    const graphType = config.graphType;
 
-    // Combine values if same X-Axis category is repeated
-    const groupedData = dataset.reduce((acc, row) => {
-        const xValue = row[datasetColumns.indexOf(xAxis)];
-        const yValue = graphType === 'pie' ? 1 : row[datasetColumns.indexOf(yAxis)];
+        const xInfo = columnRelationships[xColumn];
+        const yInfo = yColumn ? columnRelationships[yColumn] : null;
+        
+        // Process data based on graph type
+        let chartData;
+        let chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: yColumn ? 
+                        `${yColumn} by ${xColumn}` : 
+                        `Distribution of ${xColumn}`
+                }
+            }
+        };
 
-        // Initialize or update data aggregation
-        if (!acc[xValue]) {
-            acc[xValue] = { x: xValue, y: 0 }; // Initialize accumulator for this category
+        if (graphType === 'pie') {
+            // Process data for pie chart (always uses counts)
+            const counts = {};
+            dataset.forEach(row => {
+                const value = row[datasetColumns.indexOf(xColumn)];
+                counts[value] = (counts[value] || 0) + 1;
+            });
+
+            chartData = {
+                labels: Object.keys(counts),
+                datasets: [{
+                    data: Object.values(counts),
+                    backgroundColor: Object.keys(counts).map((_, i) => 
+                        `hsl(${(i * 360) / Object.keys(counts).length}, 70%, 70%)`
+                    )
+                }]
+            };
+        } else if (graphType === 'bar') {
+            // Process data for bar chart (can use counts or numerical values)
+            const processedData = {};
+            
+            dataset.forEach(row => {
+                const xValue = row[datasetColumns.indexOf(xColumn)];
+                const yValue = yColumn ? 
+                    parseFloat(row[datasetColumns.indexOf(yColumn)]) : 
+                    1; // Use 1 for counting
+                
+                if (xValue !== null && xValue !== undefined && (!yColumn || !isNaN(yValue))) {
+                    if (!processedData[xValue]) {
+                        processedData[xValue] = {
+                            count: 0,
+                            sum: 0,
+                            values: [] // Store all values for statistical calculations
+                        };
+                    }
+                    processedData[xValue].count++;
+                    processedData[xValue].sum += yValue;
+                    if (yColumn) {
+                        processedData[xValue].values.push(yValue);
+                    }
+                }
+            });
+
+            const labels = Object.keys(processedData);
+            let values;
+            let datasets = [];
+
+            if (!yColumn) {
+                // If no Y-axis selected, show counts
+                values = Object.values(processedData).map(v => v.count);
+                datasets.push({
+                    label: 'Count',
+                    data: values,
+                    backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1
+                });
+            } else {
+                // For numerical Y-axis, show mean and error bars
+                const means = Object.values(processedData).map(v => v.sum / v.count);
+                const stdDevs = Object.values(processedData).map(v => {
+                    const mean = v.sum / v.count;
+                    const squaredDiffs = v.values.map(val => Math.pow(val - mean, 2));
+                    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / v.values.length;
+                    return Math.sqrt(variance);
+                });
+
+                // Add main bars showing means
+                datasets.push({
+                    label: `Average ${yColumn}`,
+                    data: means,
+                    backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1
+                });
+
+                // Add error bars
+                datasets.push({
+                    label: 'Standard Deviation',
+                    data: labels.map((_, i) => ({
+                        x: labels[i],
+                        y: means[i],
+                        yMin: means[i] - stdDevs[i],
+                        yMax: means[i] + stdDevs[i]
+                    })),
+                    type: 'line',
+                    backgroundColor: 'transparent',
+                    borderColor: 'transparent',
+                    pointStyle: false,
+                    error: {
+                        type: 'bar',
+                        display: true,
+                        color: 'rgb(99, 102, 241)',
+                        lineWidth: 2
+                    }
+                });
+            }
+
+            chartData = {
+                labels: labels,
+                datasets: datasets
+            };
+
+            // Add appropriate scales
+            chartOptions.scales = {
+                x: {
+                    title: {
+                        display: true,
+                        text: xColumn
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: yColumn || 'Count'
+                    },
+                    beginAtZero: true
+                }
+            };
+
+            // Add error bar plugin if showing numerical values
+            if (yColumn) {
+                chartOptions.plugins.errorBars = {
+                    enabled: true,
+                    lineWidth: 2,
+                    color: 'rgb(99, 102, 241)'
+                };
+            }
+        } else if (graphType === 'distribution' || graphType === 'box') {
+            // Process data for distribution/box plots
+            const categoryData = {};
+            
+            dataset.forEach(row => {
+                const xValue = row[datasetColumns.indexOf(xColumn)];
+                const yValue = parseFloat(row[datasetColumns.indexOf(yColumn)]);
+                
+                if (xValue !== null && xValue !== undefined && !isNaN(yValue)) {
+                    if (!categoryData[xValue]) {
+                        categoryData[xValue] = [];
+                    }
+                    categoryData[xValue].push(yValue);
+                }
+            });
+
+            if (graphType === 'distribution') {
+                // Create violin or distribution plot
+                const labels = Object.keys(categoryData);
+                const datasets = [];
+                
+                labels.forEach((category, i) => {
+                    const values = categoryData[category];
+                    const color = `hsl(${(i * 360) / labels.length}, 70%, 70%)`;
+                    
+                    // Calculate basic statistics
+                    const min = Math.min(...values);
+                    const max = Math.max(...values);
+                    const avg = values.reduce((a, b) => a + b) / values.length;
+                    const median = values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+                    
+                    datasets.push({
+                        label: category,
+                        data: [{
+                            x: category,
+                            y: avg,
+                            min: min,
+                            max: max,
+                            median: median,
+                            q1: calculateQuantile(values, 0.25),
+                            q3: calculateQuantile(values, 0.75)
+                        }],
+                        backgroundColor: color,
+                        borderColor: color,
+                        borderWidth: 1
+                    });
+                });
+
+                chartData = {
+                    labels: labels,
+                    datasets: datasets
+                };
+
+                // Custom options for distribution plot
+                chartOptions.scales = {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: yColumn
+                        }
+                    }
+                };
+                
+                // Add custom drawing for distribution
+                chartOptions.plugins.customCanvasBackgroundColor = {
+                    beforeDraw: (chart) => {
+                        const ctx = chart.ctx;
+                        const xAxis = chart.scales.x;
+                        const yAxis = chart.scales.y;
+                        
+                        chart.data.datasets.forEach((dataset) => {
+                            dataset.data.forEach((dataPoint) => {
+                                const xPos = xAxis.getPixelForValue(dataPoint.x);
+                                const yPos = yAxis.getPixelForValue(dataPoint.y);
+                                
+                                // Draw violin plot shape
+                                ctx.beginPath();
+                                ctx.moveTo(xPos, yAxis.getPixelForValue(dataPoint.min));
+                                ctx.lineTo(xPos, yAxis.getPixelForValue(dataPoint.max));
+                                ctx.stroke();
+                                
+                                // Draw box for IQR
+                                const boxWidth = 20;
+                                ctx.fillStyle = dataset.backgroundColor;
+                                ctx.fillRect(
+                                    xPos - boxWidth/2,
+                                    yAxis.getPixelForValue(dataPoint.q3),
+                                    boxWidth,
+                                    yAxis.getPixelForValue(dataPoint.q1) - yAxis.getPixelForValue(dataPoint.q3)
+                                );
+                                
+                                // Draw median line
+                                ctx.beginPath();
+                                ctx.moveTo(xPos - boxWidth/2, yAxis.getPixelForValue(dataPoint.median));
+                                ctx.lineTo(xPos + boxWidth/2, yAxis.getPixelForValue(dataPoint.median));
+                                ctx.stroke();
+                            });
+                        });
+                    }
+                };
+            } else if (graphType === 'box') {
+                // Create box plot
+                const labels = Object.keys(categoryData);
+                const boxplotData = labels.map(category => {
+                    const values = categoryData[category].sort((a, b) => a - b);
+                    return {
+                        min: values[0],
+                        q1: calculateQuantile(values, 0.25),
+                        median: calculateQuantile(values, 0.5),
+                        q3: calculateQuantile(values, 0.75),
+                        max: values[values.length - 1],
+                        outliers: []
+                    };
+                });
+
+                chartData = {
+                    labels: labels,
+                    datasets: [{
+                        label: yColumn,
+                        data: boxplotData,
+                        backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                        borderColor: 'rgb(99, 102, 241)',
+                        borderWidth: 1
+                    }]
+                };
+
+                // Custom options for box plot
+                chartOptions.scales = {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: yColumn
+                        }
+                    }
+                };
+            }
+        } else {
+            // Process data for other chart types (line, scatter)
+            const processedData = dataset.reduce((acc, row) => {
+                const xValue = row[datasetColumns.indexOf(xColumn)];
+                const yValue = yColumn ? parseFloat(row[datasetColumns.indexOf(yColumn)]) : 1;
+                
+                if (xValue !== null && xValue !== undefined && (!yColumn || !isNaN(yValue))) {
+                    if (!acc[xValue]) {
+                        acc[xValue] = {
+                            count: 0,
+                            sum: 0
+                        };
+                    }
+                    acc[xValue].count++;
+                    acc[xValue].sum += yValue || 1;
+                }
+                return acc;
+            }, {});
+
+            const labels = Object.keys(processedData);
+            const values = Object.values(processedData).map(v => 
+                yColumn ? v.sum / v.count : v.count
+            );
+
+            chartData = {
+                labels: labels,
+                datasets: [{
+                    label: yColumn || 'Count',
+                    data: values,
+                    backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1
+                }]
+            };
+
+            // Add appropriate scales
+            chartOptions.scales = {
+                x: {
+                    title: {
+                        display: true,
+                        text: xColumn
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: yColumn || 'Count'
+                    },
+                    beginAtZero: true
+                }
+            };
         }
-        acc[xValue].y += yValue; // Add the Y-axis values or 1 for pie chart
 
-        return acc;
-    }, {});
-
-    const groupedDataArray = Object.values(groupedData);
-
-    let chartData;
-    let chartOptions = { responsive: true, maintainAspectRatio: false };
-
-    // Check for Pie Chart specifically
-    if (graphType === 'pie') {
-        chartData = {
-            labels: groupedDataArray.map(item => item.x),
-            datasets: [{
-                data: groupedDataArray.map(item => item.y),
-                backgroundColor: groupedDataArray.map(() => `hsl(${Math.random() * 360}, 70%, 70%)`), // Random colors
-                hoverOffset: 4
-            }]
-        };
-        chartOptions.plugins = {
-            legend: { position: 'top' },
-        };
-    } else {
-        // Handle other graph types
-        chartData = {
-            labels: groupedDataArray.map(item => item.x),
-            datasets: [{
-                label: yAxis,
-                data: groupedDataArray.map(item => item.y),
-                backgroundColor: 'rgba(0, 123, 255, 0.5)',
-                borderColor: 'rgba(0, 123, 255, 1)',
-                borderWidth: 1
-            }]
-        };
+        // Create or update chart
+        const ctx = document.getElementById('chartCanvas').getContext('2d');
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        chartInstance = new Chart(ctx, {
+            type: graphType === 'box' || graphType === 'distribution' ? 'bar' : graphType,
+            data: chartData,
+            options: chartOptions,
+            plugins: graphType === 'distribution' ? [chartOptions.plugins.customCanvasBackgroundColor] : []
+        });
     }
 
-    // Create or update the chart
-    const ctx = document.getElementById('chartCanvas').getContext('2d');
-    if (chartInstance) {
-        chartInstance.destroy();
+    // Helper function to calculate quantiles
+    function calculateQuantile(sortedArray, q) {
+        const pos = (sortedArray.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sortedArray[base + 1] !== undefined) {
+            return sortedArray[base] + rest * (sortedArray[base + 1] - sortedArray[base]);
+        } else {
+            return sortedArray[base];
+        }
     }
-    chartInstance = new Chart(ctx, {
-        type: graphType,
-        data: chartData,
-        options: chartOptions
+
+    // Event listeners
+    xAxisSelect.addEventListener('change', updateGraphRecommendations);
+    yAxisSelect.addEventListener('change', updateGraphRecommendations);
+    graphTypeSelect.addEventListener('change', function() {
+        graphTypeReason.textContent = this.selectedOptions[0]?.dataset?.reason || '';
     });
-}
 
-    // Load saved graphs when the page is loaded
-    loadSavedGraphs();
-    
-    </script>
-    
+    document.getElementById('generate-graph').addEventListener('click', generateGraph);
 
+    // Initialize the form
+    populateColumnSelector();
+</script>
 {% endblock %}

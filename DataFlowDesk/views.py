@@ -518,38 +518,259 @@ def generate_colors(n):
     np.random.shuffle(colors)
     return colors[:n]
 
+
+def analyze_column_relationships(data):
+    """Analyze relationships between columns to recommend appropriate graph types."""
+    relationships = {}
+    
+    # Patterns for different column types
+    text_patterns = ['message', 'description', 'comment', 'text', 'note']
+    id_patterns = ['id', 'code', 'uuid', 'ref']
+    category_patterns = ['category', 'type', 'class', 'label', 'status', 'group', 'spam', 'survived']
+    numeric_patterns = ['age', 'price', 'amount', 'count', 'number', 'score', 'rate']
+    
+    for col in data.columns:
+        column_data = data[col].dropna()
+        unique_count = len(column_data.unique())
+        total_rows = len(column_data)
+        
+        relationships[col] = {
+            'type': 'unknown',
+            'unique_count': unique_count,
+            'compatible_graphs': [],
+            'recommended_as_x': False,
+            'recommended_as_y': False,
+            'is_text_heavy': False,
+            'is_identifier': False,
+            'total_rows': total_rows,
+            'unique_ratio': unique_count / total_rows if total_rows > 0 else 0,
+            'distribution_friendly': False,  # New flag for columns good for distribution analysis
+            'can_be_counted': False  # New flag to indicate if column can be used for counting
+        }
+        
+        # Skip empty columns
+        if total_rows == 0:
+            continue
+        
+        # Check if column is an identifier
+        is_identifier = any(pattern in col.lower() for pattern in id_patterns)
+        relationships[col]['is_identifier'] = is_identifier
+        
+        # Simple text detection
+        if data[col].dtype == object:
+            # Check if it's a text-heavy column
+            is_text_heavy = (
+                any(pattern in col.lower() for pattern in text_patterns) or
+                any(len(str(x)) > 50 for x in column_data.head(5))
+            )
+            relationships[col]['is_text_heavy'] = is_text_heavy
+            
+            if is_text_heavy:
+                relationships[col]['type'] = 'text'
+                continue
+            
+            # Enhanced categorical detection
+            is_categorical = (
+                any(pattern in col.lower() for pattern in category_patterns) or
+                unique_count <= 20 or
+                relationships[col]['unique_ratio'] <= 0.2
+            )
+            
+            if is_categorical:
+                relationships[col]['type'] = 'categorical'
+                relationships[col]['compatible_graphs'] = ['bar', 'distribution']
+                relationships[col]['recommended_as_x'] = True
+                relationships[col]['distribution_friendly'] = True
+                relationships[col]['can_be_counted'] = True  # Categorical columns can be counted
+                if unique_count <= 10:
+                    relationships[col]['compatible_graphs'].append('pie')
+            else:
+                relationships[col]['type'] = 'text'
+        
+        # Handle numeric data
+        elif pd.api.types.is_numeric_dtype(column_data):
+            # Check if it's a numeric column good for distribution analysis
+            is_distribution_friendly = any(pattern in col.lower() for pattern in numeric_patterns)
+            relationships[col]['distribution_friendly'] = is_distribution_friendly
+            
+            # If it's an ID or has unique values equal to row count, mark as identifier
+            if is_identifier or unique_count == total_rows:
+                relationships[col]['type'] = 'identifier'
+            else:
+                # Check if it's a binary/categorical numeric column
+                if unique_count <= 2:
+                    relationships[col]['type'] = 'categorical'
+                    relationships[col]['compatible_graphs'] = ['pie', 'bar', 'distribution']
+                    relationships[col]['recommended_as_x'] = True
+                    relationships[col]['distribution_friendly'] = True
+                    relationships[col]['can_be_counted'] = True  # Binary columns can be counted
+                elif unique_count <= 20:
+                    relationships[col]['type'] = 'discrete'
+                    relationships[col]['compatible_graphs'] = ['bar', 'line', 'distribution']
+                    relationships[col]['recommended_as_x'] = True
+                    relationships[col]['recommended_as_y'] = True
+                    relationships[col]['distribution_friendly'] = True
+                    relationships[col]['can_be_counted'] = True  # Discrete columns can be counted
+                else:
+                    relationships[col]['type'] = 'continuous'
+                    relationships[col]['compatible_graphs'] = ['scatter', 'line', 'distribution']
+                    relationships[col]['recommended_as_y'] = True
+                    relationships[col]['distribution_friendly'] = True
+        
+        # Handle datetime data
+        elif pd.api.types.is_datetime64_any_dtype(column_data):
+            relationships[col]['type'] = 'datetime'
+            relationships[col]['compatible_graphs'] = ['line', 'scatter']
+            relationships[col]['recommended_as_x'] = True
+    
+    return relationships
+
+def get_recommended_graphs(x_col, y_col, relationships):
+    """Get recommended graph types based on column relationships."""
+    x_info = relationships[x_col]
+    recommendations = []
+    
+    # For categorical x-axis with no y-axis (distribution analysis)
+    if x_info['type'] == 'categorical' and not y_col:
+        recommendations.append({
+            'type': 'bar',
+            'confidence': 0.95,
+            'reason': f'Shows count distribution of {x_col}',
+            'requires_y': False
+        })
+        if x_info['unique_count'] <= 10:
+            recommendations.append({
+                'type': 'pie',
+                'confidence': 0.9,
+                'reason': 'Best for showing proportion of categories',
+                'requires_y': False
+            })
+    
+    # For categorical x-axis with numerical y-axis
+    elif x_info['type'] == 'categorical' and y_col:
+        y_info = relationships[y_col]
+        if y_info['type'] in ['continuous', 'discrete']:
+            recommendations.append({
+                'type': 'distribution',
+                'confidence': 0.95,
+                'reason': f'Best for analyzing {y_col} distribution across {x_col} categories',
+                'requires_y': True
+            })
+            recommendations.append({
+                'type': 'box',
+                'confidence': 0.9,
+                'reason': f'Good for comparing {y_col} statistics across {x_col} categories',
+                'requires_y': True
+            })
+            recommendations.append({
+                'type': 'bar',
+                'confidence': 0.85,
+                'reason': f'Shows average {y_col} for each {x_col} category',
+                'requires_y': True
+            })
+    
+    # For numerical or datetime x-axis with numerical y-axis
+    elif x_info['type'] in ['continuous', 'discrete', 'datetime'] and y_col:
+        y_info = relationships[y_col]
+        if y_info['type'] in ['continuous', 'discrete']:
+            if x_info['type'] == 'datetime':
+                recommendations.append({
+                    'type': 'line',
+                    'confidence': 0.95,
+                    'reason': 'Best for showing trends over time',
+                    'requires_y': True
+                })
+            recommendations.append({
+                'type': 'scatter',
+                'confidence': 0.9,
+                'reason': 'Best for showing relationships between numerical variables',
+                'requires_y': True
+            })
+            if x_info['type'] == 'discrete' or y_info['type'] == 'discrete':
+                recommendations.append({
+                    'type': 'bar',
+                    'confidence': 0.85,
+                    'reason': 'Good for comparing discrete values',
+                    'requires_y': True
+                })
+    
+    return recommendations
+
 def display_graphs(request, id):
     try:
         dataset = Dataset.objects.get(id=id)
     except Dataset.DoesNotExist:
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
 
-    if dataset.status == 'processed':
-        data = pd.read_csv(dataset.cleaned_file)
-    else:
-        data = pd.read_csv(dataset.file_path)
-
-    # Determine column types
-    column_types = {}
-    for column in data.columns:
-        if pd.api.types.is_numeric_dtype(data[column]):
-            if data[column].dtype == 'int64':
-                column_types[column] = 'discrete'
-            else:
-                column_types[column] = 'continuous'
+    try:
+        # Load and preprocess data
+        if dataset.status == 'processed':
+            data = pd.read_csv(dataset.cleaned_file)
         else:
-            column_types[column] = 'categorical'
-
-    dataset_data = data.head(100).values.tolist()
-    columns = data.columns.tolist()
-
-    return render(request, 'graphs.html', {
-        'dataset': dataset,
-        'dataset_data': json.dumps(dataset_data),
-        'columns': json.dumps(columns),
-        'column_types': json.dumps(column_types),
-    })
-
+            data = pd.read_csv(dataset.file_path)
+        
+        # Basic data cleaning
+        data.columns = [str(col).strip() for col in data.columns]
+        data = data.dropna(axis=1, how='all')
+        
+        # Try to convert date strings to datetime
+        for col in data.columns:
+            if data[col].dtype == object:
+                try:
+                    data[col] = pd.to_datetime(data[col], errors='raise')
+                except (ValueError, TypeError):
+                    continue
+        
+        # Analyze columns
+        column_relationships = analyze_column_relationships(data)
+        
+        # Find default columns for initial display
+        default_x = None
+        default_y = None
+        
+        # First, try to find a datetime column for x-axis
+        for col, info in column_relationships.items():
+            if info['type'] == 'datetime':
+                default_x = col
+                break
+        
+        # If no datetime, try to find a categorical column
+        if not default_x:
+            for col, info in column_relationships.items():
+                if (info['type'] == 'categorical' and 
+                    not info['is_text_heavy'] and 
+                    not info['is_identifier']):
+                    default_x = col
+                    break
+        
+        # Find a numerical column for y-axis
+        for col, info in column_relationships.items():
+            if (info['recommended_as_y'] and 
+                not info['is_identifier'] and 
+                col != default_x):
+                default_y = col
+                break
+        
+        # Prepare data for template
+        sample_size = min(100, len(data))
+        dataset_data = data.head(sample_size).values.tolist()
+        columns = data.columns.tolist()
+        
+        context = {
+            'dataset': dataset,
+            'dataset_data': json.dumps(dataset_data),
+            'columns': json.dumps(columns),
+            'column_relationships': json.dumps(column_relationships),
+            'default_x': json.dumps(default_x),
+            'default_y': json.dumps(default_y)
+        }
+        
+        return render(request, 'graphs.html', context)
+    
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Error processing dataset: {str(e)}'
+        }, status=500)
 
 
 # Function to render the upload.html page
