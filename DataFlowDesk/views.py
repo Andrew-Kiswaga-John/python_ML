@@ -446,7 +446,6 @@ from django.http import JsonResponse
 from .models import Dataset
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
 from django.utils.timezone import now
 from django.utils.timezone import now
 
@@ -456,72 +455,31 @@ from django.utils.timezone import now
 def perform_data_normalization(request, dataset_id):
     # Ensure only POST requests are allowed for normalization
     if request.method == 'POST':
-        try:
-            # Fetch the dataset
-            dataset = Dataset.objects.get(id=dataset_id)
-
-            # Check if dataset is processed
-            if dataset.status != 'processed':
-                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
-            
-            # Access the actual file path using .path
-            file_path = dataset.cleaned_file.path
-
-            # Load the dataset
-            df = pd.read_csv(file_path)
-            
-            # Identify numeric columns for normalization
-            numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
-
-            # Perform Standard Scaling
-            scaler = StandardScaler()
-            df[numeric_columns] = pd.DataFrame(
-                scaler.fit_transform(df[numeric_columns]),
-                columns=numeric_columns
-            )
-
-            # Save to a new file with a timestamp to avoid overwriting
-            # new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
-            # df.to_csv(new_file_path, index=False)
-
-            cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'normalized')
-            os.makedirs(cleaned_datasets_dir, exist_ok=True)
-            cleaned_file_name = os.path.basename(file_path).replace('_cleaned.csv', '_normalized.csv')
-            cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
-            df.to_csv(cleaned_file_path, index=False)
-
-            # Update the dataset object to reflect the cleaned dataset
-            dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
-
-            # Update the Dataset table
-            # dataset.cleaned_file.name = new_file_path  # Update file path
-            # dataset.status = 'processed'  # Update status
-            # dataset.columns_info = {  # Log normalization statistics
-            #     col: {
-            #         "mean": round(df[col].mean(), 2),
-            #         "std_dev": round(df[col].std(), 2)
-            #     } for col in numeric_columns
-            # }
-            dataset.save()
-
-            # Log the preprocessing action in DataPreprocessingLog
-            DataPreprocessingLog.objects.create(
-                dataset=dataset,
-                action='Data Normalized',
-                parameters={
-                    'scaler': 'StandardScaler',
-                    'columns': list(numeric_columns)
-                },
-                timestamp=now()
-            )
-
-            # Return success response
-            return JsonResponse({'message': f'Data normalized successfully. Saved as {cleaned_file_path}'})
-
-        except Dataset.DoesNotExist:
-            return JsonResponse({'error': 'Dataset not found.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
+        dataset = Dataset.objects.get(id=dataset_id)
+        
+        # Access the actual file path using .path
+        file_path = dataset.file_path.path
+        
+        # Load the dataset
+        df = pd.read_csv(file_path)  # Adjust this line based on how your dataset is stored
+        
+        # Assuming you want to normalize all numerical columns
+        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+        
+        # Perform Min-Max normalization (scale values between 0 and 1)
+        scaler = MinMaxScaler()
+        df[numeric_columns] = scaler.fit_transform(df[numeric_columns])
+        
+        # Save to a new file with a timestamp to avoid overwriting
+        new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
+        df.to_csv(new_file_path, index=False)  # Save with a new name
+        
+        # Optionally, you can update the dataset object with the new file path
+        dataset.file_path = new_file_path
+        dataset.save()
+        
+        # Optionally, return a message to the frontend
+        return JsonResponse({'message': f'Data normalized successfully. Saved as {new_file_path}'})
     else:
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
@@ -839,7 +797,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score, silhouette_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import PolynomialFeatures
@@ -863,16 +821,9 @@ def train_model(request):
             # Fetch dataset
             dataset = get_object_or_404(Dataset, id=dataset_id)
 
-            # Check if the dataset has been normalized
-            # normalization_log = DataPreprocessingLog.objects.filter(
-            #     dataset=dataset,
-            #     action="Data Normalized"
-            # ).exists()
-
-            # if not normalization_log:
-            #     return JsonResponse({'error': 'Dataset not Preprocessed. Please preprocess the dataset first.'}, status=400)
+            # Check if the dataset is processed
             if dataset.status != 'processed':
-                return JsonResponse({'error': 'Dataset not Preprocessed. Please preprocess the dataset first.'}, status=400)
+                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
 
             # Load dataset
             df = pd.read_csv(dataset.cleaned_file.path)
@@ -919,14 +870,6 @@ def train_model(request):
                 r2 = r2_score(y_test, y_pred)
                 metrics = {'Mean Squared Error': mse, 'R² Score': r2}
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
-
             elif model_name == 'decision_tree':
                 # Fetch parameters for Decision Tree
                 max_depth = request.POST.get('maxDepth', None)
@@ -935,14 +878,6 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 metrics = {'Model Accuracy': accuracy}
-
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'svm':
                 # Fetch parameters for SVM
@@ -965,13 +900,6 @@ def train_model(request):
                         'Mean Squared Error': mse,
                         'R² Score': r2
                     }
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'random_forest':
                 # Fetch parameters for Random Forest
@@ -981,13 +909,7 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 metrics = {'Model Accuracy': accuracy}
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+
             elif model_name == 'knn':
                 # Fetch parameters for k-Nearest Neighbors
                 n_neighbors = int(request.POST.get('nNeighbors', 5))
@@ -997,77 +919,17 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 metrics = {'Model Accuracy': accuracy}
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'polynomial_regression':
-                print("Polynomial Regression model selected.")
-
-                # Fetch degree from request and log it
                 degree = int(request.POST.get('degree', 2))
-                print(f"Degree of polynomial: {degree}")
-
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
-
-                # Initialize PolynomialFeatures and transform training data
                 poly = PolynomialFeatures(degree=degree)
-                print("Transforming X_train into polynomial features...")
                 X_train_poly = poly.fit_transform(X_train)
-                print(f"Shape of X_train after transformation: {X_train_poly.shape}")
-
-                # Transform test data and log its shape
-                print("Transforming X_test into polynomial features...")
                 X_test_poly = poly.transform(X_test)
-                print(f"Shape of X_test after transformation: {X_test_poly.shape}")
-
-                # Train the Linear Regression model
-                print("Initializing and training LinearRegression model...")
                 model = LinearRegression()
                 model.fit(X_train_poly, y_train)
-                print("Model training complete.")
-
-                # Make predictions and log predictions shape
-                print("Making predictions on X_test_poly...")
                 y_pred = model.predict(X_test_poly)
-                print(f"Shape of y_pred: {y_pred.shape}")
-                print(f"First 5 predictions: {y_pred[:5]}")
-
-                # Calculate metrics
-                print("Calculating metrics...")
-                mse = mean_squared_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                metrics = {'Mean Squared Error': mse, 'R² Score': r2}
-                print(f"Mean Squared Error: {mse}")
-                print(f"R² Score: {r2}")
-
-                # Plot results
-                print("Plotting results...")
-                plt.plot(y_test[:50], label='True')
-                plt.plot(y_pred[:50], label='Predicted')  # Use X_test_poly here
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                
-                # Save visualization
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
-                print(f"Visualization saved at {visualization_path}")
-
-                model_path = os.path.join('media/models', f"{model_name}_{dataset_id}.joblib")
-                os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                joblib.dump(model, model_path)
-
-                return JsonResponse({
-                    'metrics': metrics,
-                    'visualization': visualization_path,
-                })
-
+                accuracy = accuracy_score(y_test, y_pred)
+                metrics = {'Model Accuracy': accuracy}
 
             elif model_name == 'logistic_regression':
                 solver = request.POST.get('solver', 'lbfgs')
@@ -1077,13 +939,6 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 metrics = {'Model Accuracy': accuracy}
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'naive_bayes':
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
@@ -1092,69 +947,27 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 metrics = {'Model Accuracy': accuracy}
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'kmeans':
-                # Fetch the number of clusters
-                n_clusters = max(2, int(request.POST.get('nClusters', 3)))  # Ensure n_clusters >= 2
-
-                # Ensure feature scaling
-                scaler = StandardScaler()
-                X_scaled = scaler.fit_transform(X)
-
-                # Train-test split on scaled features
-                X_train, X_test = train_test_split(X_scaled, test_size=1 - train_test_split_ratio, random_state=42)
-
-                # Initialize and train the KMeans model
+                n_clusters = int(request.POST.get('nClusters', 3))
                 model = KMeans(n_clusters=n_clusters, random_state=42)
-                model.fit(X_train)  # Fit on training data only
-
-                # Predict clusters for both training and test data
-                y_train_pred = model.predict(X_train)
-                y_test_pred = model.predict(X_test)
-
-                # Evaluate clustering
+                model.fit(X_train)
+                y_pred = model.predict(X_test)
+                
                 try:
-                    silhouette_train = silhouette_score(X_train, y_train_pred)
-                    silhouette_test = silhouette_score(X_test, y_test_pred)
-                except ValueError as e:
-                    return JsonResponse({'error': f"Silhouette score calculation failed: {str(e)}"}, status=400)
-
-                metrics = {
-                    'Silhouette Score (Train)': silhouette_train,
-                    'Silhouette Score (Test)': silhouette_test,
-                    'Inertia': model.inertia_,
-                }
-
-                # Visualization: Reduce to 2D using PCA
-                pca = PCA(n_components=2)
-                X_test_pca = pca.fit_transform(X_test)
-                cluster_centers_pca = pca.transform(model.cluster_centers_)
-
-                # Plot results
-                plt.figure(figsize=(8, 6))
-                plt.scatter(X_test_pca[:, 0], X_test_pca[:, 1], c=y_test_pred, cmap='viridis', s=50, alpha=0.7, label='Data Points')
-                plt.scatter(cluster_centers_pca[:, 0], cluster_centers_pca[:, 1], s=200, c='red', marker='X', label='Centroids')
-                plt.legend()
-                plt.title(f"KMeans Clustering Results (n_clusters={n_clusters})")
-
-                print(f"X_test shape: {X_test.shape}, X_test_pca shape: {X_test_pca.shape}")
-                print(f"Cluster centers (before PCA): {model.cluster_centers_}")
-                print(f"Cluster centers (after PCA): {cluster_centers_pca}")
-                print(f"Unique cluster labels: {np.unique(y_test_pred)}")
-
-
-                # Save visualization
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
-
+                    # Attempt to calculate accuracy
+                    accuracy = accuracy_score(y_test, y_pred)
+                    metrics = {'Model Accuracy': accuracy}
+                except Exception as e:
+                    # If an exception occurs, calculate regression metrics instead
+                    print(f"Accuracy score could not be calculated: {str(e)}")
+                    mse = mean_squared_error(y_test, y_pred)
+                    r2 = r2_score(y_test, y_pred)
+                    metrics = {
+                        'Error': f"Accuracy score could not be calculated: {str(e)}",
+                        'Mean Squared Error': mse,
+                        'R² Score': r2
+                    }
 
             else:
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
@@ -1176,18 +989,17 @@ def train_model(request):
             # print(f"Accuracy: {accuracy:.4f}")
 
             # Visualization
-            # plt.figure(figsize=(8, 6))
-            # if model_name == 'kmeans':
-            #     # plt.scatter(X_test[:, 0], X_test[:, 1], c=model.predict(X_test), cmap='viridis')
-            #     print("model is being executed")
-            # else:
-        #     plt.plot(y_test[:50], label='True')  # Fixed
-        #     plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-            # plt.legend()
-            # plt.title(f"{model_name.capitalize()} Results")
-            # visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-            # os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-            # plt.savefig(visualization_path)
+            plt.figure(figsize=(8, 6))
+            if model_name == 'kmeans':
+                plt.scatter(X_test[:, 0], X_test[:, 1], c=model.predict(X_test), cmap='viridis')
+            else:
+                plt.plot(y_test[:50], label='True')  # Fixed
+                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
+            plt.legend()
+            plt.title(f"{model_name.capitalize()} Results")
+            visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
+            os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
+            plt.savefig(visualization_path)
 
             return JsonResponse({
                 'metrics': metrics,

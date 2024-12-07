@@ -316,26 +316,12 @@
             .then(response => response.json())
             .then(data => {
                 if (data.message) {
-                // Toastr success message
-                toastr.success(data.message, "success", {
-                    timeOut: 3000,
-                    closeButton: true,
-                    progressBar: true
-                });
-
-                // Reload page after a delay to reflect changes
-                setTimeout(() => {
+                    alert(data.message);
                     location.reload();
-                }, 3000);
-            } else {
-                // Toastr error message
-                toastr.error('An error occurred during data normalization.', "error", {
-                    timeOut: 3000,
-                    closeButton: true,
-                    progressBar: true
-                });
-            }
-        })
+                } else {
+                    alert('An error occurred during data normalization.');
+                }
+            })
             .catch(error => {
                 console.error('Error normalizing data:', error);
                 alert('An error occurred during data normalization.');
