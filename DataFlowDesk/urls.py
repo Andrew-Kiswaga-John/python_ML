@@ -25,7 +25,14 @@ urlpatterns = [
 
     path('get_columns/', views.get_columns, name='get_columns'),
 
-    path('dataset/show_all/', views.all_datasets, name='all_datasets')
+    path('dataset/show_all/', views.all_datasets, name='all_datasets'),
+
+        # Add these URL patterns to your urls.py
+    path('auth/signin/', views.signin, name='login'),
+    path('auth/signup/', views.signup, name='register'),
+    path('auth/signout/', views.signout, name='signout'),
+
+
 
 ]
 

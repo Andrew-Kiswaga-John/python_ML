@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}" class="bg-gray-50 min-h-screen flex flex-col">
     <!-- Navigation -->
     <nav id="main-nav" class="bg-slate-800 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,6 +21,10 @@
                     <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Home</a>
                     <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Documentation</a>
                     <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">About</a>
+                    {% if user.is_authenticated %}
+                        <span class="text-gray-300 px-3 py-2 text-sm font-medium">Welcome, {{ user.username }}</span>
+                        <a href="{% url 'signout' %}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Sign Out</a>
+                    {% endif %}
                 </div>
                 <!-- Mobile menu button -->
                 <div class="flex items-center sm:hidden">

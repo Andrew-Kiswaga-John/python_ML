@@ -3,6 +3,60 @@ from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
 from django.http import JsonResponse
 
+
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.views.decorators.csrf import ensure_csrf_cookie
+from .models import Profile
+
+@ensure_csrf_cookie
+def signin(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Invalid credentials'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@ensure_csrf_cookie
+def signup(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({'success': False, 'error': 'Username already exists'})
+        
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'success': False, 'error': 'Email already exists'})
+        
+        try:
+            user = User.objects.create_user(username=username, email=email, password=password)
+            Profile.objects.create(user=user)
+            
+            # Automatically log in the user after signup
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+def signout(request):
+    logout(request)
+    return redirect('home')
+
+
 def create_dataset_step1(request):
     if request.method == "POST":
         form = DatasetMetaForm(request.POST)
@@ -122,6 +176,7 @@ def create_dataset_step2(request):
 
             # Save to database
             new_dataset = Dataset.objects.create(
+                user=request.user,
                 name=dataset_meta['name'],
                 description=dataset_meta.get('description', ''),
                 file_path=file_path,
@@ -276,6 +331,7 @@ def upload_file(request):
 
                 # Save dataset details to the database
                 dataset_instance = Dataset.objects.create(
+                    user=request.user,
                     name=name,
                     description=description,
                     file_path=file_path,  # Path relative to MEDIA_ROOT
@@ -779,10 +835,10 @@ def upload_page(request):
 
 
 
-def all_datasets(request) :
-    dataset = Dataset.objects.all()
+def all_datasets(request):
+    dataset = Dataset.objects.filter(user=request.user)
+    return render(request, "datasets/show_datasets.html", {'dataset': dataset})
 
-    return render(request, "datasets/show_datasets.html", {'dataset' : dataset})
 
 
 ### MODEL TRAINING PART ###
