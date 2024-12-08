@@ -1081,6 +1081,123 @@ def train_model(request):
                     'visualization': f'data:image/png;base64,{image_base64}'
                 }
         else:
-            # Handle other model types (neural network, etc.)
-            # ... (existing code for other models) ...
-{{ ... }}
+            # Handle neural network case
+            hidden_layers = request.POST.get('hiddenLayers', '8,4')
+            try:
+                hidden_layers = tuple(map(int, hidden_layers.split(',')))
+            except Exception:
+                hidden_layers = (8, 4)  # Default values if parsing fails
+
+            # Scale the features
+            scaler = StandardScaler()
+            X_train_scaled = scaler.fit_transform(X_train)
+            X_test_scaled = scaler.transform(X_test)
+
+            # Determine if it's a classification or regression task
+            unique_values = y.nunique()
+            is_classification = unique_values < 10 or y.dtype == 'object'
+
+            if is_classification:
+                model = MLPClassifier(
+                    hidden_layer_sizes=hidden_layers,
+                    max_iter=1000,
+                    random_state=42,
+                    solver=request.POST.get('solver', 'lbfgs')
+                )
+                model.fit(X_train_scaled, y_train)
+                
+                y_pred = model.predict(X_test_scaled)
+                accuracy = accuracy_score(y_test, y_pred)
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+            else:
+                model = MLPRegressor(
+                    hidden_layer_sizes=hidden_layers,
+                    max_iter=1000,
+                    random_state=42,
+                    solver=request.POST.get('solver', 'lbfgs')
+                )
+                model.fit(X_train_scaled, y_train)
+                
+                y_pred = model.predict(X_test_scaled)
+                mse = mean_squared_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
+                
+                # Generate scatter plot of actual vs predicted values
+                plt.figure(figsize=(10, 8))
+                plt.scatter(y_test, y_pred, alpha=0.5)
+                plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+                plt.xlabel('Actual Values')
+                plt.ylabel('Predicted Values')
+                plt.title('Actual vs Predicted Values')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'mean_squared_error': float(mse),
+                    'r2_score': float(r2),
+                    'model_type': 'regression',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
+        return JsonResponse({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        logging.error(f"Error in model training: {str(e)}")
+        return JsonResponse({
+            'error': f'An error occurred during training: {str(e)}'
+        }, status=500)
+
+def training_page(request):
+    datasets = Dataset.objects.all()
+    return render(request, 'model_training.html', {'dataset': datasets})
+
+def get_columns(request):
+    if request.method == 'GET':
+        dataset_id = request.GET.get('datasetId')
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+            if dataset.status == 'processed':
+                dataset_path = dataset.cleaned_file
+            else:            
+                dataset_path = dataset.file_path
+
+            data = pd.read_csv(dataset_path)
+            columns = list(data.columns)
+            return JsonResponse({'columns': columns})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
