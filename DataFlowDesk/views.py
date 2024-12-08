@@ -309,58 +309,87 @@ def upload_file(request):
 def clean_dataset(df, delete_header=False):
     """
     Cleans the dataset:
-    - Optionally deletes the header and uses first data row as new header
-    - Removes duplicate rows
-    - Fills missing numerical values with the column mean
-    - Fills missing categorical values with 'Unknown'
-    - Ensures proper data types for numerical and categorical columns
+    - Handles duplicates, missing values, outliers, encoding, normalization
+    - Includes preprocessing for boolean columns
     """
     print("Starting dataset cleaning...")
 
     # If user wants to delete header
     if delete_header:
         print("Deleting header and using first data row as new header...")
-        # Store current column names
-        original_columns = df.columns.tolist()
-        # Get the first data row to use as new header
         new_headers = df.iloc[0].values.tolist()
-        # Drop the first row and reset index
         df = df.iloc[1:].reset_index(drop=True)
-        # Set the new headers
         df.columns = new_headers
         print("Header replaced with first data row.")
-    
+
     # Remove duplicates
     initial_rows = df.shape[0]
     df = df.drop_duplicates()
     removed_duplicates = initial_rows - df.shape[0]
     print(f"Removed {removed_duplicates} duplicate rows.")
 
-    # Handle missing values
+    # Process each column
     for col in df.columns:
-        # Debug: Log column name and type
         print(f"Processing column: {col} (Type: {df[col].dtype})")
 
-        # Handle numeric columns
-        if pd.api.types.is_numeric_dtype(df[col]):
+        # Handle boolean columns
+        if pd.api.types.is_bool_dtype(df[col]):
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
-                print(f"Filling {num_missing} missing values in numerical column '{col}' with mean.")
-                df[col].fillna(df[col].mean(), inplace=True)
+                print(f"Filling {num_missing} missing values in boolean column '{col}' with 'False'.")
+                df[col].fillna(False, inplace=True)  # Default strategy: replace with `False`
 
-        # Handle object/categorical columns
+            # Convert boolean to numeric if needed
+            print(f"Converting boolean column '{col}' to numeric (1 for True, 0 for False).")
+            df[col] = df[col].astype(int)
+
+        # Handle numeric columns
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            num_missing = df[col].isnull().sum()
+            if num_missing > 0:
+                print(f"Filling {num_missing} missing values in numerical column '{col}' with median.")
+                df[col].fillna(df[col].median(), inplace=True)
+
+            # Handle outliers
+            q1 = df[col].quantile(0.25)
+            q3 = df[col].quantile(0.75)
+            iqr = q3 - q1
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+            outliers = ((df[col] < lower_bound) | (df[col] > upper_bound)).sum()
+            if outliers > 0:
+                print(f"Handling {outliers} outliers in column '{col}'. Replacing with median.")
+                df[col] = np.where(
+                    (df[col] < lower_bound) | (df[col] > upper_bound),
+                    df[col].median(),
+                    df[col]
+                )
+
+        # Handle categorical columns
         elif pd.api.types.is_object_dtype(df[col]):
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
                 print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
                 df[col].fillna('Unknown', inplace=True)
 
-        # Handle columns that don't match numeric or object types
+            # Encode categorical data
+            print(f"Encoding categorical column '{col}' using Label Encoding.")
+            le = LabelEncoder()
+            df[col] = le.fit_transform(df[col])
+
+        # Handle other types
         else:
-            print(f"Skipping column '{col}' as it does not fit numeric or categorical types.")
+            print(f"Skipping column '{col}' as it does not fit numeric, boolean, or categorical types.")
+
+    # Normalize numerical columns (excluding boolean)
+    # print("Normalizing numerical columns...")
+    # scaler = StandardScaler()
+    # numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    # df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
     print("Dataset cleaning completed.")
     return df
+
 
 
 def perform_data_cleaning(request, dataset_id):
@@ -449,6 +478,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.decomposition import PCA
 from django.utils.timezone import now
 from django.utils.timezone import now
+from imblearn.over_sampling import SMOTE
 
 from sklearn.preprocessing import MinMaxScaler
 from django.utils.timezone import now
@@ -838,7 +868,7 @@ matplotlib.use('Agg')  # Use the non-GUI backend
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression, Lasso, Ridge
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score, silhouette_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -885,21 +915,37 @@ def train_model(request):
             X = df.drop(columns=[target_column])
             y = df[target_column]
 
-            # Preprocess categorical features
-            categorical_columns = X.select_dtypes(include=['object']).columns
-            if not categorical_columns.empty:
-                X = pd.get_dummies(X, columns=categorical_columns)
+            try:
+                class_counts = y.value_counts()
+                print(f"Class distribution in target: {class_counts.to_dict()}")
 
-            # Encode target column if it is categorical
-            if y.dtype == 'object':
-                le = LabelEncoder()
-                y = le.fit_transform(y)
+                # Apply SMOTE if classes are imbalanced
+                if class_counts.min() / class_counts.max() < 0.8:  # Threshold for imbalance
+                    print("Imbalanced classes detected. Applying SMOTE to balance classes...")
+                    smote = SMOTE(random_state=42)
+                    X, y = smote.fit_resample(X, y)
+                    print("Classes balanced using SMOTE.")
+                else:
+                    print("Classes are already balanced.")
+            except Exception as e: 
+                print("The y class is probably continuous")
+                pass
+
+            # # Preprocess categorical features
+            # categorical_columns = X.select_dtypes(include=['object']).columns
+            # if not categorical_columns.empty:
+            #     X = pd.get_dummies(X, columns=categorical_columns)
+
+            # # Encode target column if it is categorical
+            # if y.dtype == 'object':
+            #     le = LabelEncoder()
+            #     y = le.fit_transform(y)
 
             scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
+            # X_scaled = scaler.fit_transform(X)
 
             # Convert to NumPy arrays
-            X = np.array(X_scaled)
+            X = np.array(X)
             y = np.array(y)
 
             # Split data
@@ -909,28 +955,62 @@ def train_model(request):
             model = None
 
             # Handle model selection and parameters
+            # Handle model selection and parameters
             if model_name == 'linear_regression':
                 # Fetch parameters for Linear Regression
                 fit_intercept = request.POST.get('fitIntercept', 'true').lower() == 'true'
                 model = LinearRegression(fit_intercept=fit_intercept)
+
+                # Apply log transformation to the target
+                # print("Applying log transformation to the target variable...")
+                # y_train_log = np.log1p(y_train)  # log1p handles y_train=0 safely
+                # y_test_log = np.log1p(y_test)
+
+                # Scale the features
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
+                # Fit the model on the log-transformed target
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                mse = mean_squared_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                metrics = {'Mean Squared Error': mse, 'R² Score': r2}
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
+                # # Inverse log transformation of predictions
+                # y_pred = np.expm1(y_pred_log)  # expm1 reverses log1p
+
+                # Evaluate metrics on the original scale
+                mse = mean_squared_error(y_test, y_pred)
+                mae = mean_absolute_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
+                metrics = {
+                    'Mean Squared Error': mse,
+                    'Mean Absolute Error': mae,
+                    'R² Score': r2
+                }
+                print(f"Metrics: {metrics}")
+
+                # Visualization
+                plt.figure(figsize=(10, 6))
+                plt.plot(y_test[:50], label='True', linestyle='-', marker='o')  # True values
+                plt.plot(y_pred[:50], label='Predicted', linestyle='--', marker='x')  # Predicted values
                 plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
+                plt.title(f"{model_name.capitalize()} Results with  Linear Regression")
+                plt.xlabel("Sample")
+                plt.ylabel("Value")
+                
+                # Save the visualization
                 visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
                 os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
                 plt.savefig(visualization_path)
+                plt.close()  # Close the plot to prevent overlapping in future plots
 
             elif model_name == 'decision_tree':
                 # Fetch parameters for Decision Tree
                 max_depth = request.POST.get('maxDepth', None)
                 model = DecisionTreeClassifier(max_depth=int(max_depth) if max_depth else None)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
@@ -948,6 +1028,10 @@ def train_model(request):
                 # Fetch parameters for SVM
                 kernel = request.POST.get('kernel', 'rbf')
                 model = SVC(kernel=kernel)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 
@@ -977,6 +1061,10 @@ def train_model(request):
                 # Fetch parameters for Random Forest
                 n_estimators = int(request.POST.get('nEstimators', 100))
                 model = RandomForestClassifier(n_estimators=n_estimators)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
@@ -992,6 +1080,10 @@ def train_model(request):
                 # Fetch parameters for k-Nearest Neighbors
                 n_neighbors = int(request.POST.get('nNeighbors', 5))
                 print('neighbors:', n_neighbors)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model = KNeighborsClassifier(n_neighbors=n_neighbors)
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
@@ -1071,8 +1163,12 @@ def train_model(request):
 
             elif model_name == 'logistic_regression':
                 solver = request.POST.get('solver', 'lbfgs')
-                max_iter = int(request.POST.get('maxIter', 100))
+                max_iter = int(request.POST.get('maxIter', 1000))
                 model = LogisticRegression(solver=solver, max_iter=max_iter)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
@@ -1088,6 +1184,10 @@ def train_model(request):
             elif model_name == 'naive_bayes':
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
                 model = GaussianNB(var_smoothing=var_smoothing)
+
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
@@ -1105,7 +1205,7 @@ def train_model(request):
                 n_clusters = max(2, int(request.POST.get('nClusters', 3)))  # Ensure n_clusters >= 2
 
                 # Ensure feature scaling
-                scaler = StandardScaler()
+                # scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
 
                 # Train-test split on scaled features
