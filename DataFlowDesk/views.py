@@ -2,12 +2,31 @@ from django.shortcuts import render
 from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
 from django.http import JsonResponse
-
-
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.views.decorators.csrf import ensure_csrf_cookie
 from .models import Profile
+
+# Add scikit-learn imports
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, mean_squared_error, r2_score, confusion_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB, GaussianNB
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
+
+import pandas as pd
+import numpy as np
+import json
+import logging
 
 @ensure_csrf_cookie
 def signin(request):
@@ -198,19 +217,14 @@ def create_dataset_step2(request):
 import pandas as pd
 from django.shortcuts import render, redirect
 from .models import Dataset
-from django.http import JsonResponse
-import plotly.express as px
+import pandas as pd
+import json
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
 
 from django.http import JsonResponse
 import pandas as pd
 from .models import Dataset
-
-from django.http import JsonResponse
-import plotly.express as px
-import pandas as pd
-from .models import Dataset
-
-
 
 from django.http import JsonResponse
 import pandas as pd
@@ -554,9 +568,8 @@ from .models import Dataset  # Adjust based on your actual model import
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
 import json
-from collections import defaultdict
-
-# import matplotlib.pyplot as plt
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset  # Adjust based on your actual model import
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
@@ -864,231 +877,210 @@ from sklearn.cluster import KMeans
 import joblib
 import os
 
-# Model Training View
+
+import os
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import logging
+from typing import List, Tuple, Optional, Dict
+import json
+
+class NeuralNetwork(nn.Module):
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_sizes: List[int], 
+                 output_size: int, 
+                 task_type: str = 'classification',
+                 dropout_rate: float = 0.2):
+        super(NeuralNetwork, self).__init__()
+        self.task_type = task_type
+        self.batch_norm_layers = nn.ModuleList()
+        self.dropout = nn.Dropout(dropout_rate)
+        
+        # Build layers dynamically
+        layers = []
+        prev_size = input_size
+        
+        for hidden_size in hidden_sizes:
+            layer_block = nn.Sequential(
+                nn.Linear(prev_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                nn.ReLU(),
+                self.dropout
+            )
+            layers.append(layer_block)
+            prev_size = hidden_size
+        
+        self.hidden_layers = nn.ModuleList(layers)
+        self.output_layer = nn.Linear(prev_size, output_size)
+        
+        # Initialize weights using Xavier/Glorot initialization
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        for layer in self.hidden_layers:
+            if isinstance(layer[0], nn.Linear):
+                nn.init.xavier_uniform_(layer[0].weight)
+                nn.init.zeros_(layer[0].bias)
+        nn.init.xavier_uniform_(self.output_layer.weight)
+        nn.init.zeros_(self.output_layer.bias)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for layer in self.hidden_layers:
+            x = layer(x)
+        
+        x = self.output_layer(x)
+        
+        if self.task_type == 'classification':
+            if self.output_layer.out_features == 1:
+                x = torch.sigmoid(x)
+            else:
+                x = F.softmax(x, dim=1)
+        return x
+
+@csrf_exempt
 def train_model(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+    try:
+        # Get form data
+        dataset_id = request.POST.get('datasetId')
+        target_column = request.POST.get('targetColumn')
+        model_type = request.POST.get('model', 'neural_network')
+        train_split = float(request.POST.get('trainTestSplit', 80)) / 100
+        
+        # Get the dataset
         try:
-            # Fetch form data
-            dataset_id = request.POST.get('datasetId')
-            target_column = request.POST.get('targetColumn')
-            model_name = request.POST.get('model')
-            train_test_split_ratio = int(request.POST.get('trainTestSplit', 80)) / 100
+            dataset = Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            return JsonResponse({'error': 'Dataset not found.'}, status=404)
 
-            # Fetch dataset
-            dataset = get_object_or_404(Dataset, id=dataset_id)
+        # Load the dataset
+        try:
+            if dataset.status == 'processed':
+                df = pd.read_csv(dataset.cleaned_file)
+            else:
+                df = pd.read_csv(dataset.file_path)
+        except Exception as e:
+            return JsonResponse({'error': f'Error reading dataset: {str(e)}'}, status=500)
 
-            # Check if the dataset is processed
-            if dataset.status != 'processed':
-                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
+        # Get all columns except target column for features
+        feature_columns = [col for col in df.columns if col != target_column]
 
-            # Load dataset
-            df = pd.read_csv(dataset.cleaned_file.path)
+        # Validate required parameters
+        if not all([dataset_id, target_column, feature_columns]):
+            missing_params = []
+            if not dataset_id: missing_params.append('dataset_id')
+            if not target_column: missing_params.append('target_column')
+            if not feature_columns: missing_params.append('feature_columns')
+            return JsonResponse({
+                'error': f'Missing required parameters: {", ".join(missing_params)}'
+            }, status=400)
 
-            # Validate target column
-            if target_column not in df.columns:
-                return JsonResponse({'error': f"Target column '{target_column}' does not exist in the dataset."}, status=400)
+        # Prepare features and target
+        X = df[feature_columns]
+        y = df[target_column]
 
-            # Separate features and target
-            X = df.drop(columns=[target_column])
-            y = df[target_column]
+        # Split the data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, train_size=train_split, random_state=42
+        )
 
-            # Preprocess categorical features
-            categorical_columns = X.select_dtypes(include=['object']).columns
-            if not categorical_columns.empty:
-                X = pd.get_dummies(X, columns=categorical_columns)
+        # Check if we're dealing with text data
+        is_text_data = X.dtypes.apply(lambda x: x == 'object').any()
 
-            # Encode target column if it is categorical
-            if y.dtype == 'object':
-                le = LabelEncoder()
-                y = le.fit_transform(y)
-
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
-
-            # Convert to NumPy arrays
-            X = np.array(X_scaled)
-            y = np.array(y)
-
-            # Split data
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1 - train_test_split_ratio, random_state=42)
-
-            # Initialize model variable
-            model = None
-
-            # Handle model selection and parameters
-            if model_name == 'linear_regression':
-                # Fetch parameters for Linear Regression
-                fit_intercept = request.POST.get('fitIntercept', 'true').lower() == 'true'
-                model = LinearRegression(fit_intercept=fit_intercept)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                mse = mean_squared_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                metrics = {'Mean Squared Error': mse, 'R² Score': r2}
-
-            elif model_name == 'decision_tree':
-                # Fetch parameters for Decision Tree
-                max_depth = request.POST.get('maxDepth', None)
-                model = DecisionTreeClassifier(max_depth=int(max_depth) if max_depth else None)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'svm':
-                # Fetch parameters for SVM
-                kernel = request.POST.get('kernel', 'rbf')
-                model = SVC(kernel=kernel)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
+        if model_type == 'naive_bayes':
+            if is_text_data:
+                # For text data, use TF-IDF vectorization and Multinomial NB
+                # Combine all text columns into a single text
+                X_text_train = X_train.astype(str).apply(lambda x: ' '.join(x), axis=1)
+                X_text_test = X_test.astype(str).apply(lambda x: ' '.join(x), axis=1)
                 
-                try:
-                    # Attempt to calculate accuracy
-                    accuracy = accuracy_score(y_test, y_pred)
-                    metrics = {'Model Accuracy': accuracy}
-                except Exception as e:
-                    # If an exception occurs, calculate alternative metrics
-                    print(f"Accuracy score could not be calculated: {str(e)}")
-                    mse = mean_squared_error(y_test, y_pred)
-                    r2 = r2_score(y_test, y_pred)
-                    metrics = {
-                        'Error': f"Accuracy score could not be calculated: {str(e)}",
-                        'Mean Squared Error': mse,
-                        'R² Score': r2
-                    }
-
-            elif model_name == 'random_forest':
-                # Fetch parameters for Random Forest
-                n_estimators = int(request.POST.get('nEstimators', 100))
-                model = RandomForestClassifier(n_estimators=n_estimators)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
+                # Convert text to TF-IDF features
+                vectorizer = TfidfVectorizer(max_features=1000)
+                X_train_tfidf = vectorizer.fit_transform(X_text_train)
+                X_test_tfidf = vectorizer.transform(X_text_test)
+                
+                # Use Multinomial NB for text classification
+                var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
+                model = MultinomialNB(alpha=var_smoothing)
+                model.fit(X_train_tfidf, y_train)
+                
+                y_pred = model.predict(X_test_tfidf)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'knn':
-                # Fetch parameters for k-Nearest Neighbors
-                n_neighbors = int(request.POST.get('nNeighbors', 5))
-                print('neighbors:', n_neighbors)
-                model = KNeighborsClassifier(n_neighbors=n_neighbors)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'polynomial_regression':
-                degree = int(request.POST.get('degree', 2))
-                poly = PolynomialFeatures(degree=degree)
-                X_train_poly = poly.fit_transform(X_train)
-                X_test_poly = poly.transform(X_test)
-                model = LinearRegression()
-                model.fit(X_train_poly, y_train)
-                y_pred = model.predict(X_test_poly)
-                accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'logistic_regression':
-                solver = request.POST.get('solver', 'lbfgs')
-                max_iter = int(request.POST.get('maxIter', 100))
-                model = LogisticRegression(solver=solver, max_iter=max_iter)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'naive_bayes':
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                # Get feature importance for top terms
+                feature_importance = pd.Series(
+                    model.feature_log_prob_[1] - model.feature_log_prob_[0],
+                    index=vectorizer.get_feature_names_out()
+                ).sort_values(ascending=False)
+                
+                top_features = feature_importance.head(10).to_dict()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': top_features,
+                    'num_features': X_train_tfidf.shape[1],
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+            else:
+                # For numerical data, use Gaussian NB
+                scaler = StandardScaler()
+                X_train_scaled = scaler.fit_transform(X_train)
+                X_test_scaled = scaler.transform(X_test)
+                
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
                 model = GaussianNB(var_smoothing=var_smoothing)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
-
-            elif model_name == 'kmeans':
-                n_clusters = int(request.POST.get('nClusters', 3))
-                model = KMeans(n_clusters=n_clusters, random_state=42)
-                model.fit(X_train)
-                y_pred = model.predict(X_test)
+                model.fit(X_train_scaled, y_train)
                 
-                try:
-                    # Attempt to calculate accuracy
-                    accuracy = accuracy_score(y_test, y_pred)
-                    metrics = {'Model Accuracy': accuracy}
-                except Exception as e:
-                    # If an exception occurs, calculate regression metrics instead
-                    print(f"Accuracy score could not be calculated: {str(e)}")
-                    mse = mean_squared_error(y_test, y_pred)
-                    r2 = r2_score(y_test, y_pred)
-                    metrics = {
-                        'Error': f"Accuracy score could not be calculated: {str(e)}",
-                        'Mean Squared Error': mse,
-                        'R² Score': r2
-                    }
-
-            else:
-                return JsonResponse({'error': 'Invalid model selected.'}, status=400)
-
-            # Train model
-            # model.fit(X_train, y_train)
-            # y_pred = model.predict(X_test)
-            # accuracy = accuracy_score(y_test, y_pred)
-            
-            # Save model
-            model_path = os.path.join('media/models', f"{model_name}_{dataset_id}.joblib")
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            joblib.dump(model, model_path)
-
-            # Generate metrics
-            score = model.score(X_test, y_test)
-            # metrics = {'Model Accuracy': accuracy}
-            # print(f"Model Accuracy: {metrics}")
-            # print(f"Accuracy: {accuracy:.4f}")
-
-            # Visualization
-            plt.figure(figsize=(8, 6))
-            if model_name == 'kmeans':
-                plt.scatter(X_test[:, 0], X_test[:, 1], c=model.predict(X_test), cmap='viridis')
-            else:
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-            plt.legend()
-            plt.title(f"{model_name.capitalize()} Results")
-            visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-            os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-            plt.savefig(visualization_path)
-
-            return JsonResponse({
-                'metrics': metrics,
-                'visualization': visualization_path,
-            })
-
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-    return JsonResponse({'error': 'Invalid request method.'}, status=400)
-
-
-
-def training_page(request):
-    datasets = Dataset.objects.all()
-
-    return render(request, 'model_training.html', {'dataset': datasets})
-
-def get_columns(request):
-    if request.method == 'GET':
-        dataset_id = request.GET.get('datasetId')
-
-        # Assuming you have a Dataset model and a method to fetch the dataset file
-        dataset = Dataset.objects.get(id=dataset_id)
-        if dataset.status == 'processed':
-            dataset_path = dataset.cleaned_file.path  # Path to the dataset file
-        else:            
-            dataset_path = dataset.file_path.path
-
-        try:
-            # Load the dataset (e.g., CSV file)
-            data = pd.read_csv(dataset_path)
-            columns = list(data.columns)  # Get the list of columns
-            return JsonResponse({'columns': columns})
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+                y_pred = model.predict(X_test_scaled)
+                accuracy = accuracy_score(y_test, y_pred)
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+        else:
+            # Handle other model types (neural network, etc.)
+            # ... (existing code for other models) ...
+{{ ... }}

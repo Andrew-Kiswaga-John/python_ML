@@ -157,8 +157,15 @@
     <!-- Results Section -->
     <div id="results" class="mt-10 hidden">
         <h3 class="text-2xl font-bold text-gray-800 mb-4">Training Results</h3>
-        <div id="metrics" class="bg-gray-100 p-4 rounded-md text-sm text-gray-700 font-mono"></div>
-        <img id="visualization" src="" alt="Results Visualization" class="mt-6 max-w-full rounded-md shadow">
+        <div id="metrics" class="bg-gray-100 p-4 rounded-md text-sm text-gray-700 font-mono mb-6"></div>
+        
+        <!-- Visualization Section -->
+        <div id="visualization-container" class="mt-6">
+            <h4 class="text-xl font-semibold text-gray-800 mb-3">Model Performance Visualization</h4>
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <img id="visualization" src="" alt="Model Performance Visualization" class="max-w-full h-auto mx-auto">
+            </div>
+        </div>
     </div>
 </div>
 
@@ -259,20 +266,58 @@
         e.preventDefault();
         const formData = new FormData(form);
 
-        const response = await fetch('/train_model/', {
-            method: 'POST',
-            body: formData,
-        });
+        try {
+            const response = await fetch('/train_model/', {
+                method: 'POST',
+                body: formData,
+            });
 
-        const result = await response.json();
-        if (response.status === 400 && result.error.includes('Dataset not processed')) {
-            alert(result.error);
-        } else if (response.ok) {
-            document.getElementById('metrics').innerHTML = `<pre>${JSON.stringify(result.metrics, null, 2)}</pre>`;
-            document.getElementById('visualization').src = result.visualization;
-            document.getElementById('results').classList.remove('hidden');
-        } else {
-            alert('An error occurred: ' + result.error);
+            const result = await response.json();
+            
+            if (result.success) {
+                // Format the results nicely
+                let metricsHtml = '<div class="space-y-4">';
+                
+                if (result.results.model_type === 'classification') {
+                    metricsHtml += `
+                        <div class="bg-green-100 p-4 rounded-md">
+                            <h4 class="font-bold text-green-800">Classification Results</h4>
+                            <p class="text-green-700">Accuracy: ${(result.results.accuracy * 100).toFixed(2)}%</p>
+                        </div>`;
+                } else {
+                    metricsHtml += `
+                        <div class="bg-blue-100 p-4 rounded-md">
+                            <h4 class="font-bold text-blue-800">Regression Results</h4>
+                            <p class="text-blue-700">Mean Squared Error: ${result.results.mean_squared_error.toFixed(4)}</p>
+                            <p class="text-blue-700">R² Score: ${result.results.r2_score.toFixed(4)}</p>
+                        </div>`;
+                }
+
+                // Add feature information
+                metricsHtml += `
+                    <div class="bg-gray-100 p-4 rounded-md">
+                        <h4 class="font-bold text-gray-800">Model Details</h4>
+                        <p class="text-gray-700">Number of Features: ${result.results.num_features}</p>
+                        <p class="text-gray-700">Features Used: ${result.results.features_used.join(', ')}</p>
+                    </div>`;
+
+                metricsHtml += '</div>';
+                
+                // Update the metrics section
+                document.getElementById('metrics').innerHTML = metricsHtml;
+                
+                // Update the visualization
+                const visualizationImg = document.getElementById('visualization');
+                visualizationImg.src = result.results.visualization;
+                
+                // Show the results section
+                document.getElementById('results').classList.remove('hidden');
+            } else {
+                alert('Training failed: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred while training the model');
         }
     });
 </script>
