@@ -2,6 +2,78 @@ from django.shortcuts import render
 from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from .models import Profile
+
+# Add scikit-learn imports
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, mean_squared_error, r2_score, confusion_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB, GaussianNB
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
+
+import pandas as pd
+import numpy as np
+import json
+import logging
+
+@ensure_csrf_cookie
+def signin(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Invalid credentials'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@ensure_csrf_cookie
+def signup(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({'success': False, 'error': 'Username already exists'})
+        
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'success': False, 'error': 'Email already exists'})
+        
+        try:
+            user = User.objects.create_user(username=username, email=email, password=password)
+            Profile.objects.create(user=user)
+            
+            # Automatically log in the user after signup
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+def signout(request):
+    logout(request)
+    return redirect('home')
 
 def create_dataset_step1(request):
     if request.method == "POST":
@@ -122,6 +194,7 @@ def create_dataset_step2(request):
 
             # Save to database
             new_dataset = Dataset.objects.create(
+                user=request.user,
                 name=dataset_meta['name'],
                 description=dataset_meta.get('description', ''),
                 file_path=file_path,
@@ -276,6 +349,7 @@ def upload_file(request):
 
                 # Save dataset details to the database
                 dataset_instance = Dataset.objects.create(
+                    user=request.user,
                     name=name,
                     description=description,
                     file_path=file_path,  # Path relative to MEDIA_ROOT
@@ -879,6 +953,306 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.cluster import KMeans
 import joblib
 import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import logging
+from typing import List, Tuple, Optional, Dict
+import json
+
+class NeuralNetwork(nn.Module):
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_sizes: List[int], 
+                 output_size: int, 
+                 task_type: str = 'classification',
+                 dropout_rate: float = 0.2):
+        super(NeuralNetwork, self).__init__()
+        self.task_type = task_type
+        self.batch_norm_layers = nn.ModuleList()
+        self.dropout = nn.Dropout(dropout_rate)
+        
+        # Build layers dynamically
+        layers = []
+        prev_size = input_size
+        
+        for hidden_size in hidden_sizes:
+            layer_block = nn.Sequential(
+                nn.Linear(prev_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                nn.ReLU(),
+                self.dropout
+            )
+            layers.append(layer_block)
+            prev_size = hidden_size
+        
+        self.hidden_layers = nn.ModuleList(layers)
+        self.output_layer = nn.Linear(prev_size, output_size)
+        
+        # Initialize weights using Xavier/Glorot initialization
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        for layer in self.hidden_layers:
+            if isinstance(layer[0], nn.Linear):
+                nn.init.xavier_uniform_(layer[0].weight)
+                nn.init.zeros_(layer[0].bias)
+        nn.init.xavier_uniform_(self.output_layer.weight)
+        nn.init.zeros_(self.output_layer.bias)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for layer in self.hidden_layers:
+            x = layer(x)
+        
+        x = self.output_layer(x)
+        
+        if self.task_type == 'classification':
+            if self.output_layer.out_features == 1:
+                x = torch.sigmoid(x)
+            else:
+                x = F.softmax(x, dim=1)
+        return x
+    
+@csrf_exempt
+def train_model_nn(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+    try:
+        # Get form data
+        dataset_id = request.POST.get('datasetId')
+        target_column = request.POST.get('targetColumn')
+        model_type = request.POST.get('model', 'neural_network')
+        train_split = float(request.POST.get('trainTestSplit', 80)) / 100
+        
+        # Get the dataset
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            return JsonResponse({'error': 'Dataset not found.'}, status=404)
+
+        # Load the dataset
+        try:
+            if dataset.status == 'processed':
+                df = pd.read_csv(dataset.cleaned_file)
+            else:
+                df = pd.read_csv(dataset.file_path)
+        except Exception as e:
+            return JsonResponse({'error': f'Error reading dataset: {str(e)}'}, status=500)
+
+        # Get all columns except target column for features
+        feature_columns = [col for col in df.columns if col != target_column]
+
+        # Validate required parameters
+        if not all([dataset_id, target_column, feature_columns]):
+            missing_params = []
+            if not dataset_id: missing_params.append('dataset_id')
+            if not target_column: missing_params.append('target_column')
+            if not feature_columns: missing_params.append('feature_columns')
+            return JsonResponse({
+                'error': f'Missing required parameters: {", ".join(missing_params)}'
+            }, status=400)
+
+        # Prepare features and target
+        X = df[feature_columns]
+        y = df[target_column]
+
+        # Split the data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, train_size=train_split, random_state=42
+        )
+
+        # Check if we're dealing with text data
+        is_text_data = X.dtypes.apply(lambda x: x == 'object').any()
+
+        if model_type == 'naive_bayes':
+            if is_text_data:
+                # For text data, use TF-IDF vectorization and Multinomial NB
+                # Combine all text columns into a single text
+                X_text_train = X_train.astype(str).apply(lambda x: ' '.join(x), axis=1)
+                X_text_test = X_test.astype(str).apply(lambda x: ' '.join(x), axis=1)
+                
+                # Convert text to TF-IDF features
+                vectorizer = TfidfVectorizer(max_features=1000)
+                X_train_tfidf = vectorizer.fit_transform(X_text_train)
+                X_test_tfidf = vectorizer.transform(X_text_test)
+                
+                # Use Multinomial NB for text classification
+                var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
+                model = MultinomialNB(alpha=var_smoothing)
+                model.fit(X_train_tfidf, y_train)
+                
+                y_pred = model.predict(X_test_tfidf)
+                accuracy = accuracy_score(y_test, y_pred)
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                # Get feature importance for top terms
+                feature_importance = pd.Series(
+                    model.feature_log_prob_[1] - model.feature_log_prob_[0],
+                    index=vectorizer.get_feature_names_out()
+                ).sort_values(ascending=False)
+                
+                top_features = feature_importance.head(10).to_dict()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': top_features,
+                    'num_features': X_train_tfidf.shape[1],
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+            else:
+                # For numerical data, use Gaussian NB
+                scaler = StandardScaler()
+                X_train_scaled = scaler.fit_transform(X_train)
+                X_test_scaled = scaler.transform(X_test)
+                
+                var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
+                model = GaussianNB(var_smoothing=var_smoothing)
+                model.fit(X_train_scaled, y_train)
+                
+                y_pred = model.predict(X_test_scaled)
+                accuracy = accuracy_score(y_test, y_pred)
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+        else:
+            # Handle neural network case
+            hidden_layers = request.POST.get('hiddenLayers', '8,4')
+            try:
+                hidden_layers = tuple(map(int, hidden_layers.split(',')))
+            except Exception:
+                hidden_layers = (8, 4)  # Default values if parsing fails
+
+            # Scale the features
+            scaler = StandardScaler()
+            X_train_scaled = scaler.fit_transform(X_train)
+            X_test_scaled = scaler.transform(X_test)
+
+            # Determine if it's a classification or regression task
+            unique_values = y.nunique()
+            is_classification = unique_values < 10 or y.dtype == 'object'
+
+            if is_classification:
+                model = MLPClassifier(
+                    hidden_layer_sizes=hidden_layers,
+                    max_iter=1000,
+                    random_state=42,
+                    solver=request.POST.get('solver', 'lbfgs')
+                )
+                model.fit(X_train_scaled, y_train)
+                
+                y_pred = model.predict(X_test_scaled)
+                accuracy = accuracy_score(y_test, y_pred)
+                
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+            else:
+                model = MLPRegressor(
+                    hidden_layer_sizes=hidden_layers,
+                    max_iter=1000,
+                    random_state=42,
+                    solver=request.POST.get('solver', 'lbfgs')
+                )
+                model.fit(X_train_scaled, y_train)
+                
+                y_pred = model.predict(X_test_scaled)
+                mse = mean_squared_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
+                
+                # Generate scatter plot of actual vs predicted values
+                plt.figure(figsize=(10, 8))
+                plt.scatter(y_test, y_pred, alpha=0.5)
+                plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+                plt.xlabel('Actual Values')
+                plt.ylabel('Predicted Values')
+                plt.title('Actual vs Predicted Values')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'mean_squared_error': float(mse),
+                    'r2_score': float(r2),
+                    'model_type': 'regression',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
+        return JsonResponse({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        logging.error(f"Error in model training: {str(e)}")
+        return JsonResponse({
+            'error': f'An error occurred during training: {str(e)}'
+        }, status=500)
 
 # Model Training View
 def train_model(request):
@@ -914,6 +1288,7 @@ def train_model(request):
             # Separate features and target
             X = df.drop(columns=[target_column])
             y = df[target_column]
+            feature_columns = [col for col in df.columns if col != target_column]
 
             try:
                 class_counts = y.value_counts()
@@ -981,12 +1356,12 @@ def train_model(request):
                 mse = mean_squared_error(y_test, y_pred)
                 mae = mean_absolute_error(y_test, y_pred)
                 r2 = r2_score(y_test, y_pred)
-                metrics = {
+                results = {
                     'Mean Squared Error': mse,
                     'Mean Absolute Error': mae,
                     'R² Score': r2
                 }
-                print(f"Metrics: {metrics}")
+                print(f"Metrics: {results}")
 
                 # Visualization
                 plt.figure(figsize=(10, 6))
@@ -1014,7 +1389,31 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
+                # metrics = {'Model Accuracy': accuracy}
+
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
 
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
@@ -1038,13 +1437,37 @@ def train_model(request):
                 try:
                     # Attempt to calculate accuracy
                     accuracy = accuracy_score(y_test, y_pred)
-                    metrics = {'Model Accuracy': accuracy}
+                    # metrics = {'Model Accuracy': accuracy}
+
+                    # Generate confusion matrix visualization
+                    plt.figure(figsize=(10, 8))
+                    cm = confusion_matrix(y_test, y_pred)
+                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                    plt.title('Confusion Matrix')
+                    plt.xlabel('Predicted')
+                    plt.ylabel('Actual')
+                    
+                    # Save plot to base64 string
+                    buffer = io.BytesIO()
+                    plt.savefig(buffer, format='png', bbox_inches='tight')
+                    buffer.seek(0)
+                    image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                    plt.close()
+                    
+                    results = {
+                        'accuracy': float(accuracy),
+                        'model_type': 'classification',
+                        'feature_importance': None,
+                        'num_features': len(feature_columns),
+                        'features_used': feature_columns,
+                        'visualization': f'data:image/png;base64,{image_base64}'
+                    }
                 except Exception as e:
                     # If an exception occurs, calculate alternative metrics
                     print(f"Accuracy score could not be calculated: {str(e)}")
                     mse = mean_squared_error(y_test, y_pred)
                     r2 = r2_score(y_test, y_pred)
-                    metrics = {
+                    results = {
                         'Error': f"Accuracy score could not be calculated: {str(e)}",
                         'Mean Squared Error': mse,
                         'R² Score': r2
@@ -1068,7 +1491,32 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
+                # metrics = {'Model Accuracy': accuracy}
+
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
                 plt.legend()
@@ -1088,7 +1536,32 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
+                # metrics = {'Model Accuracy': accuracy}
+
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
                 plt.legend()
@@ -1134,7 +1607,7 @@ def train_model(request):
                 print("Calculating metrics...")
                 mse = mean_squared_error(y_test, y_pred)
                 r2 = r2_score(y_test, y_pred)
-                metrics = {'Mean Squared Error': mse, 'R² Score': r2}
+                results = {'Mean Squared Error': mse, 'R² Score': r2}
                 print(f"Mean Squared Error: {mse}")
                 print(f"R² Score: {r2}")
 
@@ -1156,8 +1629,8 @@ def train_model(request):
                 joblib.dump(model, model_path)
 
                 return JsonResponse({
-                    'metrics': metrics,
-                    'visualization': visualization_path,
+                        'success': True,
+                        'results': results,
                 })
 
 
@@ -1172,7 +1645,32 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
+                # metrics = {'Model Accuracy': accuracy}
+
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
                 plt.legend()
@@ -1191,7 +1689,32 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
                 accuracy = accuracy_score(y_test, y_pred)
-                metrics = {'Model Accuracy': accuracy}
+                # metrics = {'Model Accuracy': accuracy}
+
+                # Generate confusion matrix visualization
+                plt.figure(figsize=(10, 8))
+                cm = confusion_matrix(y_test, y_pred)
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                
+                # Save plot to base64 string
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight')
+                buffer.seek(0)
+                image_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                results = {
+                    'accuracy': float(accuracy),
+                    'model_type': 'classification',
+                    'feature_importance': None,
+                    'num_features': len(feature_columns),
+                    'features_used': feature_columns,
+                    'visualization': f'data:image/png;base64,{image_base64}'
+                }
+
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
                 plt.legend()
@@ -1226,7 +1749,7 @@ def train_model(request):
                 except ValueError as e:
                     return JsonResponse({'error': f"Silhouette score calculation failed: {str(e)}"}, status=400)
 
-                metrics = {
+                results = {
                     'Silhouette Score (Train)': silhouette_train,
                     'Silhouette Score (Test)': silhouette_test,
                     'Inertia': model.inertia_,
@@ -1290,8 +1813,8 @@ def train_model(request):
             # plt.savefig(visualization_path)
 
             return JsonResponse({
-                'metrics': metrics,
-                'visualization': visualization_path,
+                'success': True,
+                'results': results,
             })
 
         except Exception as e:

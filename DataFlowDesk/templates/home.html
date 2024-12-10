@@ -156,7 +156,7 @@
             <!-- Upload Dataset Card -->
             <div class="relative group slide-in-left">
                 <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer float-animation"
-                     onclick="openModal('uploadModal')">
+                     onclick="openDatasetModal('uploadModal')">
                     <div class="flex flex-col items-center">
                         <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
                             <svg class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -174,7 +174,7 @@
             <!-- Create Dataset Card -->
             <div class="relative group slide-in-right">
                 <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer float-animation"
-                     onclick="openModal('createModal')">
+                     onclick="openDatasetModal('createModal')">
                     <div class="flex flex-col items-center">
                         <div class="rounded-full bg-indigo-600/10 p-3 mb-4">
                             <svg class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -242,6 +242,70 @@
                     <p class="text-gray-600">Cross-validation, Metrics Analysis</p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Authentication Modal -->
+<div id="authModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-96 shadow-lg rounded-md bg-white transform transition-all duration-300 ease-out scale-95 translate-y-4 modal-content">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-xl font-semibold" id="authModalTitle">Sign In</h3>
+            <button onclick="closeModal('authModal')" class="text-black close-modal hover:bg-gray-100 hover:text-gray-700 transition-colors duration-200 rounded-full p-1">&times;</button>
+        </div>
+        
+        <!-- Sign In Form -->
+        <form id="signInForm" method="post" action="{% url 'login' %}" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label for="signin-username" class="block text-sm font-medium text-gray-700">Username:</label>
+                <input type="text" id="signin-username" name="username" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="signin-password" class="block text-sm font-medium text-gray-700">Password:</label>
+                <input type="password" id="signin-password" name="password" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all duration-300">
+                Sign In
+            </button>
+        </form>
+
+        <!-- Sign Up Form -->
+        <form id="signUpForm" method="post" action="{% url 'register' %}" class="space-y-4 hidden">
+            {% csrf_token %}
+            <div>
+                <label for="signup-username" class="block text-sm font-medium text-gray-700">Username:</label>
+                <input type="text" id="signup-username" name="username" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="signup-email" class="block text-sm font-medium text-gray-700">Email:</label>
+                <input type="email" id="signup-email" name="email" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="signup-password" class="block text-sm font-medium text-gray-700">Password:</label>
+                <input type="password" id="signup-password" name="password" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="signup-confirm-password" class="block text-sm font-medium text-gray-700">Confirm Password:</label>
+                <input type="password" id="signup-confirm-password" name="confirm_password" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all duration-300">
+                Sign Up
+            </button>
+        </form>
+
+        <div class="mt-4 text-center">
+            <button id="toggleAuthForm" class="text-blue-600 hover:text-blue-800 text-sm">
+                Don't have an account? Sign Up
+            </button>
         </div>
     </div>
 </div>
@@ -373,41 +437,155 @@
     // Modal functions with animations
     function openModal(modalId) {
         const modal = document.getElementById(modalId);
-        const modalContent = modal.querySelector('div');
-        
-        // First make the modal visible
         modal.classList.remove('hidden');
         
         // Trigger a reflow to ensure the transitions work
         void modal.offsetWidth;
         
         // Add the visible classes
+        modal.classList.remove('opacity-0');
         modal.classList.add('opacity-100');
-        modalContent.classList.remove('scale-95', 'translate-y-4');
-        modalContent.classList.add('scale-100', 'translate-y-0');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-95', 'translate-y-4');
+            modalContent.classList.add('scale-100', 'translate-y-0');
+        }
     }
 
     function closeModal(modalId) {
         const modal = document.getElementById(modalId);
-        const modalContent = modal.querySelector('div');
         
         // Start the closing animation
         modal.classList.remove('opacity-100');
         modal.classList.add('opacity-0');
-        modalContent.classList.remove('scale-100', 'translate-y-0');
-        modalContent.classList.add('scale-95', 'translate-y-4');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-100', 'translate-y-0');
+            modalContent.classList.add('scale-95', 'translate-y-4');
+        }
         
         // Hide the modal after the animation completes
         setTimeout(() => {
             modal.classList.add('hidden');
-        }, 300); // Match this with the duration in the CSS transitions
+        }, 300);
+    }
+
+    // Authentication check function
+    function checkAuthentication(action) {
+        // Get authentication status from a data attribute we'll add to the body
+        const isAuthenticated = document.body.dataset.authenticated === 'true';
+        
+        if (!isAuthenticated) {
+            window.intendedAction = action;
+            openModal('authModal');
+            return false;
+        }
+        return true;
+    }
+
+    // Dataset modal open function with auth check
+    function openDatasetModal(modalId) {
+        const isAuthenticated = document.body.dataset.authenticated === 'true';
+        console.log('Authentication status:', isAuthenticated); // Debug line
+        
+        if (isAuthenticated) {
+            openModal(modalId);
+        } else {
+            window.intendedAction = modalId;
+            openModal('authModal');
+        }
     }
 
     // Close modal when clicking outside
     window.onclick = function(event) {
         if (event.target.classList.contains('fixed')) {
-            const modalId = event.target.id;
-            closeModal(modalId);
+            closeModal(event.target.id);
+        }
+    }
+
+    // Initialize all event listeners when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Authentication form toggle
+        const toggleButton = document.getElementById('toggleAuthForm');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', function() {
+                const signInForm = document.getElementById('signInForm');
+                const signUpForm = document.getElementById('signUpForm');
+                const modalTitle = document.getElementById('authModalTitle');
+                
+                if (signInForm.classList.contains('hidden')) {
+                    signInForm.classList.remove('hidden');
+                    signUpForm.classList.add('hidden');
+                    modalTitle.textContent = 'Sign In';
+                    this.textContent = "Don't have an account? Sign Up";
+                } else {
+                    signInForm.classList.add('hidden');
+                    signUpForm.classList.remove('hidden');
+                    modalTitle.textContent = 'Sign Up';
+                    this.textContent = 'Already have an account? Sign In';
+                }
+            });
+        }
+
+        // Handle authentication form submissions
+        const signInForm = document.getElementById('signInForm');
+        if (signInForm) {
+            signInForm.addEventListener('submit', handleAuthSubmit);
+        }
+
+        const signUpForm = document.getElementById('signUpForm');
+        if (signUpForm) {
+            signUpForm.addEventListener('submit', handleAuthSubmit);
+        }
+
+        // Update dataset modal triggers
+        const uploadCard = document.querySelector('[onclick*="uploadModal"]');
+        if (uploadCard) {
+            uploadCard.setAttribute('onclick', 'openDatasetModal("uploadModal")');
+        }
+
+        const createCard = document.querySelector('[onclick*="createModal"]');
+        if (createCard) {
+            createCard.setAttribute('onclick', 'openDatasetModal("createModal")');
+        }
+    });
+
+    // Handle successful authentication
+    async function handleAuthSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                // Update authentication state
+                document.body.dataset.authenticated = 'true';
+                closeModal('authModal');
+                
+                if (window.intendedAction) {
+                    openModal(window.intendedAction);
+                    window.intendedAction = null;
+                }
+                
+                // Refresh the page to update UI
+                window.location.reload();
+            } else {
+                alert(result.error || 'Authentication failed. Please try again.');
+            }
+        } catch (error) {
+            console.error('Authentication error:', error);
+            alert('An error occurred. Please try again.');
         }
     }
 

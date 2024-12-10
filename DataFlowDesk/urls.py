@@ -21,11 +21,17 @@ urlpatterns = [
     path('dataset/<int:id>/graphs/', views.display_graphs, name='display_graphs'),
 
     path('train_model/', views.train_model, name='train_model'),
+    path('train_model_nn/', views.train_model_nn, name='train_model_nn'),
     path('model_training/', views.training_page, name='model_training'),
 
     path('get_columns/', views.get_columns, name='get_columns'),
 
-    path('dataset/show_all/', views.all_datasets, name='all_datasets')
+    path('dataset/show_all/', views.all_datasets, name='all_datasets'),
+
+    # Add these URL patterns to your urls.py
+    path('auth/signin/', views.signin, name='login'),
+    path('auth/signup/', views.signup, name='register'),
+    path('auth/signout/', views.signout, name='signout'),
 
 ]
 
