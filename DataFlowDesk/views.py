@@ -457,34 +457,47 @@ def display_graphs(request, dataset_id=None):
 
                 try:
                     x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
-                    y_is_cat = df[y_column].dtype == 'object' or len(df[y_column].unique()) <= 10
-                    logging.debug(f'X is categorical: {x_is_cat}, Y is categorical: {y_is_cat}')
+                    y_is_count = y_column == 'count'
+                    logging.debug(f'X is categorical: {x_is_cat}, Y is count: {y_is_count}')
 
-                    if user_choice == 'box_plot' and not x_is_cat and not y_is_cat:
-                        sns.boxplot(x=x_column, y=y_column, data=df)
-                    elif user_choice == 'line_chart' and not x_is_cat and not y_is_cat:
-                        plt.plot(df[x_column], df[y_column], marker='o')
-                        plt.xticks(rotation=45)
-                    elif user_choice == 'scatter_chart' and not x_is_cat and not y_is_cat:
-                        sns.scatterplot(x=x_column, y=y_column, data=df)
-                    elif user_choice == 'histogram' and not y_is_cat:
-                        df[y_column].hist(bins=30)
-                        plt.xlabel(y_column)
-                        plt.ylabel('Frequency')
-                    elif user_choice == 'bar_chart':
-                        if x_is_cat:
+                    if y_is_count:
+                        # Handle count visualization
+                        value_counts = df[x_column].value_counts()
+                        if user_choice == 'pie_chart' and len(value_counts) <= 10:
+                            plt.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%')
+                            plt.axis('equal')
+                        else:  # Default to bar chart for counts
+                            plt.figure(figsize=(12, 6))
+                            value_counts.plot(kind='bar')
+                            plt.title(f'Count of {x_column}', pad=20, size=14)
+                            plt.xlabel(x_column, size=12)
+                            plt.ylabel('Count', size=12)
+                    else:
+                        if user_choice == 'box_plot' and not x_is_cat and not y_is_cat:
+                            sns.boxplot(x=x_column, y=y_column, data=df)
+                        elif user_choice == 'line_chart' and not x_is_cat and not y_is_cat:
+                            plt.plot(df[x_column], df[y_column], marker='o')
+                            plt.xticks(rotation=45)
+                        elif user_choice == 'scatter_chart' and not x_is_cat and not y_is_cat:
+                            sns.scatterplot(x=x_column, y=y_column, data=df)
+                        elif user_choice == 'histogram' and not y_is_cat:
+                            df[y_column].hist(bins=30)
+                            plt.xlabel(y_column)
+                            plt.ylabel('Frequency')
+                        elif user_choice == 'bar_chart':
+                            if x_is_cat:
+                                sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
+                                plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
+                            else:
+                                df[y_column].value_counts().plot(kind='bar')
+                        elif user_choice == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 5:
+                            plt.pie(df.groupby(x_column)[y_column].sum(), labels=df[x_column].unique(), autopct='%1.1f%%')
+                            plt.axis('equal')
+                        else:
+                            # Default to bar chart if invalid selection
+                            logging.debug('Invalid selection, defaulting to bar chart')
                             sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
                             plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
-                        else:
-                            df[y_column].value_counts().plot(kind='bar')
-                    elif user_choice == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 5:
-                        plt.pie(df.groupby(x_column)[y_column].sum(), labels=df[x_column].unique(), autopct='%1.1f%%')
-                        plt.axis('equal')
-                    else:
-                        # Default to bar chart if invalid selection
-                        logging.debug('Invalid selection, defaulting to bar chart')
-                        sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
-                        plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
                 except Exception as e:
                     return JsonResponse({
                         'success': False,
