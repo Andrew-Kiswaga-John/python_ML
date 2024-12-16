@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Data Visualization for {{ dataset.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-10 p-8 bg-white shadow-xl rounded-lg">
+    <h2 class="text-3xl font-bold mb-6 text-gray-800">Data Visualization for Dataset: {{ dataset.name }}</h2>
+    
+    {% if error %}
+    <div class="bg-red-100 text-red-700 p-4 rounded mb-4">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    <!-- Visualization Options -->
+    <div class="bg-gray-50 p-6 rounded-lg mb-6">
+        <h5 class="text-xl font-medium mb-4 text-gray-700">Select Visualization Options</h5>
+        <form id="visualizationForm" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label for="graph_type" class="block text-sm font-medium text-gray-700">Graph Type:</label>
+                <select class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" id="graph_type" name="graph_type" required>
+                    <option value="">Select graph type...</option>
+                    <option value="bar_chart">Bar Chart</option>
+                    <option value="line_chart">Line Chart</option>
+                    <option value="pie_chart">Pie Chart</option>
+                    <option value="scatter_chart">Scatter Plot</option>
+                    <option value="box_plot">Box Plot</option>
+                    <option value="histogram">Histogram</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="x_column" class="block text-sm font-medium text-gray-700">X-Axis Column:</label>
+                <select class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" id="x_column" name="x_column" required>
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            
+            <div>
+                <label for="y_column" class="block text-sm font-medium text-gray-700">Y-Axis Column:</label>
+                <select class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" id="y_column" name="y_column" required>
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            
+            <div>
+                <button type="submit" class="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Generate Graph
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Error Display -->
+    <div id="errorAlert" class="bg-red-100 text-red-700 p-4 rounded mb-4" style="display: none;">
+    </div>
+    
+    <!-- Graph Display -->
+    <div id="graphContainer" class="bg-gray-50 p-6 rounded-lg mb-6" style="display: none;">
+        <h5 class="text-xl font-medium mb-4">Visualization</h5>
+        <div id="graph" class="text-center">
+            <img id="graphImage" class="mx-auto max-w-full h-auto" alt="Data Visualization">
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('visualizationForm');
+    const graphTypeSelect = document.getElementById('graph_type');
+    const xColumnSelect = document.getElementById('x_column');
+    const yColumnSelect = document.getElementById('y_column');
+    const graphContainer = document.getElementById('graphContainer');
+    const graphImage = document.getElementById('graphImage');
+    const errorAlert = document.getElementById('errorAlert');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    function showError(message) {
+        errorAlert.textContent = message;
+        errorAlert.style.display = 'block';
+        setTimeout(() => {
+            errorAlert.style.display = 'none';
+        }, 5000);
+    }
+    
+    // Load columns when page loads
+    fetch(`/get_columns/?dataset_id={{ dataset.id }}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const columns = data.columns;
+            xColumnSelect.innerHTML = '<option value="">Select X-axis column...</option>';
+            yColumnSelect.innerHTML = '<option value="">Select Y-axis column...</option>';
+            
+            columns.forEach(column => {
+                xColumnSelect.add(new Option(column, column));
+                yColumnSelect.add(new Option(column, column));
+            });
+        } else {
+            showError(data.error || 'Error loading columns');
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching columns:', error);
+        showError('Error loading columns. Please try again.');
+    });
+    
+    // Update form based on graph type
+    graphTypeSelect.addEventListener('change', function() {
+        const graphType = this.value;
+        if (graphType === 'pie_chart') {
+            xColumnSelect.previousElementSibling.textContent = 'Categories:';
+            yColumnSelect.previousElementSibling.textContent = 'Values:';
+        } else if (graphType === 'histogram') {
+            xColumnSelect.previousElementSibling.textContent = 'Data Column:';
+            yColumnSelect.required = false;
+        } else {
+            xColumnSelect.previousElementSibling.textContent = 'X-Axis Column:';
+            yColumnSelect.previousElementSibling.textContent = 'Y-Axis Column:';
+            yColumnSelect.required = true;
+        }
+    });
+    
+    // Handle form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        errorAlert.style.display = 'none';
+        
+        const graphType = graphTypeSelect.value;
+        if (!graphType || !xColumnSelect.value || (graphType !== 'histogram' && !yColumnSelect.value)) {
+            showError('Please fill in all required fields');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('dataset_id', '{{ dataset.id }}');
+        formData.append('graph_type', graphType);
+        formData.append('x_column', xColumnSelect.value);
+        if (graphType !== 'histogram') {
+            formData.append('y_column', yColumnSelect.value);
+        }
+        
+        try {
+            const response = await fetch(`/dataset/{{ dataset.id }}/graphs/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new TypeError("Expected JSON response but got " + contentType);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                graphImage.src = `data:image/png;base64,${data.graphic}`;
+                graphContainer.style.display = 'block';
+            } else {
+                showError(data.error || 'Error generating graph');
+            }
+        } catch (error) {
+            console.error('Error generating graph:', error);
+            showError('Error generating graph: ' + error.message);
+        }
+    });
+});
+</script>
+{% endblock %}

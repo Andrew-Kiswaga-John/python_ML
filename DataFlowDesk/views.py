@@ -28,6 +28,15 @@ import numpy as np
 import json
 import logging
 
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 @ensure_csrf_cookie
 def signin(request):
     if request.method == 'POST':
@@ -102,8 +111,8 @@ from django.forms import modelform_factory
 from .models import Dataset
 import csv
 import os
+import uuid
 from django.conf import settings
-
 
 
 import os
@@ -197,7 +206,7 @@ def create_dataset_step2(request):
                 user=request.user,
                 name=dataset_meta['name'],
                 description=dataset_meta.get('description', ''),
-                file_path=file_path,
+                file_path=file_path,  # Path relative to MEDIA_ROOT
                 columns_info=columns,
                 status="uploaded"
             )
@@ -216,6 +225,9 @@ def create_dataset_step2(request):
 import pandas as pd
 from django.shortcuts import render, redirect
 from .models import Dataset
+import pandas as pd
+import json
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 import plotly.express as px
 
@@ -224,7 +236,6 @@ import pandas as pd
 from .models import Dataset
 
 from django.http import JsonResponse
-import plotly.express as px
 import pandas as pd
 from .models import Dataset
 
@@ -240,6 +251,7 @@ from django.shortcuts import render
 import pandas as pd
 import json
 from .models import Dataset
+from django.contrib import messages
 
 def display_dataset(request, id):
     try:
@@ -291,6 +303,344 @@ def display_dataset(request, id):
     })
 
 
+def perform_data_normalization(request, dataset_id):
+    # Ensure only POST requests are allowed for normalization
+    if request.method == 'POST':
+        try:
+            # Fetch the dataset
+            dataset = Dataset.objects.get(id=dataset_id)
+
+            # Check if dataset is processed
+            if dataset.status != 'processed':
+                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
+            
+            # Access the actual file path using .path
+            file_path = dataset.cleaned_file.path
+
+            # Load the dataset
+            df = pd.read_csv(file_path)
+            
+            # Identify numeric columns for normalization
+            numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+
+            # Perform Standard Scaling
+            scaler = StandardScaler()
+            df[numeric_columns] = pd.DataFrame(
+                scaler.fit_transform(df[numeric_columns]),
+                columns=numeric_columns
+            )
+
+            # Save to a new file with a timestamp to avoid overwriting
+            # new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
+            # df.to_csv(new_file_path, index=False)
+
+            cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'normalized')
+            os.makedirs(cleaned_datasets_dir, exist_ok=True)
+            cleaned_file_name = os.path.basename(file_path).replace('_cleaned.csv', '_normalized.csv')
+            cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
+            df.to_csv(cleaned_file_path, index=False)
+
+            # Update the dataset object to reflect the cleaned dataset
+            dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+
+            # Update the Dataset table
+            # dataset.cleaned_file.name = new_file_path  # Update file path
+            # dataset.status = 'processed'  # Update status
+            # dataset.columns_info = {  # Log normalization statistics
+            #     col: {
+            #         "mean": round(df[col].mean(), 2),
+            #         "std_dev": round(df[col].std(), 2)
+            #     } for col in numeric_columns
+            # }
+            dataset.save()
+
+            # Log the preprocessing action in DataPreprocessingLog
+            DataPreprocessingLog.objects.create(
+                dataset=dataset,
+                action='Data Normalized',
+                parameters={
+                    'scaler': 'StandardScaler',
+                    'columns': list(numeric_columns)
+                },
+                timestamp=now()
+            )
+
+            # Return success response
+            return JsonResponse({'message': f'Data normalized successfully. Saved as {cleaned_file_path}'})
+
+        except Dataset.DoesNotExist:
+            return JsonResponse({'error': 'Dataset not found.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
+    else:
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+from django.shortcuts import render, get_object_or_404
+
+
+
+@csrf_exempt
+def display_graphs(request, dataset_id=None):
+    if request.method == 'GET':
+        try:
+            dataset = Dataset.objects.get(pk=dataset_id)
+            return render(request, 'display_graphs.html', {'dataset': dataset})
+        except Dataset.DoesNotExist:
+            return render(request, 'display_graphs.html', {'error': 'Dataset not found'})
+
+    if request.method == 'POST':
+        logging.debug('POST request received for display_graphs')
+        try:
+            dataset_id = request.POST.get('dataset_id')
+            logging.debug(f'Dataset ID: {dataset_id}')
+            if not dataset_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No dataset ID provided'
+                })
+
+            try:
+                dataset_id = int(dataset_id)
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid dataset ID format'
+                })
+
+            x_column = request.POST.get('x_column')
+            y_column = request.POST.get('y_column')
+            logging.debug(f'X Column: {x_column}, Y Column: {y_column}')
+            
+            if not x_column or not y_column:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Both X and Y columns must be provided'
+                })
+
+            try:
+                dataset = Dataset.objects.get(pk=dataset_id)
+            except Dataset.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Dataset with ID {dataset_id} not found'
+                })
+
+            # Read from cleaned file if available, otherwise from original file
+            try:
+                if dataset.cleaned_file:
+                    file_path = dataset.cleaned_file.path
+                elif dataset.file_path:
+                    file_path = dataset.file_path.path
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No file found for this dataset'
+                    })
+
+                try:
+                    df = pd.read_csv(file_path)
+                except UnicodeDecodeError:
+                    # Try with different encoding if UTF-8 fails
+                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error reading file: {str(e)}'
+                    })
+
+                plt.figure(figsize=(12, 8))
+                plt.clf()
+                
+                # Get user choice for graph type
+                user_choice = request.POST.get('graph_type', 'bar_chart')
+                logging.debug(f'User choice for graph type: {user_choice}')
+
+                try:
+                    x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
+                    y_is_cat = df[y_column].dtype == 'object' or len(df[y_column].unique()) <= 10
+                    logging.debug(f'X is categorical: {x_is_cat}, Y is categorical: {y_is_cat}')
+
+                    if user_choice == 'box_plot' and not x_is_cat and not y_is_cat:
+                        sns.boxplot(x=x_column, y=y_column, data=df)
+                    elif user_choice == 'line_chart' and not x_is_cat and not y_is_cat:
+                        plt.plot(df[x_column], df[y_column], marker='o')
+                        plt.xticks(rotation=45)
+                    elif user_choice == 'scatter_chart' and not x_is_cat and not y_is_cat:
+                        sns.scatterplot(x=x_column, y=y_column, data=df)
+                    elif user_choice == 'histogram' and not y_is_cat:
+                        df[y_column].hist(bins=30)
+                        plt.xlabel(y_column)
+                        plt.ylabel('Frequency')
+                    elif user_choice == 'bar_chart':
+                        if x_is_cat:
+                            sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
+                            plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
+                        else:
+                            df[y_column].value_counts().plot(kind='bar')
+                    elif user_choice == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 5:
+                        plt.pie(df.groupby(x_column)[y_column].sum(), labels=df[x_column].unique(), autopct='%1.1f%%')
+                        plt.axis('equal')
+                    else:
+                        # Default to bar chart if invalid selection
+                        logging.debug('Invalid selection, defaulting to bar chart')
+                        sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
+                        plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error creating plot: {str(e)}'
+                    })
+                
+                plt.title(f'{y_column} vs {x_column}', pad=20, size=14)
+                plt.xlabel(x_column, size=12)
+                plt.ylabel(y_column, size=12)
+                plt.xticks(rotation=45, ha='right')
+                plt.grid(True, alpha=0.3)
+                plt.tight_layout()
+                
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png')
+                buffer.seek(0)
+                image_png = buffer.getvalue()
+                buffer.close()  # Close the figure to free memory
+                
+                graphic = base64.b64encode(image_png).decode('utf-8')
+                
+                return JsonResponse({
+                    'success': True,
+                    'graphic': graphic
+                })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error processing dataset: {str(e)}'
+                })
+
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Unexpected error: {str(e)}'
+            })
+    
+    # For GET request
+    try:
+        if dataset_id:
+            dataset = get_object_or_404(Dataset, id=dataset_id)
+            try:
+                if dataset.cleaned_file:
+                    file_path = dataset.cleaned_file.path
+                elif dataset.file_path:
+                    file_path = dataset.file_path.path
+                else:
+                    return render(request, 'display_graphs.html', {
+                        'datasets': Dataset.objects.all(),
+                        'error': 'No file found for this dataset'
+                    })
+
+                try:
+                    df = pd.read_csv(file_path)
+                except UnicodeDecodeError:
+                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
+                
+                # Get plottable columns
+                plottable_columns = [col for col in df.columns if not (
+                    df[col].dtype == 'object' and df[col].str.len().mean() > 50
+                )]
+                
+                context = {
+                    'datasets': Dataset.objects.all(),
+                    'current_dataset': dataset,
+                    'columns': plottable_columns,
+                    'dataset_id': dataset_id
+                }
+            except Exception as e:
+                context = {
+                    'datasets': Dataset.objects.all(),
+                    'error': str(e)
+                }
+        else:
+            context = {
+                'datasets': Dataset.objects.all()
+            }
+        
+        return render(request, 'display_graphs.html', context)
+    except Exception as e:
+        return render(request, 'display_graphs.html', {
+            'datasets': Dataset.objects.all(),
+            'error': str(e)
+        })
+
+def get_columns(request):
+    try:
+        dataset_id = request.GET.get('dataset_id')
+        if not dataset_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'No dataset ID provided'
+            })
+        
+        # Convert dataset_id to integer
+        try:
+            dataset_id = int(dataset_id)
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid dataset ID format'
+            })
+            
+        try:
+            dataset = Dataset.objects.get(pk=dataset_id)
+        except Dataset.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Dataset with ID {dataset_id} not found'
+            })
+            
+        # Read from cleaned file if available, otherwise from original file
+        try:
+            if dataset.cleaned_file:
+                file_path = dataset.cleaned_file.path
+            elif dataset.file_path:
+                file_path = dataset.file_path.path
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No file found for this dataset'
+                })
+                
+            try:
+                df = pd.read_csv(file_path)
+            except UnicodeDecodeError:
+                # Try with different encoding if UTF-8 fails
+                df = pd.read_csv(file_path, encoding='ISO-8859-1')
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error reading file: {str(e)}'
+                })
+            
+            # Filter out text-heavy columns
+            columns = [col for col in df.columns if not (
+                df[col].dtype == 'object' and df[col].str.len().mean() > 50
+            )]
+            
+            return JsonResponse({
+                'success': True,
+                'columns': columns
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error accessing file: {str(e)}'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 from io import StringIO
 from django.core.files.base import ContentFile
@@ -298,7 +648,7 @@ import uuid
 import os
 import pylightxl
 import pandas as pd
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
@@ -347,14 +697,7 @@ def upload_file(request):
                             df = pd.read_csv(file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
                         except Exception as e:
                             return JsonResponse({'error': f'File reading error: {str(e)}'})
-
-                    # Handle cases where the delimiter isn't a comma
-                    if df.empty or len(df.columns) == 1:  # Single-column issue
-                        try:
-                            df = pd.read_csv(file_path, delimiter=';')  # Try a semicolon
-                        except Exception as e:
-                            return JsonResponse({'error': f'CSV Parsing Error with fallback delimiter: {str(e)}'})
-                        
+                    
                 elif file.name.endswith('.xls'):
                         try:                           
                             df = pd.read_excel(file_path, engine='xlrd')
@@ -627,91 +970,6 @@ def data_cleaning_preview(request, dataset_id):
 
 
 
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from .models import Dataset
-import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
-from django.utils.timezone import now
-from django.utils.timezone import now
-from imblearn.over_sampling import SMOTE
-
-from sklearn.preprocessing import MinMaxScaler
-from django.utils.timezone import now
-
-def perform_data_normalization(request, dataset_id):
-    # Ensure only POST requests are allowed for normalization
-    if request.method == 'POST':
-        try:
-            # Fetch the dataset
-            dataset = Dataset.objects.get(id=dataset_id)
-
-            # Check if dataset is processed
-            if dataset.status != 'processed':
-                return JsonResponse({'error': 'Dataset not processed. Please clean the dataset first.'}, status=400)
-            
-            # Access the actual file path using .path
-            file_path = dataset.cleaned_file.path
-
-            # Load the dataset
-            df = pd.read_csv(file_path)
-            
-            # Identify numeric columns for normalization
-            numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
-
-            # Perform Standard Scaling
-            scaler = StandardScaler()
-            df[numeric_columns] = pd.DataFrame(
-                scaler.fit_transform(df[numeric_columns]),
-                columns=numeric_columns
-            )
-
-            # Save to a new file with a timestamp to avoid overwriting
-            # new_file_path = f"{file_path.replace('.csv', '')}_normalized_{now().strftime('%Y%m%d%H%M%S')}.csv"
-            # df.to_csv(new_file_path, index=False)
-
-            cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'normalized')
-            os.makedirs(cleaned_datasets_dir, exist_ok=True)
-            cleaned_file_name = os.path.basename(file_path).replace('_cleaned.csv', '_normalized.csv')
-            cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
-            df.to_csv(cleaned_file_path, index=False)
-
-            # Update the dataset object to reflect the cleaned dataset
-            dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
-
-            # Update the Dataset table
-            # dataset.cleaned_file.name = new_file_path  # Update file path
-            # dataset.status = 'processed'  # Update status
-            # dataset.columns_info = {  # Log normalization statistics
-            #     col: {
-            #         "mean": round(df[col].mean(), 2),
-            #         "std_dev": round(df[col].std(), 2)
-            #     } for col in numeric_columns
-            # }
-            dataset.save()
-
-            # Log the preprocessing action in DataPreprocessingLog
-            DataPreprocessingLog.objects.create(
-                dataset=dataset,
-                action='Data Normalized',
-                parameters={
-                    'scaler': 'StandardScaler',
-                    'columns': list(numeric_columns)
-                },
-                timestamp=now()
-            )
-
-            # Return success response
-            return JsonResponse({'message': f'Data normalized successfully. Saved as {cleaned_file_path}'})
-
-        except Dataset.DoesNotExist:
-            return JsonResponse({'error': 'Dataset not found.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
-    else:
-        return JsonResponse({'error': 'Invalid request method.'}, status=400)
-
 from django.shortcuts import render, get_object_or_404
 
 
@@ -727,9 +985,8 @@ from .models import Dataset  # Adjust based on your actual model import
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
 import json
-from collections import defaultdict
-
-# import matplotlib.pyplot as plt
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
@@ -737,282 +994,16 @@ import json
 import numpy as np
 from collections import Counter
 
-def generate_colors(n):
-    """Generates a list of n visually distinct colors."""
-    import numpy as np
-    import matplotlib.colors as mcolors
-    colors = list(mcolors.CSS4_COLORS.values())
-    if n > len(colors):  # Repeat colors if necessary
-        colors *= (n // len(colors)) + 1
-    np.random.shuffle(colors)
-    return colors[:n]
-
-
-def analyze_column_relationships(data):
-    """Analyze relationships between columns to recommend appropriate graph types."""
-    relationships = {}
-    
-    # Patterns for different column types
-    text_patterns = ['message', 'description', 'comment', 'text', 'note']
-    id_patterns = ['id', 'code', 'uuid', 'ref']
-    category_patterns = ['category', 'type', 'class', 'label', 'status', 'group', 'spam', 'survived']
-    numeric_patterns = ['age', 'price', 'amount', 'count', 'number', 'score', 'rate']
-    
-    for col in data.columns:
-        column_data = data[col].dropna()
-        unique_count = len(column_data.unique())
-        total_rows = len(column_data)
-        
-        relationships[col] = {
-            'type': 'unknown',
-            'unique_count': unique_count,
-            'compatible_graphs': [],
-            'recommended_as_x': False,
-            'recommended_as_y': False,
-            'is_text_heavy': False,
-            'is_identifier': False,
-            'total_rows': total_rows,
-            'unique_ratio': unique_count / total_rows if total_rows > 0 else 0,
-            'distribution_friendly': False,  # New flag for columns good for distribution analysis
-            'can_be_counted': False  # New flag to indicate if column can be used for counting
-        }
-        
-        # Skip empty columns
-        if total_rows == 0:
-            continue
-        
-        # Check if column is an identifier
-        is_identifier = any(pattern in col.lower() for pattern in id_patterns)
-        relationships[col]['is_identifier'] = is_identifier
-        
-        # Simple text detection
-        if data[col].dtype == object:
-            # Check if it's a text-heavy column
-            is_text_heavy = (
-                any(pattern in col.lower() for pattern in text_patterns) or
-                any(len(str(x)) > 50 for x in column_data.head(5))
-            )
-            relationships[col]['is_text_heavy'] = is_text_heavy
-            
-            if is_text_heavy:
-                relationships[col]['type'] = 'text'
-                continue
-            
-            # Enhanced categorical detection
-            is_categorical = (
-                any(pattern in col.lower() for pattern in category_patterns) or
-                unique_count <= 20 or
-                relationships[col]['unique_ratio'] <= 0.2
-            )
-            
-            if is_categorical:
-                relationships[col]['type'] = 'categorical'
-                relationships[col]['compatible_graphs'] = ['bar', 'distribution']
-                relationships[col]['recommended_as_x'] = True
-                relationships[col]['distribution_friendly'] = True
-                relationships[col]['can_be_counted'] = True  # Categorical columns can be counted
-                if unique_count <= 10:
-                    relationships[col]['compatible_graphs'].append('pie')
-            else:
-                relationships[col]['type'] = 'text'
-        
-        # Handle numeric data
-        elif pd.api.types.is_numeric_dtype(column_data):
-            # Check if it's a numeric column good for distribution analysis
-            is_distribution_friendly = any(pattern in col.lower() for pattern in numeric_patterns)
-            relationships[col]['distribution_friendly'] = is_distribution_friendly
-            
-            # If it's an ID or has unique values equal to row count, mark as identifier
-            if is_identifier or unique_count == total_rows:
-                relationships[col]['type'] = 'identifier'
-            else:
-                # Check if it's a binary/categorical numeric column
-                if unique_count <= 2:
-                    relationships[col]['type'] = 'categorical'
-                    relationships[col]['compatible_graphs'] = ['pie', 'bar', 'distribution']
-                    relationships[col]['recommended_as_x'] = True
-                    relationships[col]['distribution_friendly'] = True
-                    relationships[col]['can_be_counted'] = True  # Binary columns can be counted
-                elif unique_count <= 20:
-                    relationships[col]['type'] = 'discrete'
-                    relationships[col]['compatible_graphs'] = ['bar', 'line', 'distribution']
-                    relationships[col]['recommended_as_x'] = True
-                    relationships[col]['recommended_as_y'] = True
-                    relationships[col]['distribution_friendly'] = True
-                    relationships[col]['can_be_counted'] = True  # Discrete columns can be counted
-                else:
-                    relationships[col]['type'] = 'continuous'
-                    relationships[col]['compatible_graphs'] = ['scatter', 'line', 'distribution']
-                    relationships[col]['recommended_as_y'] = True
-                    relationships[col]['distribution_friendly'] = True
-        
-        # Handle datetime data
-        elif pd.api.types.is_datetime64_any_dtype(column_data):
-            relationships[col]['type'] = 'datetime'
-            relationships[col]['compatible_graphs'] = ['line', 'scatter']
-            relationships[col]['recommended_as_x'] = True
-    
-    return relationships
-
-def get_recommended_graphs(x_col, y_col, relationships):
-    """Get recommended graph types based on column relationships."""
-    x_info = relationships[x_col]
-    recommendations = []
-    
-    # For categorical x-axis with no y-axis (distribution analysis)
-    if x_info['type'] == 'categorical' and not y_col:
-        recommendations.append({
-            'type': 'bar',
-            'confidence': 0.95,
-            'reason': f'Shows count distribution of {x_col}',
-            'requires_y': False
-        })
-        if x_info['unique_count'] <= 10:
-            recommendations.append({
-                'type': 'pie',
-                'confidence': 0.9,
-                'reason': 'Best for showing proportion of categories',
-                'requires_y': False
-            })
-    
-    # For categorical x-axis with numerical y-axis
-    elif x_info['type'] == 'categorical' and y_col:
-        y_info = relationships[y_col]
-        if y_info['type'] in ['continuous', 'discrete']:
-            recommendations.append({
-                'type': 'distribution',
-                'confidence': 0.95,
-                'reason': f'Best for analyzing {y_col} distribution across {x_col} categories',
-                'requires_y': True
-            })
-            recommendations.append({
-                'type': 'box',
-                'confidence': 0.9,
-                'reason': f'Good for comparing {y_col} statistics across {x_col} categories',
-                'requires_y': True
-            })
-            recommendations.append({
-                'type': 'bar',
-                'confidence': 0.85,
-                'reason': f'Shows average {y_col} for each {x_col} category',
-                'requires_y': True
-            })
-    
-    # For numerical or datetime x-axis with numerical y-axis
-    elif x_info['type'] in ['continuous', 'discrete', 'datetime'] and y_col:
-        y_info = relationships[y_col]
-        if y_info['type'] in ['continuous', 'discrete']:
-            if x_info['type'] == 'datetime':
-                recommendations.append({
-                    'type': 'line',
-                    'confidence': 0.95,
-                    'reason': 'Best for showing trends over time',
-                    'requires_y': True
-                })
-            recommendations.append({
-                'type': 'scatter',
-                'confidence': 0.9,
-                'reason': 'Best for showing relationships between numerical variables',
-                'requires_y': True
-            })
-            if x_info['type'] == 'discrete' or y_info['type'] == 'discrete':
-                recommendations.append({
-                    'type': 'bar',
-                    'confidence': 0.85,
-                    'reason': 'Good for comparing discrete values',
-                    'requires_y': True
-                })
-    
-    return recommendations
-
-def display_graphs(request, id):
-    try:
-        dataset = Dataset.objects.get(id=id)
-    except Dataset.DoesNotExist:
-        return JsonResponse({'error': 'Dataset not found.'}, status=404)
-
-    try:
-        # Load and preprocess data
-        if dataset.status == 'processed':
-            data = pd.read_csv(dataset.cleaned_file)
-        else:
-            data = pd.read_csv(dataset.file_path)
-        
-        # Basic data cleaning
-        data.columns = [str(col).strip() for col in data.columns]
-        data = data.dropna(axis=1, how='all')
-        
-        # Try to convert date strings to datetime
-        for col in data.columns:
-            if data[col].dtype == object:
-                try:
-                    data[col] = pd.to_datetime(data[col], errors='raise')
-                except (ValueError, TypeError):
-                    continue
-        
-        # Analyze columns
-        column_relationships = analyze_column_relationships(data)
-        
-        # Find default columns for initial display
-        default_x = None
-        default_y = None
-        
-        # First, try to find a datetime column for x-axis
-        for col, info in column_relationships.items():
-            if info['type'] == 'datetime':
-                default_x = col
-                break
-        
-        # If no datetime, try to find a categorical column
-        if not default_x:
-            for col, info in column_relationships.items():
-                if (info['type'] == 'categorical' and 
-                    not info['is_text_heavy'] and 
-                    not info['is_identifier']):
-                    default_x = col
-                    break
-        
-        # Find a numerical column for y-axis
-        for col, info in column_relationships.items():
-            if (info['recommended_as_y'] and 
-                not info['is_identifier'] and 
-                col != default_x):
-                default_y = col
-                break
-        
-        # Prepare data for template
-        sample_size = min(100, len(data))
-        dataset_data = data.head(sample_size).values.tolist()
-        columns = data.columns.tolist()
-        
-        context = {
-            'dataset': dataset,
-            'dataset_data': json.dumps(dataset_data),
-            'columns': json.dumps(columns),
-            'column_relationships': json.dumps(column_relationships),
-            'default_x': json.dumps(default_x),
-            'default_y': json.dumps(default_y)
-        }
-        
-        return render(request, 'graphs.html', context)
-    
-    except Exception as e:
-        return JsonResponse({
-            'error': f'Error processing dataset: {str(e)}'
-        }, status=500)
 
 
 # Function to render the upload.html page
 def upload_page(request):
     return render(request, 'upload.html')
 
-
-
 def all_datasets(request) :
     dataset = Dataset.objects.all()
 
     return render(request, "datasets/show_datasets.html", {'dataset' : dataset})
-
 
 ### MODEL TRAINING PART ###
 
@@ -1913,20 +1904,74 @@ def training_page(request):
     return render(request, 'model_training.html', {'dataset': datasets})
 
 def get_columns(request):
-    if request.method == 'GET':
-        dataset_id = request.GET.get('datasetId')
-
-        # Assuming you have a Dataset model and a method to fetch the dataset file
-        dataset = Dataset.objects.get(id=dataset_id)
-        if dataset.status == 'processed':
-            dataset_path = dataset.cleaned_file.path  # Path to the dataset file
-        else:            
-            dataset_path = dataset.file_path.path
-
+    try:
+        dataset_id = request.GET.get('dataset_id')
+        if not dataset_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'No dataset ID provided'
+            })
+        
+        # Convert dataset_id to integer
         try:
-            # Load the dataset (e.g., CSV file)
-            data = pd.read_csv(dataset_path)
-            columns = list(data.columns)  # Get the list of columns
-            return JsonResponse({'columns': columns})
+            dataset_id = int(dataset_id)
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid dataset ID format'
+            })
+            
+        try:
+            dataset = Dataset.objects.get(pk=dataset_id)
+        except Dataset.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Dataset with ID {dataset_id} not found'
+            })
+            
+        # Read from cleaned file if available, otherwise from original file
+        try:
+            if dataset.cleaned_file:
+                file_path = dataset.cleaned_file.path
+            elif dataset.file_path:
+                file_path = dataset.file_path.path
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No file found for this dataset'
+                })
+                
+            try:
+                df = pd.read_csv(file_path)
+            except UnicodeDecodeError:
+                # Try with different encoding if UTF-8 fails
+                df = pd.read_csv(file_path, encoding='ISO-8859-1')
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error reading file: {str(e)}'
+                })
+            
+            # Filter out text-heavy columns
+            columns = [col for col in df.columns if not (
+                df[col].dtype == 'object' and df[col].str.len().mean() > 50
+            )]
+            
+            return JsonResponse({
+                'success': True,
+                'columns': columns
+            })
+            
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse({
+                'success': False,
+                'error': f'Error accessing file: {str(e)}'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+from django.shortcuts import render, get_object_or_404
