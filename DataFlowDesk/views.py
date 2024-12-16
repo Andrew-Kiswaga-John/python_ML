@@ -248,17 +248,35 @@ def display_dataset(request, id):
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
 
     # Load dataset file
-    if dataset.status == 'processed':
-        data = pd.read_csv(dataset.cleaned_file)
-    else:
-        # data = pd.read_csv(dataset.file_path)
-        try:
-            data = pd.read_csv(dataset.file_path, on_bad_lines='skip')  # Default UTF-8
-        except UnicodeDecodeError:
-            try:
-                data = pd.read_csv(dataset.file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
-            except Exception as e:
-                return JsonResponse({'error': f'File reading error: {str(e)}'})
+    try:
+        if dataset.status == 'processed':
+            # Load cleaned file (CSV only)
+            data = pd.read_csv(dataset.cleaned_file)
+        else:
+            # Handle CSV and Excel files for unprocessed datasets
+            file_path = dataset.file_path.path
+            if file_path.endswith('.csv'):
+                try:
+                    data = pd.read_csv(file_path, on_bad_lines='skip')  # Default UTF-8
+                except UnicodeDecodeError:
+                    try:
+                        data = pd.read_csv(file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+                    except Exception as e:
+                        return JsonResponse({'error': f'CSV File reading error: {str(e)}'})
+            elif file_path.endswith('.xlsx'):
+                try:
+                    data = pd.read_excel(file_path, engine='openpyxl')  # Use openpyxl for .xlsx
+                except Exception as e:
+                    return JsonResponse({'error': f'Excel (.xlsx) File reading error: {str(e)}'})
+            elif file_path.endswith('.xls'):
+                try:
+                    data = pd.read_excel(file_path, engine='xlrd')  # Use xlrd for .xls
+                except Exception as e:
+                    return JsonResponse({'error': f'Excel (.xls) File reading error: {str(e)}'})
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+    except Exception as e:
+        return JsonResponse({'error': f'Error loading dataset: {str(e)}'})
 
     # Prepare data for display
     dataset_preview = data.head(10).values.tolist()  # Show the first 10 rows
@@ -336,6 +354,12 @@ def upload_file(request):
                             df = pd.read_csv(file_path, delimiter=';')  # Try a semicolon
                         except Exception as e:
                             return JsonResponse({'error': f'CSV Parsing Error with fallback delimiter: {str(e)}'})
+                        
+                elif file.name.endswith('.xls'):
+                        try:                           
+                            df = pd.read_excel(file_path, engine='xlrd')
+                        except Exception as e:
+                            return JsonResponse({'error': f'File reading error: {str(e)}'})
                 else:
                     # read excel
                     db = pylightxl.readxl(file_path)
@@ -364,13 +388,60 @@ def upload_file(request):
                     'message': 'Dataset uploaded successfully!',
                     'preview': first_five_rows,
                     'dataset_id': dataset_instance.id
-                })
-            
-                
+                })                            
 
-            # Handling Kaggle dataset URL (future implementation)
+            # Handling Kaggle dataset URL
             elif request.POST.get('source') == 'kaggle':
-                return JsonResponse({'error': 'Kaggle source is not implemented yet.'})
+                kaggle_link = request.POST.get('kaggle_link')
+                if not kaggle_link:
+                    return JsonResponse({'error': 'No Kaggle link provided.'})
+
+                # Extract dataset identifier from Kaggle link
+                dataset_id = '/'.join(kaggle_link.rstrip('/').split('/')[-2:])
+                datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
+                os.makedirs(datasets_dir, exist_ok=True)
+
+                # Use Kaggle API to download the dataset
+                try:
+                    import kaggle
+                    kaggle.api.dataset_download_files(dataset_id, path=datasets_dir, unzip=True)
+                except Exception as e:
+                    return JsonResponse({'error': f'Error downloading dataset from Kaggle: {str(e)}'})
+
+                # Locate the downloaded file
+                downloaded_files = [
+                    os.path.join(datasets_dir, f) for f in os.listdir(datasets_dir)
+                    if f.endswith('.csv') or f.endswith(('.xls', '.xlsx'))
+                ]
+                if not downloaded_files:
+                    return JsonResponse({'error': 'No valid CSV or Excel files found in the downloaded dataset.'})
+
+                file_path = downloaded_files[0]  # Use the first valid file
+
+                # Load the dataset
+                if file_path.endswith('.csv'):
+                    df = pd.read_csv(file_path)
+                elif file_path.endswith(('.xls', '.xlsx')):
+                    df = pd.read_excel(file_path)
+
+                # Save dataset details to the database
+                dataset_instance = Dataset.objects.create(
+                    user=request.user,
+                    name=name,
+                    description=description,
+                    file_path=file_path,  # Path relative to MEDIA_ROOT
+                    columns_info=df.columns.tolist(),  # Save column names as JSON
+                )
+
+                # Get the first five rows as HTML
+                first_five_rows = df.head().to_html(classes='table table-bordered')
+                print(f"dataset_id: {dataset_instance.id}")
+
+                return JsonResponse({
+                    'message': 'Dataset uploaded successfully!',
+                    'preview': first_five_rows,
+                    'dataset_id': dataset_instance.id
+                })
 
             else:
                 return JsonResponse({'error': 'Invalid data source selected.'})
@@ -446,6 +517,9 @@ def clean_dataset(df, delete_header=False):
                 print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
                 df[col].fillna('Unknown', inplace=True)
 
+            # Ensure all entries are strings and strip whitespace
+            df[col] = df[col].astype(str).str.strip()
+
             # Encode categorical data
             print(f"Encoding categorical column '{col}' using Label Encoding.")
             le = LabelEncoder()
@@ -454,12 +528,6 @@ def clean_dataset(df, delete_header=False):
         # Handle other types
         else:
             print(f"Skipping column '{col}' as it does not fit numeric, boolean, or categorical types.")
-
-    # Normalize numerical columns (excluding boolean)
-    # print("Normalizing numerical columns...")
-    # scaler = StandardScaler()
-    # numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
-    # df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
     print("Dataset cleaning completed.")
     return df
@@ -479,8 +547,16 @@ def perform_data_cleaning(request, dataset_id):
         dataset = Dataset.objects.get(id=dataset_id)
         file_path = dataset.file_path.path
 
-        # Load dataset with original headers
-        df = pd.read_csv(file_path, on_bad_lines='skip')
+        # Determine file type based on the extension
+        file_extension = os.path.splitext(file_path)[-1].lower()
+        if file_extension == '.csv':
+            df = pd.read_csv(file_path, on_bad_lines='skip')
+            cleaned_file_suffix = '_cleaned.csv'
+        elif file_extension in ['.xls', '.xlsx']:
+            df = pd.read_excel(file_path)
+            cleaned_file_suffix = '_xlscleaned.csv'
+        else:
+            return JsonResponse({'error': 'Unsupported file format. Only CSV and Excel files are allowed.'}, status=400)
 
         # Perform cleaning with the delete_header parameter
         cleaned_df = clean_dataset(df, delete_header=delete_header)
@@ -488,7 +564,7 @@ def perform_data_cleaning(request, dataset_id):
         # Save the cleaned dataset with a new name
         cleaned_datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'cleaned')
         os.makedirs(cleaned_datasets_dir, exist_ok=True)
-        cleaned_file_name = os.path.basename(file_path).replace('.csv', '_cleaned.csv')
+        cleaned_file_name = os.path.basename(file_path).replace('.csv', cleaned_file_suffix).replace('.xls', cleaned_file_suffix).replace('.xlsx', cleaned_file_suffix)
         cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
         cleaned_df.to_csv(cleaned_file_path, index=False)
 
@@ -509,6 +585,7 @@ def perform_data_cleaning(request, dataset_id):
     except Exception as e:
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
 
+
 def data_cleaning_preview(request, dataset_id):
     """
     Generates a preview of tasks needed for cleaning the dataset.
@@ -521,10 +598,16 @@ def data_cleaning_preview(request, dataset_id):
         if dataset.status == 'processed':
             return JsonResponse({'tasks': ["Dataset already processed"]})
 
-        file_path = dataset.file_path  # Path to the dataset
+        file_path = dataset.file_path.path  # Path to the dataset
 
-        # Load dataset
-        df = pd.read_csv(file_path, on_bad_lines='skip')
+        # Determine file type based on the extension
+        file_extension = os.path.splitext(file_path)[-1].lower()
+        if file_extension == '.csv':
+            df = pd.read_csv(file_path, on_bad_lines='skip')
+        elif file_extension in ['.xls', '.xlsx']:
+            df = pd.read_excel(file_path)
+        else:
+            return JsonResponse({'error': 'Unsupported file format. Only CSV and Excel files are allowed.'}, status=400)
 
         # Identify cleaning tasks
         tasks = []
