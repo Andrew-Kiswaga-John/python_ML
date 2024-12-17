@@ -8,6 +8,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('<int:dataset_id>/dashboard/', views.dashboard, name='dashboard'),
     path('', views.my_view, name='home'),
     path('', views.upload_page, name='upload_page'),
     path('upload-file/', views.upload_file, name='upload_file'),

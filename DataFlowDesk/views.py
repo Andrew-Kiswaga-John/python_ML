@@ -80,6 +80,104 @@ def signup(request):
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
+
+def generate_plot_base64(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    plt.close(fig)  # Close the figure to free memory
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+
+def dashboard(request,dataset_id):
+
+    try:
+        dataset = Dataset.objects.get(id=dataset_id)
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
+    
+
+    try:
+        if dataset.status == 'processed':
+            # Load cleaned file (CSV only)
+            data = pd.read_csv(dataset.cleaned_file)
+        else:
+            # Handle CSV and Excel files for unprocessed datasets
+            file_path = dataset.file_path.path
+            if file_path.endswith('.csv'):
+                try:
+                    data = pd.read_csv(file_path, on_bad_lines='skip')  # Default UTF-8
+                except UnicodeDecodeError:
+                    try:
+                        data = pd.read_csv(file_path, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+                    except Exception as e:
+                        return JsonResponse({'error': f'CSV File reading error: {str(e)}'})
+            elif file_path.endswith('.xlsx'):
+                try:
+                    data = pd.read_excel(file_path, engine='openpyxl')  # Use openpyxl for .xlsx
+                except Exception as e:
+                    return JsonResponse({'error': f'Excel (.xlsx) File reading error: {str(e)}'})
+            elif file_path.endswith('.xls'):
+                try:
+                    data = pd.read_excel(file_path, engine='xlrd')  # Use xlrd for .xls
+                except Exception as e:
+                    return JsonResponse({'error': f'Excel (.xls) File reading error: {str(e)}'})
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+    except Exception as e:
+        return JsonResponse({'error': f'Error loading dataset: {str(e)}'})
+
+    dataset_preview = data.head(10).values.tolist()  # Show the first 10 rows
+    columns = data.columns.tolist()
+
+
+    try:
+        # ... existing data loading code ...
+        
+        # Calculate new metrics
+        # 1. Missing Values
+        missing_values = data.isnull().sum()
+        total_missing = missing_values.sum()
+        missing_percentage = (total_missing / (data.shape[0] * data.shape[1])) * 100
+        
+        # 2. Duplicate Records
+        duplicate_count = data.duplicated().sum()
+        duplicate_percentage = (duplicate_count / len(data)) * 100
+        
+        # 3. Feature Types
+        # Get the original categorical columns that were encoded
+        categorical_columns = data.attrs.get('categorical_columns', [])
+        
+        feature_types = {
+            'Numerical': len(data.select_dtypes(include=['int64', 'float64']).columns) - len(categorical_columns),
+            'Categorical': len(categorical_columns),
+            'DateTime': len(data.select_dtypes(include=['datetime64']).columns),
+            'Boolean': len(data.select_dtypes(include=['bool']).columns)
+        }
+        
+        # 4. Memory Usage
+        memory_usage = data.memory_usage(deep=True).sum()
+        memory_usage_mb = memory_usage / (1024 * 1024)  # Convert to MB
+
+        
+        return render(request, 'dashboard.html', {
+            'dataset': dataset,
+            'dataset_data': dataset_preview,
+            'columns': columns,
+            'rows': data,
+            'total_missing': total_missing,
+            'missing_percentage': round(missing_percentage, 2),
+            'duplicate_count': duplicate_count,
+            'duplicate_percentage': round(duplicate_percentage, 2),
+            'feature_types': feature_types,
+            'memory_usage_mb': round(memory_usage_mb, 2),
+        })
+
+    except Exception as e:
+            return JsonResponse({'error': f'Error loading dataset: {str(e)}'})
+
+
+
 def signout(request):
     logout(request)
     return redirect('home')
@@ -814,6 +912,9 @@ def clean_dataset(df, delete_header=False):
     - Includes preprocessing for boolean columns
     """
     print("Starting dataset cleaning...")
+    
+    # Keep track of categorical columns
+    categorical_columns = []
 
     # If user wants to delete header
     if delete_header:
@@ -868,6 +969,7 @@ def clean_dataset(df, delete_header=False):
 
         # Handle categorical columns
         elif pd.api.types.is_object_dtype(df[col]):
+            categorical_columns.append(col)  # Track this as a categorical column
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
                 print(f"Filling {num_missing} missing values in categorical column '{col}' with 'Unknown'.")
@@ -885,6 +987,9 @@ def clean_dataset(df, delete_header=False):
         else:
             print(f"Skipping column '{col}' as it does not fit numeric, boolean, or categorical types.")
 
+    # Store categorical column information in the DataFrame attributes
+    df.attrs['categorical_columns'] = categorical_columns
+    
     print("Dataset cleaning completed.")
     return df
 
