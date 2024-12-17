@@ -25,6 +25,7 @@ urlpatterns = [
     path('model_training/', views.training_page, name='model_training'),
 
     path('get_columns/', views.get_columns, name='get_columns'),
+    path('get_columns_graphs/', views.get_columns_graphs, name='get_columns_graphs'),
     path('dataset/show_all/', views.all_datasets, name='all_datasets'),
 
     # Add these URL patterns to your urls.py

@@ -525,10 +525,9 @@ def display_graphs(request, dataset_id=None):
 
             # Read from cleaned file if available, otherwise from original file
             try:
-                if dataset.cleaned_file:
-                    file_path = dataset.cleaned_file.path
-                elif dataset.file_path:
+                if dataset.file_path:
                     file_path = dataset.file_path.path
+
                 else:
                     return JsonResponse({
                         'success': False,
@@ -682,7 +681,7 @@ def display_graphs(request, dataset_id=None):
             'error': str(e)
         })
 
-def get_columns(request):
+def get_columns_graphs(request):
     try:
         dataset_id = request.GET.get('dataset_id')
         if not dataset_id:
@@ -2022,74 +2021,22 @@ def training_page(request):
     return render(request, 'model_training.html', {'dataset': datasets})
 
 def get_columns(request):
-    try:
-        dataset_id = request.GET.get('dataset_id')
-        if not dataset_id:
-            return JsonResponse({
-                'success': False,
-                'error': 'No dataset ID provided'
-            })
-        
-        # Convert dataset_id to integer
-        try:
-            dataset_id = int(dataset_id)
-        except ValueError:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid dataset ID format'
-            })
-            
-        try:
-            dataset = Dataset.objects.get(pk=dataset_id)
-        except Dataset.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'Dataset with ID {dataset_id} not found'
-            })
-            
-        # Read from cleaned file if available, otherwise from original file
-        try:
-            if dataset.cleaned_file:
-                file_path = dataset.cleaned_file.path
-            elif dataset.file_path:
-                file_path = dataset.file_path.path
-            else:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No file found for this dataset'
-                })
-                
-            try:
-                df = pd.read_csv(file_path)
-            except UnicodeDecodeError:
-                # Try with different encoding if UTF-8 fails
-                df = pd.read_csv(file_path, encoding='ISO-8859-1')
-            except Exception as e:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error reading file: {str(e)}'
-                })
-            
-            # Filter out text-heavy columns
-            columns = [col for col in df.columns if not (
-                df[col].dtype == 'object' and df[col].str.len().mean() > 50
-            )]
-            
-            return JsonResponse({
-                'success': True,
-                'columns': columns
-            })
-            
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Error accessing file: {str(e)}'
-            })
-            
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
+    if request.method == 'GET':
+        dataset_id = request.GET.get('datasetId')
 
+        # Assuming you have a Dataset model and a method to fetch the dataset file
+        dataset = Dataset.objects.get(id=dataset_id)
+        if dataset.status == 'processed':
+            dataset_path = dataset.cleaned_file.path  # Path to the dataset file
+        else:            
+            dataset_path = dataset.file_path.path
+
+        try:
+            # Load the dataset (e.g., CSV file)
+            data = pd.read_csv(dataset_path)
+            columns = list(data.columns)  # Get the list of columns
+            return JsonResponse({'columns': columns})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+        
 from django.shortcuts import render, get_object_or_404

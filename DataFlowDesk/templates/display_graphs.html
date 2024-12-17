@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Load columns when page loads
-    fetch(`/get_columns/?dataset_id={{ dataset.id }}`)
+    fetch(`/get_columns_graphs/?dataset_id={{ dataset.id }}`)
     .then(response => response.json())
     .then(data => {
         if (data.success) {
