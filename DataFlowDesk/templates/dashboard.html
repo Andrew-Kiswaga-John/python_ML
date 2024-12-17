@@ -1,55 +1,221 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Analytics Dashboard{% endblock %}
 
-{% block header_title %}Case Study: Predicting Customer Churn{% endblock %}
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    /* Add margin to main content to accommodate sidebar */
+    .content-with-sidebar {
+        margin-left: 16rem; /* 256px = 16rem (w-64 from sidebar) */
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<!-- Metrics Overview -->
-<div class="grid grid-cols-4 gap-4">
-    <div class="bg-white p-4 shadow rounded-lg text-center">
-        <h2 class="text-xl font-bold">Running</h2>
-        <p class="text-2xl text-blue-500">2</p>
+{% include 'includes/sidebar.html' %}
+
+<div class="content-with-sidebar">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Filters -->
+        <div class="flex gap-4 mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">{{ dataset.name }}</h1>
+
+        </div>
+
+        <!-- Metrics Cards - First Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Total Chats -->
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+                <div class="text-4xl font-semibold mb-2">{{ rows|length }}</div>
+                <div class="text-gray-600">Total rows</div>
+            </div>
+            <!-- Total Chat Deflections -->
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+                <div class="text-4xl font-semibold mb-2">{{ columns|length }}</div>
+                <div class="text-gray-600">Total Features</div>
+            </div>
+
+        </div>
+        <!-- Data Quality Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <!-- Missing Values -->
+    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-4xl font-semibold mb-2">{{ missing_percentage }}%</div>
+        <div class="text-gray-600">Missing Values</div>
+        <div class="text-sm text-gray-500">Total: {{ total_missing }}</div>
     </div>
-    <div class="bg-white p-4 shadow rounded-lg text-center">
-        <h2 class="text-xl font-bold">Completed</h2>
-        <p class="text-2xl text-green-500">32</p>
+    
+    <!-- Duplicate Records -->
+    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-4xl font-semibold mb-2">{{ duplicate_percentage }}%</div>
+        <div class="text-gray-600">Duplicate Records</div>
+        <div class="text-sm text-gray-500">Count: {{ duplicate_count }}</div>
     </div>
-    <div class="bg-white p-4 shadow rounded-lg text-center">
-        <h2 class="text-xl font-bold">Failed</h2>
-        <p class="text-2xl text-red-500">0</p>
+    
+    <!-- Memory Usage -->
+    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-4xl font-semibold mb-2">{{ memory_usage_mb }}</div>
+        <div class="text-gray-600">Memory Usage (MB)</div>
     </div>
-    <div class="bg-white p-4 shadow rounded-lg text-center">
-        <h2 class="text-xl font-bold">Other</h2>
-        <p class="text-2xl text-gray-500">1</p>
+    
+    <!-- Feature Types -->
+    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+        <div class="text-sm font-medium text-gray-600">Feature Types</div>
+        <div class="mt-2">
+            <div class="flex justify-between">
+                <span>Numerical:</span>
+                <span>{{ feature_types.Numerical }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Categorical:</span>
+                <span>{{ feature_types.Categorical }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span>DateTime:</span>
+                <span>{{ feature_types.DateTime }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Boolean:</span>
+                <span>{{ feature_types.Boolean }}</span>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Visualization Chart -->
-<div class="bg-white p-4 shadow rounded-lg">
-    <h2 class="text-lg font-bold text-gray-800 mb-4">Median Absolute Error Statistic</h2>
-    <div class="h-48 bg-gradient-to-r from-yellow-200 to-red-400 rounded-lg"></div>
+        <!-- Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Median Chat Duration -->
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+                <h3 class="text-lg font-medium mb-4">Median chat duration</h3>
+                <canvas id="medianChatDuration" height="200"></canvas>
+            </div>
+            <!-- Number of Chats Chart -->
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+                <h3 class="text-lg font-medium mb-4">Number of chats and chats successfully deflected</h3>
+                <canvas id="chatsDeflected" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="grid grid-cols-1 gap-6">
+            <!-- CSAT Score Distribution -->
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+                <h3 class="text-lg font-medium mb-4">Chat CSAT Score Distribution</h3>
+                <canvas id="csatDistribution" height="100"></canvas>
+            </div>
+            <!-- Chat CSAT Data Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-medium">Chat CSAT data</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chat ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chat start time</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last predicted intent</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">587a3622-3fe6-4db3-9828-ddd0765cf608</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2023-11-12 10:57:11</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">hasn't received funds</td>
+                            </tr>
+                            <!-- Add more rows as needed -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Data Overview Table -->
-<div class="bg-white p-4 shadow rounded-lg">
-    <h2 class="text-lg font-bold text-gray-800 mb-4">Overview Data</h2>
-    <table class="min-w-full table-auto text-left border-collapse border border-gray-300">
-        <thead>
-            <tr>
-                <th class="border border-gray-300 px-4 py-2">Run ID</th>
-                <th class="border border-gray-300 px-4 py-2">Properties</th>
-                <th class="border border-gray-300 px-4 py-2">Value</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="border border-gray-300 px-4 py-2">Example 1</td>
-                <td class="border border-gray-300 px-4 py-2">Feature Engineering</td>
-                <td class="border border-gray-300 px-4 py-2">42.8k</td>
-            </tr>
-            <!-- Add more rows here -->
-        </tbody>
-    </table>
-</div>
+<script>
+// Chart.js Configurations
+document.addEventListener('DOMContentLoaded', function() {
+    // Median Chat Duration Chart
+    const medianDurationCtx = document.getElementById('medianChatDuration').getContext('2d');
+    new Chart(medianDurationCtx, {
+        type: 'line',
+        data: {
+            labels: ['Nov 7', 'Nov 8', 'Nov 9', 'Nov 10', 'Nov 11', 'Nov 12', 'Nov 13', 'Nov 14'],
+            datasets: [{
+                label: 'Median Duration',
+                data: [100, 120, 95, 110, 105, 115, 125, 0],
+                borderColor: 'rgb(99, 102, 241)',
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Median Time Spent in Seconds'
+                    }
+                }
+            }
+        }
+    });
+
+    // Chats Deflected Chart
+    const chatsDeflectedCtx = document.getElementById('chatsDeflected').getContext('2d');
+    new Chart(chatsDeflectedCtx, {
+        type: 'line',
+        data: {
+            labels: ['Nov 7', 'Nov 8', 'Nov 9', 'Nov 10', 'Nov 11', 'Nov 12', 'Nov 13', 'Nov 14'],
+            datasets: [{
+                label: 'Number of chats',
+                data: [60, 55, 65, 70, 75, 65, 60, 0],
+                borderColor: 'rgb(99, 102, 241)',
+                tension: 0.4,
+                fill: false
+            }, {
+                label: 'Chats deflected',
+                data: [40, 35, 45, 50, 45, 40, 35, 0],
+                borderColor: 'rgb(167, 139, 250)',
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // CSAT Distribution Chart
+    const csatDistributionCtx = document.getElementById('csatDistribution').getContext('2d');
+    new Chart(csatDistributionCtx, {
+        type: 'bar',
+        data: {
+            labels: ['1', '2', '3', '4', '5'],
+            datasets: [{
+                label: 'CSAT Score Distribution',
+                data: [5, 10, 15, 30, 40],
+                backgroundColor: 'rgb(99, 102, 241)',
+                barThickness: 40
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script>
 {% endblock %}
