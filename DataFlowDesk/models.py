@@ -39,7 +39,7 @@ class DataPreprocessingLog(models.Model):
 class MLModel(models.Model):
     dataset = models.ForeignKey(Dataset, on_delete=models.CASCADE, related_name='ml_models')
     algorithm = models.CharField(max_length=255)  # e.g., "Linear Regression"
-    hyperparameters = models.JSONField(blank=True, null=True)  # Store hyperparameter details
+    model_path = models.FileField(upload_to='models/', max_length=10000)  # Store hyperparameter details
     training_status = models.CharField(max_length=50, choices=[('training', 'Training'), ('completed', 'Completed')], default='training')
     created_at = models.DateTimeField(auto_now_add=True)
 

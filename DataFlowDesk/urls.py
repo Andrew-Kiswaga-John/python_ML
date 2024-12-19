@@ -27,6 +27,9 @@ urlpatterns = [
     path('get_columns/', views.get_columns, name='get_columns'),
 
     path('dataset/show_all/', views.all_datasets, name='all_datasets'),
+    path('predictions/', views.render_predictions_view, name='predictions'),
+    path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
+    path('fetch-columns/', views.fetch_columns, name='fetch_columns'),
 
     # Add these URL patterns to your urls.py
     path('auth/signin/', views.signin, name='login'),
