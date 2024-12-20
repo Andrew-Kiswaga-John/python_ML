@@ -354,6 +354,19 @@ from django.http import JsonResponse
 import pandas as pd
 from .models import Dataset
 
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from .models import Dataset
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.decomposition import PCA
+from django.utils.timezone import now
+from django.utils.timezone import now
+from imblearn.over_sampling import SMOTE
+
+from sklearn.preprocessing import MinMaxScaler
+from django.utils.timezone import now
+
 
 
 from django.http import JsonResponse
@@ -2152,29 +2165,17 @@ def train_model(request):
                 X_test_pca = pca.fit_transform(X_test)
                 cluster_centers_pca = pca.transform(model.cluster_centers_)
 
-                # Plot results
-                plt.figure(figsize=(8, 6))
-                plt.scatter(X_test_pca[:, 0], X_test_pca[:, 1], c=y_test_pred, cmap='viridis', s=50, alpha=0.7, label='Data Points')
-                plt.scatter(cluster_centers_pca[:, 0], cluster_centers_pca[:, 1], s=200, c='red', marker='X', label='Centroids')
-                plt.legend()
-                plt.title(f"KMeans Clustering Results (n_clusters={n_clusters})")
-
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-
-                results = {
-                    'Silhouette Score (Train)': silhouette_train,
-                    'Silhouette Score (Test)': silhouette_test,
-                    'Inertia': model.inertia_,
-                    'model_type': 'clustering',
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Call generate_visualizations
+                results = generate_visualizations(
+                    model_type='clustering',
+                    model=model,
+                    X=X_test,
+                    clusters=y_test_pred,
+                    pca_data=X_test_pca,
+                    cluster_centers_pca=cluster_centers_pca,
+                    inertia=model.inertia_,
+                    silhouette_score=silhouette_test
+                )
 
                 # Save the trained model as a .pkl file
                 model_filename = f"kmeans_model_{dataset_id}.pkl"
@@ -2220,9 +2221,9 @@ def train_model(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
-def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, feature_names=None, class_names=None, **kwargs):
+def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, feature_names=None, class_names=None, X=None, clusters=None, **kwargs):
 
-    # buffer = io.BytesIO()
+    buffer = io.BytesIO()
     visualizations = {}
     additional_metrics = {}
 
@@ -2285,10 +2286,9 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
         }
 
     elif model_type == 'clustering':
-        # Cluster Visualization using PCA (if provided in kwargs)
-        if 'pca_data' in kwargs:
+        # PCA Visualization for Clusters
+        if 'pca_data' in kwargs and clusters is not None:
             pca_data = kwargs['pca_data']
-            clusters = kwargs.get('clusters', None)
             plt.figure(figsize=(10, 6))
             sns.scatterplot(
                 x=pca_data[:, 0],
@@ -2297,19 +2297,27 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
                 palette='viridis',
                 alpha=0.7
             )
-            plt.title('Cluster Visualization')
+            plt.scatter(
+                kwargs.get('cluster_centers_pca')[:, 0],
+                kwargs.get('cluster_centers_pca')[:, 1],
+                c='red',
+                s=200,
+                marker='X',
+                label='Centroids'
+            )
+            plt.title('KMeans Clustering Visualization')
             plt.xlabel('PCA Component 1')
             plt.ylabel('PCA Component 2')
             plt.legend(title="Cluster")
             plt.savefig(buffer, format='png', bbox_inches='tight')
             buffer.seek(0)
-            visualizations['clusters_visual'] = base64.b64encode(buffer.getvalue()).decode()
+            visualizations['clusters_visual'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
             plt.close()
 
         # Additional Clustering Metrics
         additional_metrics = {
-            'inertia': kwargs.get('inertia', None),
-            'silhouette_score': kwargs.get('silhouette_score', None)
+            'inertia': kwargs.get('inertia'),
+            'silhouette_score': kwargs.get('silhouette_score')
         }
 
     return {
@@ -2342,3 +2350,176 @@ def get_columns(request):
             return JsonResponse({'columns': columns})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
+
+def render_predictions_view(request):
+    # Fetch models to display in the dropdown
+    models = MLModel.objects.filter(training_status='completed').order_by('-created_at')
+    return render(request, 'predictions.html', {
+        'models': models,
+        'target_columns': None,  # Initial state; no dataset uploaded
+        'results': None,         # No predictions yet
+        'metrics': None,         # No metrics yet
+    })
+
+
+@csrf_exempt
+def perform_predictions(request):
+    models = MLModel.objects.filter(training_status='completed').order_by('-created_at')
+    if request.method == 'POST' and request.FILES.get('dataset'):
+        try:
+            # Handle dataset upload
+            uploaded_file = request.FILES['dataset']
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+
+            # Read the dataset based on the file type
+            if file_extension == 'csv':
+                df = pd.read_csv(uploaded_file, on_bad_lines='skip')
+            elif file_extension in ['xls', 'xlsx']:
+                df = pd.read_excel(uploaded_file)
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+            
+            dataset = clean_dataset(df, delete_header=False)
+
+            # Extract target column and model information
+            model_id = request.POST['model']
+            model_entry = models.get(id=model_id)
+            model_path = model_entry.model_path.path
+            model_algorithm = model_entry.algorithm
+
+            if not os.path.exists(model_path):
+                return JsonResponse({'error': 'Model file not found.'})
+
+            # Load the trained model
+            model = joblib.load(model_path)
+
+            # Prepare features
+            X = dataset
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+
+            # Check if the model is KMeans
+            if model_algorithm == 'KMeans':
+                # Predict cluster labels
+                cluster_labels = model.predict(X_scaled)
+
+                # Append cluster labels to dataset
+                dataset['Cluster'] = cluster_labels
+
+                # Evaluate clustering if silhouette score is applicable
+                try:
+                    silhouette = silhouette_score(X_scaled, cluster_labels)
+                    metrics = {
+                        "type": "clustering",
+                        "silhouette_score": round(silhouette, 3),
+                        "inertia": round(model.inertia_, 3),
+                    }
+                except ValueError as e:
+                    metrics = {
+                        "type": "clustering",
+                        "error": f"Silhouette score calculation failed: {str(e)}",
+                        "inertia": round(model.inertia_, 3),
+                    }
+
+                # (Optional) PCA for visualization
+                pca = PCA(n_components=2)
+                X_pca = pca.fit_transform(X_scaled)
+                dataset['PCA_1'] = X_pca[:, 0]
+                dataset['PCA_2'] = X_pca[:, 1]
+
+            else:
+                # Handle other models (Polynomial Regression, etc.)
+                target_column = request.POST['target']
+                print(f"target column is {target_column}")
+                X = dataset.drop(columns=[target_column])
+                y = dataset[target_column]
+                X_scaled = scaler.fit_transform(X)
+                if model_algorithm == 'Polynomial Regression':
+                    print('starting polynomial regression')
+                    poly = PolynomialFeatures(degree=2)
+                    X_transformed = poly.fit_transform(X_scaled)
+                else:
+                    X_transformed = X_scaled
+
+                predictions = model.predict(X_transformed)
+
+                # Determine if it's regression or classification
+                if hasattr(model, "predict_proba") or len(set(y)) <= 2:
+                    accuracy = accuracy_score(y, predictions)
+                    cm = confusion_matrix(y, predictions)
+                    metrics = {
+                        "type": "classification",
+                        "accuracy": round(accuracy, 3),
+                        "confusion_matrix": cm.tolist(),
+                    }
+                else:
+                    mse = mean_squared_error(y, predictions)
+                    r2 = r2_score(y, predictions)
+                    metrics = {
+                        "type": "regression",
+                        "mse": round(mse, 3),
+                        "r2": round(r2, 3),
+                    }
+
+                # Append predictions to dataset
+                dataset['Predicted'] = predictions
+
+            # Convert dataset to HTML for rendering
+            # results_html = dataset.to_html(classes='table-auto w-full text-center border-collapse')
+
+            # Return the results and metrics as JSON
+            return JsonResponse({
+                # 'results': results_html,
+                'metrics': metrics,
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)})
+
+    # Return an error if the request is invalid
+    return JsonResponse({'error': 'Invalid request. Please use POST with a valid dataset.'})
+
+@csrf_exempt
+def fetch_columns(request):
+    if request.method == 'POST' and request.FILES.get('dataset'):
+        try:
+            # Handle dataset upload
+            uploaded_file = request.FILES['dataset']
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+
+            # Read the dataset based on the file type
+            if file_extension == 'csv':
+                df = pd.read_csv(uploaded_file, on_bad_lines='skip')
+            elif file_extension in ['xls', 'xlsx']:
+                df = pd.read_excel(uploaded_file)
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+            
+            # Clean dataset and extract columns
+            dataset = clean_dataset(df, delete_header=False)
+            columns = dataset.columns.tolist()
+
+            # Return the list of columns as a JSON response
+            return JsonResponse({'columns': columns})
+        
+        except Exception as e:
+            return JsonResponse({'error': str(e)})
+
+    # Return an error if the request is invalid
+    return JsonResponse({'error': 'Invalid request. Please use POST with a valid dataset.'})
+
+
+from django.shortcuts import render, get_object_or_404
+
+def delete_dataset(request, dataset_id):
+    if not request.user.is_authenticated:
+        return redirect('signin')
+    
+    dataset = get_object_or_404(Dataset, id=dataset_id, user=request.user)
+    
+    if request.method == 'POST':
+        dataset.delete()
+        messages.success(request, 'Dataset deleted successfully.')
+        return redirect('general_dashboard')
+    
+    return redirect('general_dashboard')

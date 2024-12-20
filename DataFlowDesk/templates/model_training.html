@@ -67,10 +67,10 @@
         </div>
 
         <!-- Parameters for Decision Tree -->
-        <!-- <div id="decisionTreeParams" class="hidden">
+        <div id="decisionTreeParams" class="hidden">
             <label for="maxDepth" class="block text-sm font-medium text-gray-700">Max Depth:</label>
             <input type="number" id="maxDepth" name="maxDepth" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 5">
-        </div> -->
+        </div>
 
         <!-- Parameters for Random Forest -->
         <div id="randomForestParams" class="hidden">
@@ -294,9 +294,9 @@
                     metricsHtml += `
                         <div class="bg-purple-100 p-4 rounded-md">
                             <h4 class="font-bold text-purple-800">Clustering Results</h4>
-                            <p class="text-purple-700">Silhouette Score (Train): ${result.results['Silhouette Score (Train)'].toFixed(4)}</p>
-                            <p class="text-purple-700">Silhouette Score (Test): ${result.results['Silhouette Score (Test)'].toFixed(4)}</p>
-                            <p class="text-purple-700">Inertia: ${result.results.Inertia.toFixed(4)}</p>
+                            <p class="text-purple-700">Silhouette Score: ${result.results.metrics.silhouette_score.toFixed(4)}</p>
+                            
+                            <p class="text-purple-700">Inertia: ${result.results.metrics.inertia.toFixed(4)}</p>
                         </div>`;
                 } else {
                     metricsHtml += `
