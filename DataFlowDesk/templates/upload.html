@@ -5,108 +5,128 @@
 {% block header_title %}Upload Dataset{% endblock %}
 
 {% block content %}
-<div class="bg-white shadow rounded-md p-6">
-    <h2 class="text-lg font-bold mb-4">Upload or Extract Your Dataset</h2>
-    <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_file' %}" class="space-y-4">
-        {% csrf_token %}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Choose Data Source:</label>
-            <div class="flex space-x-4">
-                <label class="flex items-center">
-                    <input type="radio" name="source" value="local" class="mr-2" required checked>
-                    <span>From Computer</span>
-                </label>
-                <label class="flex items-center">
-                    <input type="radio" name="source" value="kaggle" class="mr-2">
-                    <span>From Kaggle</span>
-                </label>
-            </div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+        <div class="p-6 bg-white border-b border-gray-200">
+            <h2 class="text-2xl font-bold mb-4">Upload Dataset</h2>
+            <form method="post" enctype="multipart/form-data" id="uploadForm" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Choose Dataset File</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                        <div class="space-y-1 text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <div class="flex text-sm text-gray-600">
+                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                                    <span>Upload a file</span>
+                                    <input id="file-upload" name="file" type="file" class="sr-only" required>
+                                </label>
+                                <p class="pl-1">or drag and drop</p>
+                            </div>
+                            <p class="text-xs text-gray-500">CSV, Excel up to 10MB</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dataset Name -->
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name</label>
+                    <input type="text" name="name" id="name" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                </div>
+                <!-- Target Class Selection (initially hidden) -->
+                <div id="targetClassSection" style="display: block;">
+                    <label for="target_class" class="block text-sm font-medium text-gray-700">Select Target Class</label>
+                    <select name="target_class" id="target_class" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="">Select a column</option>
+                    </select>
+                    <p class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
+                </div>
+
+
+                <!-- Dataset Description -->
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="description" name="description" rows="3" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
+                </div>
+
+
+                <!-- Submit Button -->
+                <div class="flex justify-end">
+                    <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Upload Dataset
+                    </button>
+                </div>
+            </form>
         </div>
-
-        <div id="kaggle-input" class="hidden">
-            <label for="kaggle-link" class="block text-sm font-medium text-gray-700">Kaggle Dataset URL:</label>
-            <input type="url" id="kaggle-link" name="kaggle_link"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        </div>
-
-        <div>
-            <label for="dataset" id="file-label" class="block text-sm font-medium text-gray-700">Select Dataset (CSV/Excel):</label>
-            <input type="file" id="dataset" name="dataset" accept=".csv, .xls, .xlsx"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        </div>
-
-        <div>
-            <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name:</label>
-            <input type="text" id="name" name="name"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
-        </div>
-
-        <div>
-            <label for="description" class="block text-sm font-medium text-gray-700">Dataset Description:</label>
-            <textarea id="description" name="description" rows="3"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required></textarea>
-        </div>
-
-        <button type="submit"
-            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-            Upload Dataset
-        </button>
-    </form>
-
-    <div id="response" class="mt-4">
-        <!-- Response messages will appear here -->
     </div>
 </div>
 
+<!-- JavaScript for handling file upload and column detection -->
 <script>
-    // Toggle visibility of Kaggle input vs file input
-    document.querySelectorAll('input[name="source"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const kaggleInput = document.getElementById('kaggle-input');
-            const fileInput = document.getElementById('dataset');
-            const fileLabel = document.getElementById('file-label');
+    document.getElementById('file-upload').addEventListener('change', async function(e) {
+        console.log('File selected:', e.target.files[0]); // Debug log
+        const file = e.target.files[0];
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
             
-            if (e.target.value === 'kaggle') {
-                kaggleInput.classList.remove('hidden');
-                fileInput.classList.add('hidden');
-                fileLabel.classList.add('hidden');
-                fileInput.required = false;
-            } else {
-                kaggleInput.classList.add('hidden');
-                fileInput.classList.remove('hidden');
-                fileLabel.classList.remove('hidden');
-                fileInput.required = true;
+            try {
+                console.log('Sending request to /get_columns_target/'); // Debug log
+                const response = await fetch('/get_columns_target/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+                
+                console.log('Response status:', response.status); // Debug log
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Received data:', data); // Debug log
+                    
+                    const targetSelect = document.getElementById('target_class');
+                    if (!targetSelect) {
+                        console.error('Target select element not found!');
+                        return;
+                    }
+                    
+                    // Clear previous options
+                    targetSelect.innerHTML = '<option value="">Select a column</option>';
+                    
+                    // Add new options
+                    if (data.columns && Array.isArray(data.columns)) {
+                        data.columns.forEach(column => {
+                            const option = document.createElement('option');
+                            option.value = column;
+                            option.textContent = column;
+                            targetSelect.appendChild(option);
+                        });
+                        
+                        // Show the target class selection
+                        const targetSection = document.getElementById('targetClassSection');
+                        if (targetSection) {
+                            targetSection.style.display = 'block';
+                            console.log('Target section displayed'); // Debug log
+                        } else {
+                            console.error('Target section element not found!');
+                        }
+                    } else {
+                        console.error('Invalid columns data received:', data);
+                    }
+                } else {
+                    const errorData = await response.json();
+                    console.error('Server error:', errorData.error);
+                }
+            } catch (error) {
+                console.error('Request error:', error);
             }
-        });
-    });
-
-    // Handle form submission
-    const form = document.getElementById('upload-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData(form);
-
-        const response = await fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            }
-        });
-
-        const result = await response.json();
-
-        const responseDiv = document.getElementById('response');
-        if (result.error) {
-                responseDiv.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
-            } else {
-                responseDiv.innerHTML = `
-                    <p style="color: green;">${result.message}</p>
-                    <h3>Preview of Uploaded Dataset:</h3>
-                    ${result.preview}
-                `;
-            }
+        }
     });
 </script>
 {% endblock %}

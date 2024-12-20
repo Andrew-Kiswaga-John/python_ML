@@ -21,6 +21,8 @@ class Dataset(models.Model):
     columns_info = models.JSONField(blank=True, null=True)  # JSON format for column details
     cleaned_file = models.FileField(upload_to='datasets/cleaned/', null=True, blank=True)
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('processed', 'Processed')], default='pending')
+    graphs = models.JSONField(default=list, blank=True)  # New column to store chart file paths
+    target_class = models.CharField(max_length=255, null=True, blank=True)  # Store the target column name
 
     def __str__(self):
         return self.name

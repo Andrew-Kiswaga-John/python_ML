@@ -335,13 +335,19 @@
 
             <div id="kaggle-input" class="hidden">
                 <label for="kaggle-link" class="block text-sm font-medium text-gray-700">Kaggle Dataset URL:</label>
-                <input type="url" id="kaggle-link" name="kaggle_link"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <div class="flex space-x-2">
+                    <input type="url" id="kaggle-link" name="kaggle_link"
+                        class="flex-1 mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <button type="button" id="analyze-kaggle" 
+                        class="mt-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        Analyze Columns
+                    </button>
+                </div>
             </div>
 
             <div>
                 <label for="dataset" id="file-label" class="block text-sm font-medium text-gray-700">Select Dataset (CSV/Excel):</label>
-                <input type="file" id="dataset" name="dataset" accept=".csv, .xls, .xlsx"
+                <input type="file" id="dataset" name="file" accept=".csv, .xls, .xlsx"
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
             </div>
 
@@ -350,7 +356,14 @@
                 <input type="text" id="name" name="name"
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
             </div>
-
+<!-- Target Class Selection -->
+<div id="targetClassSection" style="display: none;">
+    <label for="target_class" class="block text-sm font-medium text-gray-700">Select Target Class</label>
+    <select name="target_class" id="target_class" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        <option value="">Select a column</option>
+    </select>
+    <p id="target-class-help" class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
+</div>
             <div>
                 <label for="description" class="block text-sm font-medium text-gray-700">Dataset Description:</label>
                 <textarea id="description" name="description" rows="3"
@@ -498,6 +511,78 @@
         }
     }
 
+
+
+// Add Kaggle analyze button handler
+document.getElementById('analyze-kaggle').addEventListener('click', async function() {
+    const kaggleUrl = document.getElementById('kaggle-link').value;
+    if (!kaggleUrl) {
+        alert('Please enter a Kaggle dataset URL');
+        return;
+    }
+
+    const targetSection = document.getElementById('targetClassSection');
+    const targetSelect = document.getElementById('target_class');
+    const helpText = document.getElementById('target-class-help');
+
+    try {
+        // Show loading state
+        targetSection.style.display = 'block';
+        targetSelect.disabled = true;
+        targetSelect.required = false;
+        helpText.textContent = 'Analyzing Kaggle dataset...';
+        this.disabled = true;
+        this.innerHTML = '<span class="animate-spin inline-block h-4 w-4 border-t-2 border-white rounded-full mr-2"></span>Analyzing...';
+
+        const response = await fetch('/get_columns_target/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify({
+                kaggle_url: kaggleUrl
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Clear existing options
+            targetSelect.innerHTML = '<option value="">Select a column</option>';
+            
+            if (data.columns && Array.isArray(data.columns)) {
+                data.columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = column;
+                    targetSelect.appendChild(option);
+                });
+                
+                targetSelect.disabled = false;
+                targetSelect.required = true;
+                helpText.textContent = 'Please select a target class for your analysis';
+                helpText.className = 'mt-2 text-sm text-indigo-600 font-medium';
+            } else {
+                throw new Error('No columns found in the dataset');
+            }
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to analyze Kaggle dataset');
+        }
+    } catch (error) {
+        console.error('Kaggle analysis error:', error);
+        targetSelect.innerHTML = '<option value="">Error analyzing dataset</option>';
+        targetSelect.disabled = true;
+        targetSelect.required = false;
+        helpText.textContent = error.message || 'Failed to analyze Kaggle dataset. Please check the URL and try again.';
+        helpText.className = 'mt-2 text-sm text-red-600 font-medium';
+    } finally {
+        this.disabled = false;
+        this.textContent = 'Analyze Columns';
+    }
+});
+
     // Close modal when clicking outside
     window.onclick = function(event) {
         if (event.target.classList.contains('fixed')) {
@@ -609,6 +694,85 @@
             }
         });
     });
+
+    document.getElementById('dataset').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Validate file type
+        const validTypes = ['.csv', '.xls', '.xlsx'];
+        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!validTypes.includes(fileExtension)) {
+            alert('Please upload a valid CSV or Excel file (.csv, .xls, .xlsx)');
+            this.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            // Show loading state
+            const targetSection = document.getElementById('targetClassSection');
+            targetSection.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div><p class="mt-2 text-sm text-gray-500">Loading columns...</p></div>';
+            targetSection.style.display = 'block';
+
+            const response = await fetch('/get_columns_target/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Restore target section HTML with improved layout
+                targetSection.innerHTML = `
+                    <label for="target_class" class="block text-sm font-medium text-gray-700">Select Target Class</label>
+                    <select name="target_class" id="target_class" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="">Select a column</option>
+                    </select>
+                `;
+
+                const targetSelect = document.getElementById('target_class');
+                const columnDetails = document.getElementById('column-details');
+                
+                // Add options and show data types
+                if (data.columns && Array.isArray(data.columns)) {
+                    data.columns.forEach(column => {
+                        const option = document.createElement('option');
+                        option.value = column;
+                        option.textContent = column;
+                        targetSelect.appendChild(option);
+                        
+                        // Add column type information
+                        const dtype = data.dtypes[column] || 'unknown';
+                        const columnInfo = document.createElement('div');
+
+                    });
+                }
+            } else {
+                const errorData = await response.json();
+                targetSection.innerHTML = `
+                    <div class="text-red-500 p-4 rounded-md bg-red-50">
+                        <p class="font-medium">Error loading columns:</p>
+                        <p class="text-sm">${errorData.error || 'Unknown error occurred'}</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Request error:', error);
+            document.getElementById('targetClassSection').innerHTML = `
+                <div class="text-red-500 p-4 rounded-md bg-red-50">
+                    <p class="font-medium">Error:</p>
+                    <p class="text-sm">Failed to load columns. Please try again or contact support.</p>
+                </div>
+            `;
+        }
+    }
+});
 
     // Handle upload form submission
     const uploadForm = document.getElementById('upload-form');

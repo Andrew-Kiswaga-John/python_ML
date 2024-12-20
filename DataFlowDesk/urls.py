@@ -2,31 +2,33 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 
-
 from django.conf import settings
 from django.conf.urls.static import static
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('<int:dataset_id>/dashboard/', views.dashboard, name='dataset_dashboard'),
+    path('general_dashboard/', views.general_dashboard, name='general_dashboard'),
     path('', views.my_view, name='home'),
     path('', views.upload_page, name='upload_page'),
-    path('upload-file/', views.upload_file, name='upload_file'),
+    path('upload_file/', views.upload_file, name='upload_file'),
     path('create-dataset/step1/', views.create_dataset_step1, name='create_dataset_step1'),
     path('create-dataset/step2/', views.create_dataset_step2, name='create_dataset_step2'),
     path('dataset/<int:id>/', views.display_dataset, name='display_dataset'),
     path('dataset/<int:dataset_id>/cleaning_preview/', views.data_cleaning_preview, name='data_cleaning_preview'),
     path('dataset/<int:dataset_id>/perform_cleaning/', views.perform_data_cleaning, name='perform_data_cleaning'),
     path('perform_data_normalization/<int:dataset_id>/', views.perform_data_normalization, name='perform_data_normalization'),
-    path('dataset/<int:id>/graphs/', views.display_graphs, name='display_graphs'),
-
+    path('dataset/<int:dataset_id>/graphs/', views.display_graphs, name='display_graphs'),
+    path('delete_dataset/<int:dataset_id>/', views.delete_dataset, name='delete_dataset'),
     path('train_model/', views.train_model, name='train_model'),
     path('train_model_nn/', views.train_model_nn, name='train_model_nn'),
     path('model_training/', views.training_page, name='model_training'),
 
     path('get_columns/', views.get_columns, name='get_columns'),
-
-    path('dataset/show_all/', views.all_datasets, name='all_datasets'),
+    path('get_columns_target/', views.get_columns_target, name='get_columns_target'),
+    path('get_columns_graphs/', views.get_columns_graphs, name='get_columns_graphs'),
+    # path('dataset/show_all/', views.all_datasets, name='all_datasets'),
     path('predictions/', views.render_predictions_view, name='predictions'),
     path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
     path('fetch-columns/', views.fetch_columns, name='fetch_columns'),

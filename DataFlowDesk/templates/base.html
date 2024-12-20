@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ML Analyzer{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+            .content-with-sidebar {
+        margin-left: 16rem; /* 256px = 16rem (w-64 from sidebar) */
+    }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}" class="bg-gray-50 min-h-screen flex flex-col">
@@ -19,7 +24,7 @@
                 </div>
                 <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
                     <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Home</a>
-                    <a href="{% url 'all_datasets' %}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">My datasets</a>
+                    <a href="{% url 'general_dashboard' %}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">My datasets</a>
                     <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Documentation</a>
                     <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">About</a>
                     {% if user.is_authenticated %}
