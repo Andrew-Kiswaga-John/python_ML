@@ -34,6 +34,10 @@ urlpatterns = [
     path('get_columns_graphs/', views.get_columns_graphs, name='get_columns_graphs'),
     path('dataset/<int:dataset_id>/graphs/', views.display_graphs, name='display_graphs'),
     path('save_graph/', views.save_graph, name='save_graph'),
+    path('predictions/', views.render_predictions_view, name='predictions'),
+    path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
+    path('fetch-columns/', views.fetch_columns, name='fetch_columns'),
+
     # Add these URL patterns to your urls.py
     path('auth/signin/', views.signin, name='login'),
     path('auth/signup/', views.signup, name='register'),

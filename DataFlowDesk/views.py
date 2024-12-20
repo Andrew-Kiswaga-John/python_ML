@@ -13,6 +13,7 @@ from .models import Profile
 
 # Add scikit-learn imports
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.tree import plot_tree
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, mean_squared_error, r2_score, confusion_matrix
@@ -357,6 +358,19 @@ from .models import Dataset
 from django.http import JsonResponse
 import pandas as pd
 from .models import Dataset
+
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from .models import Dataset
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.decomposition import PCA
+from django.utils.timezone import now
+from django.utils.timezone import now
+from imblearn.over_sampling import SMOTE
+
+from sklearn.preprocessing import MinMaxScaler
+from django.utils.timezone import now
 
 
 
@@ -2042,39 +2056,12 @@ def train_model_nn(request):
                 model.fit(X_train_tfidf, y_train)
                 
                 y_pred = model.predict(X_test_tfidf)
-                accuracy = accuracy_score(y_test, y_pred)
-                
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                # Get feature importance for top terms
-                feature_importance = pd.Series(
-                    model.feature_log_prob_[1] - model.feature_log_prob_[0],
-                    index=vectorizer.get_feature_names_out()
-                ).sort_values(ascending=False)
-                
-                top_features = feature_importance.head(10).to_dict()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': top_features,
-                    'num_features': X_train_tfidf.shape[1],
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
             else:
                 # For numerical data, use Gaussian NB
                 scaler = StandardScaler()
@@ -2086,31 +2073,12 @@ def train_model_nn(request):
                 model.fit(X_train_scaled, y_train)
                 
                 y_pred = model.predict(X_test_scaled)
-                accuracy = accuracy_score(y_test, y_pred)
-                
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
         else:
             # Handle neural network case
             hidden_layers = request.POST.get('hiddenLayers', '8,4')
@@ -2138,31 +2106,12 @@ def train_model_nn(request):
                 model.fit(X_train_scaled, y_train)
                 
                 y_pred = model.predict(X_test_scaled)
-                accuracy = accuracy_score(y_test, y_pred)
-                
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
             else:
                 model = MLPRegressor(
                     hidden_layer_sizes=hidden_layers,
@@ -2173,33 +2122,36 @@ def train_model_nn(request):
                 model.fit(X_train_scaled, y_train)
                 
                 y_pred = model.predict(X_test_scaled)
-                mse = mean_squared_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                
-                # Generate scatter plot of actual vs predicted values
-                plt.figure(figsize=(10, 8))
-                plt.scatter(y_test, y_pred, alpha=0.5)
-                plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-                plt.xlabel('Actual Values')
-                plt.ylabel('Predicted Values')
-                plt.title('Actual vs Predicted Values')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'mean_squared_error': float(mse),
-                    'r2_score': float(r2),
-                    'model_type': 'regression',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='regression',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
+
+        # Save the trained model as a .pkl file
+        model_filename = f"Neural_network_model_{dataset_id}.pkl"
+        models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+        os.makedirs(models_dir, exist_ok=True)
+        model_path = os.path.join(models_dir, model_filename)
+        with open(model_path, 'wb') as f:
+            joblib.dump(model, f)
+
+        # Save to MLModel table
+        ml_model = MLModel.objects.create(
+            dataset=dataset,
+            algorithm='Neural Network',
+            training_status='completed',
+            model_path = model_path
+        )
+
+        # Save results to ModelResult table
+        ModelResult.objects.create(
+            model=ml_model,
+            metric_name='accuracy',
+            metric_value=results['metrics']['accuracy'],
+            # visualization_path=f'data:image/png;base64,{image_base64}',
+        )
 
         return JsonResponse({
             'success': True,
@@ -2225,14 +2177,6 @@ def train_model(request):
             # Fetch dataset
             dataset = get_object_or_404(Dataset, id=dataset_id)
 
-            # Check if the dataset has been normalized
-            # normalization_log = DataPreprocessingLog.objects.filter(
-            #     dataset=dataset,
-            #     action="Data Normalized"
-            # ).exists()
-
-            # if not normalization_log:
-            #     return JsonResponse({'error': 'Dataset not Preprocessed. Please preprocess the dataset first.'}, status=400)
             if dataset.status != 'processed':
                 return JsonResponse({'error': 'Dataset not Preprocessed. Please preprocess the dataset first.'}, status=400)
 
@@ -2264,18 +2208,7 @@ def train_model(request):
                 print("The y class is probably continuous")
                 pass
 
-            # # Preprocess categorical features
-            # categorical_columns = X.select_dtypes(include=['object']).columns
-            # if not categorical_columns.empty:
-            #     X = pd.get_dummies(X, columns=categorical_columns)
-
-            # # Encode target column if it is categorical
-            # if y.dtype == 'object':
-            #     le = LabelEncoder()
-            #     y = le.fit_transform(y)
-
             scaler = StandardScaler()
-            # X_scaled = scaler.fit_transform(X)
 
             # Convert to NumPy arrays
             X = np.array(X)
@@ -2288,16 +2221,10 @@ def train_model(request):
             model = None
 
             # Handle model selection and parameters
-            # Handle model selection and parameters
             if model_name == 'linear_regression':
                 # Fetch parameters for Linear Regression
                 fit_intercept = request.POST.get('fitIntercept', 'true').lower() == 'true'
                 model = LinearRegression(fit_intercept=fit_intercept)
-
-                # Apply log transformation to the target
-                # print("Applying log transformation to the target variable...")
-                # y_train_log = np.log1p(y_train)  # log1p handles y_train=0 safely
-                # y_test_log = np.log1p(y_test)
 
                 # Scale the features
                 X_train = scaler.fit_transform(X_train)
@@ -2307,38 +2234,43 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
 
-                # # Inverse log transformation of predictions
-                # y_pred = np.expm1(y_pred_log)  # expm1 reverses log1p
-
                 # Evaluate metrics on the original scale
-                mse = mean_squared_error(y_test, y_pred)
-                mae = mean_absolute_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                results = {
-                    'Mean Squared Error': mse,
-                    'Mean Absolute Error': mae,
-                    'R² Score': r2
-                }
-                print(f"Metrics: {results}")
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='regression',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
+                # print(f"Metrics: {results}")
 
-                # Visualization
-                plt.figure(figsize=(10, 6))
-                plt.plot(y_test[:50], label='True', linestyle='-', marker='o')  # True values
-                plt.plot(y_pred[:50], label='Predicted', linestyle='--', marker='x')  # Predicted values
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results with  Linear Regression")
-                plt.xlabel("Sample")
-                plt.ylabel("Value")
-                
-                # Save the visualization
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
-                plt.close()  # Close the plot to prevent overlapping in future plots
+                # Save the trained model as a .pkl file
+                model_filename = f"linear_regression_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Linear Regression',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='mean_squared_error',
+                    metric_value=results['metrics']['mean_squared_error'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
 
             elif model_name == 'decision_tree':
                 # Fetch parameters for Decision Tree
-                max_depth = request.POST.get('maxDepth', None)
+                max_depth = request.POST.get('maxDepth', 3)
                 model = DecisionTreeClassifier(max_depth=int(max_depth) if max_depth else None)
 
                 X_train = scaler.fit_transform(X_train)
@@ -2346,40 +2278,43 @@ def train_model(request):
 
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                # metrics = {'Model Accuracy': accuracy}
 
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Generate visualizations
+                feature_names = feature_columns  # Feature names from the dataset
+                class_names = df[target_column].unique().astype(str)  # Class names based on unique target labels
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred,
+                    model=model,
+                    feature_names=feature_names,
+                    class_names=class_names
+                )
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+                # Save the trained model as a .pkl file
+                model_filename = f"decision_tree_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Decision Tree',
+                    training_status='completed',
+                    model_path=model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy']
+                )
+
+
 
             elif model_name == 'svm':
                 # Fetch parameters for SVM
@@ -2393,33 +2328,12 @@ def train_model(request):
                 y_pred = model.predict(X_test)
                 
                 try:
-                    # Attempt to calculate accuracy
-                    accuracy = accuracy_score(y_test, y_pred)
-                    # metrics = {'Model Accuracy': accuracy}
-
-                    # Generate confusion matrix visualization
-                    plt.figure(figsize=(10, 8))
-                    cm = confusion_matrix(y_test, y_pred)
-                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                    plt.title('Confusion Matrix')
-                    plt.xlabel('Predicted')
-                    plt.ylabel('Actual')
-                    
-                    # Save plot to base64 string
-                    buffer = io.BytesIO()
-                    plt.savefig(buffer, format='png', bbox_inches='tight')
-                    buffer.seek(0)
-                    image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                    plt.close()
-                    
-                    results = {
-                        'accuracy': float(accuracy),
-                        'model_type': 'classification',
-                        'feature_importance': None,
-                        'num_features': len(feature_columns),
-                        'features_used': feature_columns,
-                        'visualization': f'data:image/png;base64,{image_base64}'
-                    }
+                    # Generate Visualizations
+                    results = generate_visualizations(
+                        model_type='classification',
+                        y_true=y_test,
+                        y_pred=y_pred
+                    )
                 except Exception as e:
                     # If an exception occurs, calculate alternative metrics
                     print(f"Accuracy score could not be calculated: {str(e)}")
@@ -2430,6 +2344,31 @@ def train_model(request):
                         'Mean Squared Error': mse,
                         'R² Score': r2
                     }
+
+                # Save the trained model as a .pkl file
+                model_filename = f"svm_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='SVM',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
                 plt.legend()
@@ -2448,32 +2387,36 @@ def train_model(request):
 
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                # metrics = {'Model Accuracy': accuracy}
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
 
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Save the trained model as a .pkl file
+                model_filename = f"random_forest_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Random Forest',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
 
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
@@ -2482,6 +2425,7 @@ def train_model(request):
                 visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
                 os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
                 plt.savefig(visualization_path)
+
             elif model_name == 'knn':
                 # Fetch parameters for k-Nearest Neighbors
                 n_neighbors = int(request.POST.get('nNeighbors', 5))
@@ -2493,32 +2437,36 @@ def train_model(request):
                 model = KNeighborsClassifier(n_neighbors=n_neighbors)
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                # metrics = {'Model Accuracy': accuracy}
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
 
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Save the trained model as a .pkl file
+                model_filename = f"knn_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='KNN',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
 
                 plt.plot(y_test[:50], label='True')  # Fixed
                 plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
@@ -2563,28 +2511,36 @@ def train_model(request):
 
                 # Calculate metrics
                 print("Calculating metrics...")
-                mse = mean_squared_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                results = {'Mean Squared Error': mse, 'R² Score': r2}
-                print(f"Mean Squared Error: {mse}")
-                print(f"R² Score: {r2}")
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='regression',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
 
-                # Plot results
-                print("Plotting results...")
-                plt.plot(y_test[:50], label='True')
-                plt.plot(y_pred[:50], label='Predicted')  # Use X_test_poly here
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                
-                # Save visualization
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
-                print(f"Visualization saved at {visualization_path}")
+                # Save the trained model as a .pkl file
+                model_filename = f"Polynomial_regression_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
 
-                model_path = os.path.join('media/models', f"{model_name}_{dataset_id}.joblib")
-                os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                joblib.dump(model, model_path)
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Polynomial Regression',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='mean_squared_error',
+                    metric_value=results['metrics']['mean_squared_error'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
 
                 return JsonResponse({
                         'success': True,
@@ -2602,40 +2558,37 @@ def train_model(request):
 
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                # metrics = {'Model Accuracy': accuracy}
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
 
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Save the trained model as a .pkl file
+                model_filename = f"logistic_regression_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Logistic Regression',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
 
             elif model_name == 'naive_bayes':
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
@@ -2646,47 +2599,42 @@ def train_model(request):
 
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                # metrics = {'Model Accuracy': accuracy}
+                # Generate Visualizations
+                results = generate_visualizations(
+                    model_type='classification',
+                    y_true=y_test,
+                    y_pred=y_pred
+                )
 
-                # Generate confusion matrix visualization
-                plt.figure(figsize=(10, 8))
-                cm = confusion_matrix(y_test, y_pred)
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted')
-                plt.ylabel('Actual')
-                
-                # Save plot to base64 string
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', bbox_inches='tight')
-                buffer.seek(0)
-                image_base64 = base64.b64encode(buffer.getvalue()).decode()
-                plt.close()
-                
-                results = {
-                    'accuracy': float(accuracy),
-                    'model_type': 'classification',
-                    'feature_importance': None,
-                    'num_features': len(feature_columns),
-                    'features_used': feature_columns,
-                    'visualization': f'data:image/png;base64,{image_base64}'
-                }
+                # Save the trained model as a .pkl file
+                model_filename = f"naive_bayes_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Naive Bayes',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
 
             elif model_name == 'kmeans':
                 # Fetch the number of clusters
                 n_clusters = max(2, int(request.POST.get('nClusters', 3)))  # Ensure n_clusters >= 2
-
+                X = df
                 # Ensure feature scaling
-                # scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
 
                 # Train-test split on scaled features
@@ -2707,68 +2655,55 @@ def train_model(request):
                 except ValueError as e:
                     return JsonResponse({'error': f"Silhouette score calculation failed: {str(e)}"}, status=400)
 
-                results = {
-                    'Silhouette Score (Train)': silhouette_train,
-                    'Silhouette Score (Test)': silhouette_test,
-                    'Inertia': model.inertia_,
-                }
-
                 # Visualization: Reduce to 2D using PCA
                 pca = PCA(n_components=2)
                 X_test_pca = pca.fit_transform(X_test)
                 cluster_centers_pca = pca.transform(model.cluster_centers_)
 
-                # Plot results
-                plt.figure(figsize=(8, 6))
-                plt.scatter(X_test_pca[:, 0], X_test_pca[:, 1], c=y_test_pred, cmap='viridis', s=50, alpha=0.7, label='Data Points')
-                plt.scatter(cluster_centers_pca[:, 0], cluster_centers_pca[:, 1], s=200, c='red', marker='X', label='Centroids')
-                plt.legend()
-                plt.title(f"KMeans Clustering Results (n_clusters={n_clusters})")
+                # Call generate_visualizations
+                results = generate_visualizations(
+                    model_type='clustering',
+                    model=model,
+                    X=X_test,
+                    clusters=y_test_pred,
+                    pca_data=X_test_pca,
+                    cluster_centers_pca=cluster_centers_pca,
+                    inertia=model.inertia_,
+                    silhouette_score=silhouette_test
+                )
 
-                print(f"X_test shape: {X_test.shape}, X_test_pca shape: {X_test_pca.shape}")
-                print(f"Cluster centers (before PCA): {model.cluster_centers_}")
-                print(f"Cluster centers (after PCA): {cluster_centers_pca}")
-                print(f"Unique cluster labels: {np.unique(y_test_pred)}")
+                # Save the trained model as a .pkl file
+                model_filename = f"kmeans_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
 
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='KMeans',
+                    training_status='completed',
+                    model_path=model_path
+                )
 
-                # Save visualization
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='Silhouette Score (Train)',
+                    metric_value=silhouette_train,
+                )
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='Silhouette Score (Test)',
+                    metric_value=silhouette_test,
+                )
+
 
 
             else:
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
-
-            # Train model
-            # model.fit(X_train, y_train)
-            # y_pred = model.predict(X_test)
-            # accuracy = accuracy_score(y_test, y_pred)
-            
-            # Save model
-            model_path = os.path.join('media/models', f"{model_name}_{dataset_id}.joblib")
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            joblib.dump(model, model_path)
-
-            # Generate metrics
-            score = model.score(X_test, y_test)
-            # metrics = {'Model Accuracy': accuracy}
-            # print(f"Model Accuracy: {metrics}")
-            # print(f"Accuracy: {accuracy:.4f}")
-
-            # Visualization
-            # plt.figure(figsize=(8, 6))
-            # if model_name == 'kmeans':
-            #     # plt.scatter(X_test[:, 0], X_test[:, 1], c=model.predict(X_test), cmap='viridis')
-            #     print("model is being executed")
-            # else:
-        #     plt.plot(y_test[:50], label='True')  # Fixed
-        #     plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-            # plt.legend()
-            # plt.title(f"{model_name.capitalize()} Results")
-            # visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-            # os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-            # plt.savefig(visualization_path)
 
             return JsonResponse({
                 'success': True,
@@ -2780,6 +2715,111 @@ def train_model(request):
 
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
+
+def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, feature_names=None, class_names=None, X=None, clusters=None, **kwargs):
+
+    buffer = io.BytesIO()
+    visualizations = {}
+    additional_metrics = {}
+
+    if model_type == 'classification':
+        # Generate confusion matrix
+        cm = confusion_matrix(y_true, y_pred)
+        buffer = io.BytesIO()
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        visualizations['confusion_matrix'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+        plt.close()
+
+        # Generate decision tree visualization (if applicable)
+        if model and isinstance(model, DecisionTreeClassifier):
+            buffer = io.BytesIO()
+            plt.figure(figsize=(20, 12))
+            plot_tree(
+                model,
+                feature_names=feature_names,
+                class_names=class_names,
+                filled=True,
+                rounded=True,
+                fontsize=10
+            )
+            plt.title('Decision Tree Visualization')
+            plt.savefig(buffer, format='png', bbox_inches='tight')
+            buffer.seek(0)
+            visualizations['decision_tree'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            plt.close()
+
+        # Accuracy metric
+        accuracy = accuracy_score(y_true, y_pred)
+        additional_metrics['accuracy'] = round(accuracy, 3)
+
+    elif model_type == 'regression':
+        # Scatter Plot: Actual vs Predicted
+        plt.figure(figsize=(10, 6))
+        plt.scatter(y_true, y_pred, alpha=0.5, label='Predicted vs Actual')
+        plt.plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--', lw=2, label='Ideal Fit')
+        plt.title('Regression Results: Actual vs Predicted')
+        plt.xlabel('Actual Values')
+        plt.ylabel('Predicted Values')
+        plt.legend()
+        plt.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        visualizations['linear_graph'] = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+
+        # Metrics
+        mse = mean_squared_error(y_true, y_pred)
+        r2 = r2_score(y_true, y_pred)
+        additional_metrics = {
+            'mean_squared_error': round(mse, 3),
+            'r2_score': round(r2, 3)
+        }
+
+    elif model_type == 'clustering':
+        # PCA Visualization for Clusters
+        if 'pca_data' in kwargs and clusters is not None:
+            pca_data = kwargs['pca_data']
+            plt.figure(figsize=(10, 6))
+            sns.scatterplot(
+                x=pca_data[:, 0],
+                y=pca_data[:, 1],
+                hue=clusters,
+                palette='viridis',
+                alpha=0.7
+            )
+            plt.scatter(
+                kwargs.get('cluster_centers_pca')[:, 0],
+                kwargs.get('cluster_centers_pca')[:, 1],
+                c='red',
+                s=200,
+                marker='X',
+                label='Centroids'
+            )
+            plt.title('KMeans Clustering Visualization')
+            plt.xlabel('PCA Component 1')
+            plt.ylabel('PCA Component 2')
+            plt.legend(title="Cluster")
+            plt.savefig(buffer, format='png', bbox_inches='tight')
+            buffer.seek(0)
+            visualizations['clusters_visual'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            plt.close()
+
+        # Additional Clustering Metrics
+        additional_metrics = {
+            'inertia': kwargs.get('inertia'),
+            'silhouette_score': kwargs.get('silhouette_score')
+        }
+
+    return {
+        'visualizations': visualizations,
+        'metrics': additional_metrics,
+        'model_type': model_type
+    }
 
 
 def training_page(request):
@@ -2805,7 +2845,165 @@ def get_columns(request):
             return JsonResponse({'columns': columns})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
+
+def render_predictions_view(request):
+    # Fetch models to display in the dropdown
+    models = MLModel.objects.filter(training_status='completed').order_by('-created_at')
+    return render(request, 'predictions.html', {
+        'models': models,
+        'target_columns': None,  # Initial state; no dataset uploaded
+        'results': None,         # No predictions yet
+        'metrics': None,         # No metrics yet
+    })
+
+
+@csrf_exempt
+def perform_predictions(request):
+    models = MLModel.objects.filter(training_status='completed').order_by('-created_at')
+    if request.method == 'POST' and request.FILES.get('dataset'):
+        try:
+            # Handle dataset upload
+            uploaded_file = request.FILES['dataset']
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+
+            # Read the dataset based on the file type
+            if file_extension == 'csv':
+                df = pd.read_csv(uploaded_file, on_bad_lines='skip')
+            elif file_extension in ['xls', 'xlsx']:
+                df = pd.read_excel(uploaded_file)
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+            
+            dataset = clean_dataset(df, delete_header=False)
+
+            # Extract target column and model information
+            model_id = request.POST['model']
+            model_entry = models.get(id=model_id)
+            model_path = model_entry.model_path.path
+            model_algorithm = model_entry.algorithm
+
+            if not os.path.exists(model_path):
+                return JsonResponse({'error': 'Model file not found.'})
+
+            # Load the trained model
+            model = joblib.load(model_path)
+
+            # Prepare features
+            X = dataset
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+
+            # Check if the model is KMeans
+            if model_algorithm == 'KMeans':
+                # Predict cluster labels
+                cluster_labels = model.predict(X_scaled)
+
+                # Append cluster labels to dataset
+                dataset['Cluster'] = cluster_labels
+
+                # Evaluate clustering if silhouette score is applicable
+                try:
+                    silhouette = silhouette_score(X_scaled, cluster_labels)
+                    metrics = {
+                        "type": "clustering",
+                        "silhouette_score": round(silhouette, 3),
+                        "inertia": round(model.inertia_, 3),
+                    }
+                except ValueError as e:
+                    metrics = {
+                        "type": "clustering",
+                        "error": f"Silhouette score calculation failed: {str(e)}",
+                        "inertia": round(model.inertia_, 3),
+                    }
+
+                # (Optional) PCA for visualization
+                pca = PCA(n_components=2)
+                X_pca = pca.fit_transform(X_scaled)
+                dataset['PCA_1'] = X_pca[:, 0]
+                dataset['PCA_2'] = X_pca[:, 1]
+
+            else:
+                # Handle other models (Polynomial Regression, etc.)
+                target_column = request.POST['target']
+                print(f"target column is {target_column}")
+                X = dataset.drop(columns=[target_column])
+                y = dataset[target_column]
+                X_scaled = scaler.fit_transform(X)
+                if model_algorithm == 'Polynomial Regression':
+                    print('starting polynomial regression')
+                    poly = PolynomialFeatures(degree=2)
+                    X_transformed = poly.fit_transform(X_scaled)
+                else:
+                    X_transformed = X_scaled
+
+                predictions = model.predict(X_transformed)
+
+                # Determine if it's regression or classification
+                if hasattr(model, "predict_proba") or len(set(y)) <= 2:
+                    accuracy = accuracy_score(y, predictions)
+                    cm = confusion_matrix(y, predictions)
+                    metrics = {
+                        "type": "classification",
+                        "accuracy": round(accuracy, 3),
+                        "confusion_matrix": cm.tolist(),
+                    }
+                else:
+                    mse = mean_squared_error(y, predictions)
+                    r2 = r2_score(y, predictions)
+                    metrics = {
+                        "type": "regression",
+                        "mse": round(mse, 3),
+                        "r2": round(r2, 3),
+                    }
+
+                # Append predictions to dataset
+                dataset['Predicted'] = predictions
+
+            # Convert dataset to HTML for rendering
+            # results_html = dataset.to_html(classes='table-auto w-full text-center border-collapse')
+
+            # Return the results and metrics as JSON
+            return JsonResponse({
+                # 'results': results_html,
+                'metrics': metrics,
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)})
+
+    # Return an error if the request is invalid
+    return JsonResponse({'error': 'Invalid request. Please use POST with a valid dataset.'})
+
+@csrf_exempt
+def fetch_columns(request):
+    if request.method == 'POST' and request.FILES.get('dataset'):
+        try:
+            # Handle dataset upload
+            uploaded_file = request.FILES['dataset']
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+
+            # Read the dataset based on the file type
+            if file_extension == 'csv':
+                df = pd.read_csv(uploaded_file, on_bad_lines='skip')
+            elif file_extension in ['xls', 'xlsx']:
+                df = pd.read_excel(uploaded_file)
+            else:
+                return JsonResponse({'error': 'Unsupported file format. Please upload a CSV or Excel file.'})
+            
+            # Clean dataset and extract columns
+            dataset = clean_dataset(df, delete_header=False)
+            columns = dataset.columns.tolist()
+
+            # Return the list of columns as a JSON response
+            return JsonResponse({'columns': columns})
         
+        except Exception as e:
+            return JsonResponse({'error': str(e)})
+
+    # Return an error if the request is invalid
+    return JsonResponse({'error': 'Invalid request. Please use POST with a valid dataset.'})
+
+
 from django.shortcuts import render, get_object_or_404
 
 def delete_dataset(request, dataset_id):

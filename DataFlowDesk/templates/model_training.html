@@ -159,13 +159,13 @@
         <h3 class="text-2xl font-bold text-gray-800 mb-4">Training Results</h3>
         <div id="metrics" class="bg-gray-100 p-4 rounded-md text-sm text-gray-700 font-mono mb-6"></div>
         
-        <!-- Visualization Section -->
-        <div id="visualization-container" class="mt-6">
-            <h4 class="text-xl font-semibold text-gray-800 mb-3">Model Performance Visualization</h4>
-            <div class="bg-white p-4 rounded-lg shadow-md">
-                <img id="visualization" src="" alt="Model Performance Visualization" class="max-w-full h-auto mx-auto">
-            </div>
+    <!-- Visualization Section -->
+    <div id="visualization-container" class="mt-6">
+        <h4 class="text-xl font-semibold text-gray-800 mb-3">Model Performance Visualizations</h4>
+        <div id="visualization-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Visualizations will be dynamically added here -->
         </div>
+    </div>
     </div>
 </div>
 
@@ -288,33 +288,45 @@
                     metricsHtml += `
                         <div class="bg-green-100 p-4 rounded-md">
                             <h4 class="font-bold text-green-800">Classification Results</h4>
-                            <p class="text-green-700">Accuracy: ${(result.results.accuracy * 100).toFixed(2)}%</p>
+                            <p class="text-green-700">Accuracy: ${(result.results.metrics.accuracy * 100).toFixed(2)}%</p>
+                        </div>`;
+                } else if (result.results.model_type === 'clustering') {
+                    metricsHtml += `
+                        <div class="bg-purple-100 p-4 rounded-md">
+                            <h4 class="font-bold text-purple-800">Clustering Results</h4>
+                            <p class="text-purple-700">Silhouette Score: ${result.results.metrics.silhouette_score.toFixed(4)}</p>
+                            
+                            <p class="text-purple-700">Inertia: ${result.results.metrics.inertia.toFixed(4)}</p>
                         </div>`;
                 } else {
                     metricsHtml += `
                         <div class="bg-blue-100 p-4 rounded-md">
                             <h4 class="font-bold text-blue-800">Regression Results</h4>
-                            <p class="text-blue-700">Mean Squared Error: ${result.results.mean_squared_error.toFixed(4)}</p>
-                            <p class="text-blue-700">R² Score: ${result.results.r2_score.toFixed(4)}</p>
+                            <p class="text-blue-700">Mean Squared Error: ${result.results.metrics.mean_squared_error.toFixed(4)}</p>
+                            <p class="text-blue-700">R² Score: ${result.results.metrics.r2_score.toFixed(4)}</p>
                         </div>`;
                 }
-
-                // Add feature information
-                metricsHtml += `
-                    <div class="bg-gray-100 p-4 rounded-md">
-                        <h4 class="font-bold text-gray-800">Model Details</h4>
-                        <p class="text-gray-700">Number of Features: ${result.results.num_features}</p>
-                        <p class="text-gray-700">Features Used: ${result.results.features_used.join(', ')}</p>
-                    </div>`;
-
-                metricsHtml += '</div>';
 
                 // Update the metrics section
                 document.getElementById('metrics').innerHTML = metricsHtml;
 
-                // Update the visualization
-                const visualizationImg = document.getElementById('visualization');
-                visualizationImg.src = result.results.visualization;
+                // Clear the visualization grid
+                const visualizationGrid = document.getElementById('visualization-grid');
+                visualizationGrid.innerHTML = '';
+
+                // Add multiple visualizations
+                const visualizations = result.results.visualizations;
+                Object.keys(visualizations).forEach((key, index) => {
+                    const visualizationCard = document.createElement('div');
+                    visualizationCard.className = 'bg-white p-4 rounded-lg shadow-md';
+
+                    visualizationCard.innerHTML = `
+                        <h5 class="text-lg font-semibold text-gray-700 mb-2">Visualization: ${key.replace('_', ' ')}</h5>
+                        <img src="${visualizations[key]}" alt="Model Visualization ${index + 1}" class="max-w-full h-auto mx-auto">
+                    `;
+
+                    visualizationGrid.appendChild(visualizationCard);
+                });
 
                 // Show the results section
                 document.getElementById('results').classList.remove('hidden');
@@ -326,6 +338,7 @@
             alert('An error occurred while training the model');
         }
     });
+
 
 </script>
 {% endblock %}
