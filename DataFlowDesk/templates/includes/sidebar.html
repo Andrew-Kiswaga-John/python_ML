@@ -1,7 +1,8 @@
+{% load static %}
 <!-- Sidebar -->
-<aside class="fixed inset-y-0 left-0 bg-slate-900 w-64 transition-transform duration-300 ease-in-out transform z-30">
+<aside class="fixed inset-y-0 left-0 bg-gradient-to-b from-blue-700/90 to-blue-800 w-64 transition-transform duration-300 ease-in-out transform z-30">
     <style>
-        /* Hover styles for nav sections */
+        /* Previous styles remain the same */
         .nav-section .nav-content {
             max-height: 0;
             overflow: hidden;
@@ -11,7 +12,7 @@
         }
         
         .nav-section:hover .nav-content {
-            max-height: 300px; /* Adjust based on your content */
+            max-height: 300px;
             opacity: 1;
             transform: translateY(0);
         }
@@ -24,15 +25,20 @@
             transform: rotate(180deg);
         }
 
-        /* Keep Analytics section open by default */
-        .nav-section[data-section="analytics"] .nav-content {
-            max-height: 300px;
-            opacity: 1;
-            transform: translateY(0);
+        /* Add spacing between nav sections */
+        .nav-section {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+        
+        .nav-section:last-child {
+            border-bottom: none;
         }
 
-        .nav-section[data-section="analytics"] .nav-arrow {
-            transform: rotate(180deg);
+        /* Add padding to nav content */
+        .nav-content {
+            padding-top: 0.5rem;
         }
 
         /* Smooth hover effect for menu items */
@@ -48,123 +54,125 @@
         .nav-item {
             transition: background-color 0.2s ease-in-out;
         }
+
+        /* User profile section animation */
+        .user-profile {
+            animation: fadeInDown 0.5s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 
     <!-- Logo Section -->
-    <div class="flex items-center h-16 px-6 border-b border-slate-800">
-        <a href="/" class="flex items-center space-x-2">
-            <span class="text-xl font-semibold text-white">ML Analyzer</span>
+    <div class="flex items-center justify-center h-20 px-6 border-b border-white/10 mb-6">
+        <a href="/" class="flex items-center justify-center w-full">
+            <img src="{% static 'images/logo.png' %}" alt="ML Analyzer Logo" class="h-16 w-auto object-contain">
         </a>
     </div>
 
+    <!-- User Profile Section -->
+    {% if user.is_authenticated %}
+    <div class="px-6 py-4 border-b border-white/10 user-profile">
+        <div class="flex items-center space-x-3 mb-3">
+            <!-- User Avatar -->
+            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                <span class="text-lg font-semibold text-white">{{ user.username|make_list|first|upper }}</span>
+            </div>
+            <!-- Welcome Message -->
+            <div>
+                <p class="text-white font-medium">Welcome back,</p>
+                <p class="text-white/80 text-sm">{{ user.username }}</p>
+            </div>
+        </div>
+        <!-- User Status -->
+        <div class="flex items-center space-x-2 text-xs text-white/60">
+            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+            <span>Online</span>
+            <span class="ml-2">•</span>
+            <span>Last login: {{ user.last_login|date:"j M, H:i" }}</span>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Navigation Menu -->
-    <nav class="px-4 pt-4">
-        <!-- Discover Section -->
-        <div class="mb-4 nav-section" data-section="discover">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
+    <nav class="px-4 pt-2">
+        <!-- Dashboard Section -->
+        <div class="nav-section" data-section="dashboard">
+            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
                 <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    <!-- Dashboard Icon -->
+                    <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                     </svg>
-                    <span>Discover</span>
+                    <span>Dashboard</span>
                 </div>
                 <svg class="w-4 h-4 nav-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Dashboard</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Automation</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">All Topics</a>
+            <div class="nav-content ml-6 space-y-2">
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Overview</a>
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Analytics</a>
             </div>
         </div>
 
-        <!-- Solve Section -->
-        <div class="mb-4 nav-section" data-section="solve">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
+        <!-- Datasets Section -->
+        <div class="nav-section" data-section="datasets">
+            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
                 <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    <!-- Dataset Icon -->
+                    <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                     </svg>
-                    <span>Solve</span>
+                    <span>Datasets</span>
                 </div>
                 <svg class="w-4 h-4 nav-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Workflow Builder</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Intent Predictions</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Action Builder</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Widget Configuration</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Email Configuration</a>
+            <div class="nav-content ml-6 space-y-2">
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Upload Dataset</a>
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">My Datasets</a>
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Create Dataset</a>
             </div>
         </div>
 
-        <!-- Triage Section -->
-        <div class="mb-4 nav-section" data-section="triage">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
+        <!-- Analysis Section -->
+        <div class="nav-section" data-section="analysis">
+            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
                 <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    <!-- Analysis Icon -->
+                    <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
-                    <span>Triage</span>
+                    <span>Analysis</span>
                 </div>
                 <svg class="w-4 h-4 nav-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Dashboard</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Classifiers</a>
-            </div>
-        </div>
-
-        <!-- Assist Section -->
-        <div class="mb-4 nav-section" data-section="assist">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span>Assist</span>
-                </div>
-                <svg class="w-4 h-4 nav-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Assist Analytics</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Notes</a>
-            </div>
-        </div>
-
-        <!-- Analytics Section -->
-        <div class="mb-4 nav-section" data-section="analytics">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 bg-slate-800 rounded-md">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    <span>Analytics</span>
-                </div>
-                <svg class="w-4 h-4 nav-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Solve Email Analytics</a>
-                <a href="#" class="block px-2 py-1 text-sm text-white bg-slate-700 rounded-md">Solve Chat Analytics</a>
+            <div class="nav-content ml-6 space-y-2">
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Visualizations</a>
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Model Training</a>
             </div>
         </div>
 
         <!-- Settings Section -->
-        <div class="mb-4 nav-section" data-section="settings">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
+        <div class="nav-section" data-section="settings">
+            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
                 <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <!-- Settings Icon -->
+                    <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                     </svg>
                     <span>Settings</span>
                 </div>
@@ -172,11 +180,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Account</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Integrations</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Team</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">SSO</a>
+            <div class="nav-content ml-6 space-y-2">
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Account</a>
+                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Sign out</a>
             </div>
         </div>
     </nav>

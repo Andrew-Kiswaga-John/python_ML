@@ -1,8 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
     <title>{% block title %}ML Analyzer{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -13,36 +15,6 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}" class="bg-gray-50 min-h-screen flex flex-col">
-    <!-- Navigation -->
-    <nav id="main-nav" class="bg-slate-800 shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <a href="/" class="flex items-center text-white font-bold text-xl">
-                        ML Analyzer
-                    </a>
-                </div>
-                <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-                    <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Home</a>
-                    <a href="{% url 'general_dashboard' %}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">My datasets</a>
-                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Documentation</a>
-                    <a href="#" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">About</a>
-                    {% if user.is_authenticated %}
-                        <span class="text-gray-300 px-3 py-2 text-sm font-medium">Welcome, {{ user.username }}</span>
-                        <a href="{% url 'signout' %}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">Sign Out</a>
-                    {% endif %}
-                </div>
-                <!-- Mobile menu button -->
-                <div class="flex items-center sm:hidden">
-                    <button type="button" class="text-gray-300 hover:text-white">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
 
     <!-- Main Content -->
     <main class="flex-grow">

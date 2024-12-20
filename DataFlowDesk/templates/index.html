@@ -889,19 +889,15 @@ document.getElementById('analyze-kaggle').addEventListener('click', async functi
             if (result.success) {
                 // Update authentication state
                 document.body.dataset.authenticated = 'true';
-                
                 closeModal('authModal');
                 
-                if (result.redirect_url) {
-                    // Redirect to the dashboard
-                    window.location.href = result.redirect_url;
-                } else if (window.intendedAction) {
+                if (window.intendedAction) {
                     openModal(window.intendedAction);
                     window.intendedAction = null;
-                } else {
-                    // Fallback to reload if no redirect URL
-                    window.location.reload();
                 }
+                
+                // Refresh the page to update UI
+                window.location.reload();
             } else {
                 alert(result.error || 'Authentication failed. Please try again.');
             }

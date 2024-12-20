@@ -37,6 +37,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+
+def index(request) :
+    return render( request, "index.html")
+
 @ensure_csrf_cookie
 def signin(request):
     if request.method == 'POST':
@@ -46,7 +51,7 @@ def signin(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return JsonResponse({'success': True})
+            return JsonResponse({'success': True, 'redirect_url': '/general_dashboard/'})
         else:
             return JsonResponse({'success': False, 'error': 'Invalid credentials'})
     
@@ -74,7 +79,7 @@ def signup(request):
             if user is not None:
                 login(request, user)
             
-            return JsonResponse({'success': True})
+            return JsonResponse({'success': True, 'redirect_url': '/general_dashboard/'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
@@ -493,216 +498,33 @@ from django.shortcuts import render, get_object_or_404
 
 
 
+import os
+import io
+import json
+import base64
+import logging
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from datetime import datetime
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .models import Dataset
+
+
 @csrf_exempt
-def display_graphs(request, dataset_id=None):
-    if request.method == 'GET':
-        try:
-            dataset = Dataset.objects.get(pk=dataset_id)
-            return render(request, 'display_graphs.html', {'dataset': dataset})
-        except Dataset.DoesNotExist:
-            return render(request, 'display_graphs.html', {'error': 'Dataset not found'})
-
-    if request.method == 'POST':
-        logging.debug('POST request received for display_graphs')
-        try:
-            dataset_id = request.POST.get('dataset_id')
-            logging.debug(f'Dataset ID: {dataset_id}')
-            if not dataset_id:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No dataset ID provided'
-                })
-
-            try:
-                dataset_id = int(dataset_id)
-            except ValueError:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Invalid dataset ID format'
-                })
-
-            x_column = request.POST.get('x_column')
-            y_column = request.POST.get('y_column')
-            logging.debug(f'X Column: {x_column}, Y Column: {y_column}')
-            
-            if not x_column or not y_column:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Both X and Y columns must be provided'
-                })
-
-            try:
-                dataset = Dataset.objects.get(pk=dataset_id)
-            except Dataset.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Dataset with ID {dataset_id} not found'
-                })
-
-            # Read from cleaned file if available, otherwise from original file
-            try:
-                if dataset.cleaned_file:
-                    file_path = dataset.cleaned_file.path
-                elif dataset.file_path:
-                    file_path = dataset.file_path.path
-
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'No file found for this dataset'
-                    })
-
-                try:
-                    df = pd.read_csv(file_path)
-                except UnicodeDecodeError:
-                    # Try with different encoding if UTF-8 fails
-                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
-                except Exception as e:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Error reading file: {str(e)}'
-                    })
-
-                plt.figure(figsize=(12, 8))
-                plt.clf()
-                
-                # Get user choice for graph type
-                user_choice = request.POST.get('graph_type', 'bar_chart')
-                logging.debug(f'User choice for graph type: {user_choice}')
-
-                try:
-                    x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
-                    y_is_count = y_column == 'count'
-                    logging.debug(f'X is categorical: {x_is_cat}, Y is count: {y_is_count}')
-
-                    if y_is_count:
-                        # Handle count visualization
-                        value_counts = df[x_column].value_counts()
-                        if user_choice == 'pie_chart' and len(value_counts) <= 10:
-                            plt.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%')
-                            plt.axis('equal')
-                        else:  # Default to bar chart for counts
-                            plt.figure(figsize=(12, 6))
-                            value_counts.plot(kind='bar')
-                            plt.title(f'Count of {x_column}', pad=20, size=14)
-                            plt.xlabel(x_column, size=12)
-                            plt.ylabel('Count', size=12)
-                    else:
-                        if user_choice == 'box_plot' and not x_is_cat and not y_is_cat:
-                            sns.boxplot(x=x_column, y=y_column, data=df)
-                        elif user_choice == 'line_chart' and not x_is_cat and not y_is_cat:
-                            plt.plot(df[x_column], df[y_column], marker='o')
-                            plt.xticks(rotation=45)
-                        elif user_choice == 'scatter_chart' and not x_is_cat and not y_is_cat:
-                            sns.scatterplot(x=x_column, y=y_column, data=df)
-                        elif user_choice == 'histogram' and not y_is_cat:
-                            df[y_column].hist(bins=30)
-                            plt.xlabel(y_column)
-                            plt.ylabel('Frequency')
-                        elif user_choice == 'bar_chart':
-                            if x_is_cat:
-                                sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
-                                plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
-                            else:
-                                df[y_column].value_counts().plot(kind='bar')
-                        elif user_choice == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 5:
-                            plt.pie(df.groupby(x_column)[y_column].sum(), labels=df[x_column].unique(), autopct='%1.1f%%')
-                            plt.axis('equal')
-                        else:
-                            # Default to bar chart if invalid selection
-                            logging.debug('Invalid selection, defaulting to bar chart')
-                            sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
-                            plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
-                except Exception as e:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Error creating plot: {str(e)}'
-                    })
-                
-                plt.title(f'{y_column} vs {x_column}', pad=20, size=14)
-                plt.xlabel(x_column, size=12)
-                plt.ylabel(y_column, size=12)
-                plt.xticks(rotation=45, ha='right')
-                plt.grid(True, alpha=0.3)
-                plt.tight_layout()
-                
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png')
-                buffer.seek(0)
-                image_png = buffer.getvalue()
-                buffer.close()  # Close the figure to free memory
-                
-                graphic = base64.b64encode(image_png).decode('utf-8')
-                
-                return JsonResponse({
-                    'success': True,
-                    'graphic': graphic
-                })
-
-            except Exception as e:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error processing dataset: {str(e)}'
-                })
-
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Unexpected error: {str(e)}'
-            })
-    
-    # For GET request
-    try:
-        if dataset_id:
-            dataset = get_object_or_404(Dataset, id=dataset_id)
-            try:
-                if dataset.cleaned_file:
-                    file_path = dataset.cleaned_file.path
-                elif dataset.file_path:
-                    file_path = dataset.file_path.path
-                else:
-                    return render(request, 'display_graphs.html', {
-                        'datasets': Dataset.objects.all(),
-                        'error': 'No file found for this dataset'
-                    })
-
-                try:
-                    df = pd.read_csv(file_path)
-                except UnicodeDecodeError:
-                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
-                
-                # Get plottable columns
-                plottable_columns = [col for col in df.columns if not (
-                    df[col].dtype == 'object' and df[col].str.len().mean() > 50
-                )]
-                
-                context = {
-                    'datasets': Dataset.objects.all(),
-                    'current_dataset': dataset,
-                    'columns': plottable_columns,
-                    'dataset_id': dataset_id
-                }
-            except Exception as e:
-                context = {
-                    'datasets': Dataset.objects.all(),
-                    'error': str(e)
-                }
-        else:
-            context = {
-                'datasets': Dataset.objects.all()
-            }
-        
-        return render(request, 'display_graphs.html', context)
-    except Exception as e:
-        return render(request, 'display_graphs.html', {
-            'datasets': Dataset.objects.all(),
-            'error': str(e)
-        })
-
 def get_columns_graphs(request):
+    logging.debug(f"get_columns_graphs called with request.GET: {request.GET}")  # Add debug logging
+    
     try:
-        dataset_id = request.GET.get('dataset_id')
+        # Check both GET and POST for dataset_id
+        dataset_id = request.GET.get('dataset_id') or request.POST.get('dataset_id')
+        logging.debug(f"Received dataset_id: {dataset_id}")  # Debug log
+        
         if not dataset_id:
+            logging.warning("No dataset ID provided")  # Warning log
             return JsonResponse({
                 'success': False,
                 'error': 'No dataset ID provided'
@@ -712,6 +534,7 @@ def get_columns_graphs(request):
         try:
             dataset_id = int(dataset_id)
         except ValueError:
+            logging.error(f"Invalid dataset ID format: {dataset_id}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid dataset ID format'
@@ -719,7 +542,9 @@ def get_columns_graphs(request):
             
         try:
             dataset = Dataset.objects.get(pk=dataset_id)
+            logging.debug(f"Found dataset: {dataset.name}")  # Debug log
         except Dataset.DoesNotExist:
+            logging.error(f"Dataset not found with ID: {dataset_id}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': f'Dataset with ID {dataset_id} not found'
@@ -729,46 +554,539 @@ def get_columns_graphs(request):
         try:
             if dataset.cleaned_file:
                 file_path = dataset.cleaned_file.path
+                logging.debug(f"Using cleaned file: {file_path}")  # Debug log
             elif dataset.file_path:
                 file_path = dataset.file_path.path
+                logging.debug(f"Using original file: {file_path}")  # Debug log
             else:
+                logging.error("No file found for dataset")  # Error log
                 return JsonResponse({
                     'success': False,
                     'error': 'No file found for this dataset'
                 })
                 
             try:
-                df = pd.read_csv(file_path)
-            except UnicodeDecodeError:
-                # Try with different encoding if UTF-8 fails
-                df = pd.read_csv(file_path, encoding='ISO-8859-1')
+                # Try different encodings
+                encodings = ['utf-8', 'ISO-8859-1', 'latin1']
+                df = None
+                last_error = None
+                
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding, low_memory=False)
+                        logging.debug(f"Successfully read file with encoding: {encoding}")  # Debug log
+                        break
+                    except UnicodeDecodeError:
+                        last_error = f"Failed to read with encoding: {encoding}"
+                        continue
+                    except Exception as e:
+                        last_error = str(e)
+                        break
+                
+                if df is None:
+                    raise Exception(f"Failed to read file with any encoding. Last error: {last_error}")
+                
             except Exception as e:
+                logging.error(f"Error reading file: {str(e)}")  # Error log
                 return JsonResponse({
                     'success': False,
                     'error': f'Error reading file: {str(e)}'
                 })
             
-            # Filter out text-heavy columns
-            columns = [col for col in df.columns if not (
-                df[col].dtype == 'object' and df[col].str.len().mean() > 50
-            )]
+            # Filter out text-heavy columns and get column types
+            columns = []
+            column_types = {}
+            
+            for col in df.columns:
+                try:
+                    if df[col].dtype == 'object':
+                        # Check if it's a text-heavy column
+                        if df[col].str.len().mean() <= 50:
+                            columns.append(col)
+                            column_types[col] = 'categorical'
+                    else:
+                        columns.append(col)
+                        column_types[col] = 'numerical' if pd.api.types.is_numeric_dtype(df[col]) else 'other'
+                except Exception as e:
+                    logging.warning(f"Error processing column {col}: {str(e)}")
+                    continue
+            
+            logging.debug(f"Found columns: {columns}")  # Debug log
             
             return JsonResponse({
                 'success': True,
-                'columns': columns
+                'columns': columns,
+                'column_types': column_types
             })
             
         except Exception as e:
+            logging.error(f"Error accessing file: {str(e)}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': f'Error accessing file: {str(e)}'
             })
             
     except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")  # Error log
         return JsonResponse({
             'success': False,
             'error': str(e)
         })
+
+
+import os
+import io
+import json
+import base64
+import logging
+from datetime import datetime
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .models import Dataset
+
+@csrf_exempt
+def display_graphs(request, dataset_id=None):
+    logging.debug(f"display_graphs called with dataset_id: {dataset_id}")
+    
+    if not dataset_id:
+        return render(request, 'display_graphs.html', {
+            'error': 'No dataset ID provided'
+        })
+
+    try:
+        dataset = get_object_or_404(Dataset, id=dataset_id)
+        logging.debug(f"Found dataset: {dataset.name}")
+
+        if request.method == 'POST':
+            logging.debug('Processing POST request for graph generation')
+            try:
+                # Validate POST data
+                x_column = request.POST.get('x_column')
+                y_column = request.POST.get('y_column')
+                graph_type = request.POST.get('graph_type', 'bar_chart')
+                
+                logging.debug(f'Parameters - X: {x_column}, Y: {y_column}, Type: {graph_type}')
+                
+                if not x_column:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'X-axis column must be provided'
+                    })
+
+                if graph_type != 'histogram' and not y_column:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Y-axis column must be provided for non-histogram graphs'
+                    })
+
+                # Get file path
+                if dataset.cleaned_file:
+                    file_path = dataset.cleaned_file.path
+                elif dataset.file_path:
+                    file_path = dataset.file_path.path
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No file found for this dataset'
+                    })
+
+                # Read dataset with multiple encoding attempts
+                encodings = ['utf-8', 'ISO-8859-1', 'latin1']
+                df = None
+                last_error = None
+
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding, low_memory=False)
+                        logging.debug(f"Successfully read file with encoding: {encoding}")
+                        break
+                    except UnicodeDecodeError:
+                        last_error = f"Failed to read with encoding: {encoding}"
+                        continue
+                    except Exception as e:
+                        last_error = str(e)
+                        break
+
+                if df is None:
+                    raise Exception(f"Failed to read file with any encoding. Last error: {last_error}")
+
+                try:
+                    # Determine column types
+                    x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
+                    y_is_count = y_column == 'count'
+                    y_is_cat = False if y_is_count else (df[y_column].dtype == 'object' or len(df[y_column].unique()) <= 10)
+
+                    logging.debug(f'Column types - X categorical: {x_is_cat}, Y count: {y_is_count}, Y categorical: {y_is_cat}')
+
+                    # Set style with a valid style name
+                    plt.style.use('default')
+                    
+                    # Create figure with a white background
+                    plt.figure(figsize=(12, 8), facecolor='white')
+                    plt.clf()
+
+                    # Set the color palette
+                    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+                    
+                    if y_is_count:
+                        # Handle count visualization
+                        value_counts = df[x_column].value_counts()
+                        if graph_type == 'pie_chart' and len(value_counts) <= 10:
+                            plt.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%', 
+                                  colors=colors[:len(value_counts)])
+                            plt.title(f'Distribution of {x_column}', pad=20, size=14)
+                            plt.axis('equal')
+                        else:
+                            ax = value_counts.plot(kind='bar', color=colors[0])
+                            plt.title(f'Count of {x_column}', pad=20, size=14)
+                            plt.xlabel(x_column, size=12)
+                            plt.ylabel('Count', size=12)
+                            
+                            # Add value labels on top of bars
+                            for i, v in enumerate(value_counts):
+                                ax.text(i, v, str(v), ha='center', va='bottom')
+                    else:
+                        if graph_type == 'box_plot' and not x_is_cat and not y_is_cat:
+                            sns.boxplot(x=x_column, y=y_column, data=df, color=colors[0])
+                            plt.title(f'Box Plot of {y_column} by {x_column}', pad=20, size=14)
+                        
+                        elif graph_type == 'line_chart' and not x_is_cat and not y_is_cat:
+                            plt.plot(df[x_column], df[y_column], marker='o', color=colors[0])
+                            plt.title(f'Line Chart of {y_column} vs {x_column}', pad=20, size=14)
+                            plt.xticks(rotation=45)
+                        
+                        elif graph_type == 'scatter_chart' and not x_is_cat and not y_is_cat:
+                            plt.scatter(df[x_column], df[y_column], color=colors[0], alpha=0.5)
+                            plt.title(f'Scatter Plot of {y_column} vs {x_column}', pad=20, size=14)
+                        
+                        elif graph_type == 'histogram':
+                            plt.hist(df[x_column], bins=30, color=colors[0], alpha=0.7)
+                            plt.title(f'Histogram of {x_column}', pad=20, size=14)
+                            plt.xlabel(x_column)
+                            plt.ylabel('Frequency')
+                        
+                        elif graph_type == 'bar_chart':
+                            if x_is_cat:
+                                ax = sns.barplot(x=x_column, y=y_column, data=df, color=colors[0])
+                                plt.title(f'Bar Chart of {y_column} by {x_column}', pad=20, size=14)
+                                
+                                # Add value labels on top of bars
+                                for i in ax.containers:
+                                    ax.bar_label(i, padding=3)
+                            else:
+                                ax = df[y_column].value_counts().plot(kind='bar', color=colors[0])
+                                plt.title(f'Bar Chart of {y_column}', pad=20, size=14)
+                                
+                                # Add value labels
+                                for i, v in enumerate(df[y_column].value_counts()):
+                                    ax.text(i, v, str(v), ha='center', va='bottom')
+                        
+                        elif graph_type == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 10:
+                            grouped_data = df.groupby(x_column)[y_column].sum()
+                            plt.pie(grouped_data, labels=grouped_data.index, autopct='%1.1f%%',
+                                  colors=colors[:len(grouped_data)])
+                            plt.title(f'Pie Chart of {y_column} by {x_column}', pad=20, size=14)
+                            plt.axis('equal')
+                        
+                        else:
+                            logging.debug('Invalid selection, defaulting to bar chart')
+                            ax = sns.barplot(x=x_column, y=y_column, data=df, color=colors[0])
+                            plt.title(f'Bar Chart of {y_column} by {x_column}', pad=20, size=14)
+                            
+                            # Add value labels
+                            for i in ax.containers:
+                                ax.bar_label(i, padding=3)
+
+                    # Common plot settings
+                    plt.xlabel(x_column, size=12)
+                    plt.ylabel(y_column if not y_is_count else 'Count', size=12)
+                    plt.xticks(rotation=45, ha='right')
+                    plt.grid(True, alpha=0.3)
+                    
+                    # Adjust layout to prevent label cutoff
+                    plt.tight_layout()
+
+                    # Save plot to buffer
+                    buffer = io.BytesIO()
+                    plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight', 
+                              facecolor='white', edgecolor='none')
+                    buffer.seek(0)
+                    image_png = buffer.getvalue()
+                    buffer.close()
+                    plt.close('all')  # Close all figures to free memory
+
+                    # Convert to base64
+                    graphic = base64.b64encode(image_png).decode('utf-8')
+
+                    return JsonResponse({
+                        'success': True,
+                        'graphic': graphic
+                    })
+
+                except Exception as e:
+                    logging.error(f'Error creating plot: {str(e)}')
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error creating plot: {str(e)}'
+                    })
+
+            except Exception as e:
+                logging.error(f'Error processing POST request: {str(e)}')
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        # Handle GET request
+        try:
+            # Get file path
+            if dataset.cleaned_file:
+                file_path = dataset.cleaned_file.path
+            elif dataset.file_path:
+                file_path = dataset.file_path.path
+            else:
+                return render(request, 'display_graphs.html', {
+                    'error': 'No file found for this dataset',
+                    'dataset': dataset,
+                    'dataset_id': dataset_id
+                })
+
+            # Read dataset
+            try:
+                df = pd.read_csv(file_path, low_memory=False)
+            except UnicodeDecodeError:
+                df = pd.read_csv(file_path, encoding='ISO-8859-1', low_memory=False)
+
+            # Get plottable columns
+            plottable_columns = []
+            column_types = {}
+
+            for col in df.columns:
+                try:
+                    if df[col].dtype == 'object':
+                        if df[col].str.len().mean() <= 50:
+                            plottable_columns.append(col)
+                            column_types[col] = 'categorical'
+                    else:
+                        plottable_columns.append(col)
+                        column_types[col] = 'numerical' if pd.api.types.is_numeric_dtype(df[col]) else 'other'
+                except Exception as e:
+                    logging.warning(f"Error processing column {col}: {str(e)}")
+                    continue
+
+            # Sort saved graphs
+            saved_graphs = sorted(dataset.graphs, key=lambda x: x.get('created_at', ''), reverse=True) if dataset.graphs else []
+
+            context = {
+                'dataset': dataset,
+                'dataset_id': dataset_id,
+                'columns': plottable_columns,
+                'column_types': column_types,
+                'saved_graphs': saved_graphs,
+                'graph_types': [
+                    ('bar_chart', 'Bar Chart'),
+                    ('line_chart', 'Line Chart'),
+                    ('scatter_chart', 'Scatter Plot'),
+                    ('pie_chart', 'Pie Chart'),
+                    ('histogram', 'Histogram'),
+                    ('box_plot', 'Box Plot')
+                ]
+            }
+
+            return render(request, 'display_graphs.html', context)
+
+        except Exception as e:
+            logging.error(f"Error preparing display context: {str(e)}")
+            return render(request, 'display_graphs.html', {
+                'error': str(e),
+                'dataset': dataset,
+                'dataset_id': dataset_id
+            })
+
+    except Dataset.DoesNotExist:
+        logging.error(f"Dataset not found with ID: {dataset_id}")
+        return render(request, 'display_graphs.html', {
+            'error': f'Dataset with ID {dataset_id} not found'
+        })
+    except Exception as e:
+        logging.error(f"Unexpected error in display_graphs: {str(e)}")
+        return render(request, 'display_graphs.html', {
+            'error': str(e)
+        })
+    
+
+@csrf_exempt
+def save_graph(request):
+    logging.debug("save_graph view called")
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Only POST method is allowed'
+        })
+
+    try:
+        # Get and validate required parameters
+        graph_data = request.POST.get('graph_image')
+        dataset_id = request.POST.get('dataset_id')
+        x_column = request.POST.get('x_column')
+        y_column = request.POST.get('y_column')
+        graph_type = request.POST.get('graph_type')
+
+        logging.debug(f"Received parameters - Dataset ID: {dataset_id}, X: {x_column}, Y: {y_column}, Type: {graph_type}")
+
+        # Validate required fields
+        if not all([graph_data, dataset_id, x_column, graph_type]):
+            missing_fields = []
+            if not graph_data: missing_fields.append('graph_image')
+            if not dataset_id: missing_fields.append('dataset_id')
+            if not x_column: missing_fields.append('x_column')
+            if not graph_type: missing_fields.append('graph_type')
+            
+            return JsonResponse({
+                'success': False,
+                'error': f'Missing required fields: {", ".join(missing_fields)}'
+            })
+
+        # Validate dataset_id format
+        try:
+            dataset_id = int(dataset_id)
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid dataset ID format'
+            })
+
+        # Get dataset
+        try:
+            dataset = Dataset.objects.get(pk=dataset_id)
+            logging.debug(f"Found dataset: {dataset.name}")
+        except Dataset.DoesNotExist:
+            logging.error(f"Dataset not found with ID: {dataset_id}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Dataset not found'
+            })
+
+        # Generate timestamp and clean filename components
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Clean filename components to remove special characters
+        def clean_filename(s):
+            return "".join(c for c in s if c.isalnum() or c in ('-', '_')).lower()
+
+        x_column_clean = clean_filename(x_column)
+        y_column_clean = clean_filename(y_column) if y_column else 'count'
+        graph_type_clean = clean_filename(graph_type)
+
+        # Create filename and paths
+        filename = f"graph_{dataset_id}_{graph_type_clean}_{x_column_clean}_vs_{y_column_clean}_{timestamp}.png"
+        relative_path = f'datasets/graphs/{filename}'
+        
+        # Ensure media directories exist
+        graphs_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'graphs')
+        os.makedirs(graphs_dir, exist_ok=True)
+        
+        file_path = os.path.join(graphs_dir, filename)
+        logging.debug(f"Saving graph to: {file_path}")
+
+        # Process and save the image
+        try:
+            # Remove data URL prefix if present
+            if 'base64,' in graph_data:
+                graph_data = graph_data.split('base64,')[1]
+
+            # Decode and save the image
+            try:
+                image_data = base64.b64decode(graph_data)
+            except Exception as e:
+                logging.error(f"Error decoding base64 data: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid image data'
+                })
+
+            # Save the file
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
+
+            # Verify file was saved
+            if not os.path.exists(file_path):
+                raise Exception("File was not saved successfully")
+
+            # Create graph info dictionary
+            graph_info = {
+                'file_path': relative_path,
+                'graph_type': graph_type,
+                'x_column': x_column,
+                'y_column': y_column,
+                'created_at': timestamp,
+                'file_size': os.path.getsize(file_path)
+            }
+
+            # Update dataset's graphs list
+            try:
+                graphs = dataset.graphs or []
+                graphs.append(graph_info)
+                
+                # Keep only the last 50 graphs to prevent excessive storage
+                if len(graphs) > 50:
+                    # Delete old graph files
+                    for old_graph in graphs[:-50]:
+                        old_file_path = os.path.join(settings.MEDIA_ROOT, old_graph['file_path'])
+                        try:
+                            if os.path.exists(old_file_path):
+                                os.remove(old_file_path)
+                        except Exception as e:
+                            logging.warning(f"Error deleting old graph file: {str(e)}")
+                    
+                    # Keep only the latest 50 graphs
+                    graphs = graphs[-50:]
+
+                dataset.graphs = graphs
+                dataset.save()
+                logging.debug("Dataset updated successfully")
+
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Graph saved successfully',
+                    'data': {
+                        'filename': filename,
+                        'file_path': relative_path,
+                        'created_at': timestamp
+                    }
+                })
+
+            except Exception as e:
+                # If there's an error saving to the database, delete the saved file
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as delete_error:
+                    logging.error(f"Error deleting file after database error: {str(delete_error)}")
+                
+                raise Exception(f"Error updating dataset: {str(e)}")
+
+        except Exception as e:
+            logging.error(f"Error saving graph: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Error saving graph: {str(e)}'
+            })
+
+    except Exception as e:
+        logging.error(f"Unexpected error in save_graph: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}'
+        })
+
 
 from io import StringIO
 from django.core.files.base import ContentFile
@@ -824,17 +1142,18 @@ def upload_file(request):
                 try:
                     if file.name.endswith('.csv'):
                         try:
-                            df = pd.read_csv(file, on_bad_lines='skip')  # Default UTF-8
+                            # Add low_memory=False to handle mixed types warning
+                            df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
                         except UnicodeDecodeError:
                             try:
-                                df = pd.read_csv(file, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+                                df = pd.read_csv(file, on_bad_lines='skip', encoding='ISO-8859-1', low_memory=False)
                             except Exception as e:
                                 return JsonResponse({'error': f'CSV File reading error: {str(e)}'}, status=400)
 
                         # Handle cases where the delimiter isn't a comma
-                        if df.empty or len(df.columns) == 1:  # Single-column issue
+                        if df.empty or len(df.columns) == 1:
                             try:
-                                df = pd.read_csv(file, delimiter=';')  # Try a semicolon
+                                df = pd.read_csv(file, delimiter=';', low_memory=False)
                             except Exception as e:
                                 return JsonResponse({'error': f'CSV Parsing Error with fallback delimiter: {str(e)}'}, status=400)
                     elif file.name.endswith('.xlsx'):
@@ -852,48 +1171,92 @@ def upload_file(request):
                 if not kaggle_link:
                     return JsonResponse({'error': 'No Kaggle link provided.'}, status=400)
 
-                # Extract dataset identifier from Kaggle link
-                dataset_id = '/'.join(kaggle_link.rstrip('/').split('/')[-2:])
-                datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
-                os.makedirs(datasets_dir, exist_ok=True)
-
-                # Use Kaggle API to download the dataset
                 try:
-                    import kaggle
-                    kaggle.api.dataset_download_files(dataset_id, path=datasets_dir, unzip=True)
+                    import requests
+                    import zipfile
+                    from urllib.parse import urlparse
+                    
+                    # Create datasets directory
+                    datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
+                    os.makedirs(datasets_dir, exist_ok=True)
+                    
+                    # Download to a temporary zip file
+                    zip_path = os.path.join(datasets_dir, 'temp_dataset.zip')
+                    
+                    # Download the file with proper headers
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                    }
+                    
+                    response = requests.get(kaggle_link, headers=headers, stream=True)
+                    response.raise_for_status()
+                    
+                    # Save the downloaded zip file
+                    with open(zip_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    
+                    # Extract the zip file
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        # List all files in the zip
+                        files = zip_ref.namelist()
+                        print(f"Files in zip: {files}")  # Debug log
+                        
+                        # Find the first CSV or Excel file
+                        data_file = None
+                        for file in files:
+                            if file.endswith(('.csv', '.xlsx', '.xls')):
+                                data_file = file
+                                break
+                        
+                        if not data_file:
+                            raise Exception("No CSV or Excel files found in the downloaded dataset")
+                        
+                        # Extract the file
+                        zip_ref.extract(data_file, datasets_dir)
+                        file_path = os.path.join(datasets_dir, data_file)
+
+                    # Load the dataset with low_memory=False
+                    try:
+                        if file_path.endswith('.csv'):
+                            df = pd.read_csv(file_path, low_memory=False)
+                        elif file_path.endswith(('.xls', '.xlsx')):
+                            df = pd.read_excel(file_path)
+                    except Exception as e:
+                        return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
+
+                    # Create a File object from the downloaded file
+                    with open(file_path, 'rb') as f:
+                        file = ContentFile(f.read())
+                        file.name = os.path.basename(file_path)
+
+                    # Clean up temporary files
+                    os.remove(zip_path)
+                    os.remove(file_path)
+
                 except Exception as e:
-                    return JsonResponse({'error': f'Error downloading dataset from Kaggle: {str(e)}'}, status=400)
-
-                # Locate the downloaded file
-                downloaded_files = [
-                    os.path.join(datasets_dir, f) for f in os.listdir(datasets_dir)
-                    if f.endswith('.csv') or f.endswith(('.xls', '.xlsx'))
-                ]
-                if not downloaded_files:
-                    return JsonResponse({'error': 'No valid CSV or Excel files found in the downloaded dataset.'}, status=400)
-
-                file_path = downloaded_files[0]  # Use the first valid file
-
-                # Load the dataset
-                try:
-                    if file_path.endswith('.csv'):
-                        df = pd.read_csv(file_path)
-                    elif file_path.endswith(('.xls', '.xlsx')):
-                        df = pd.read_excel(file_path)
-                except Exception as e:
-                    return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
-
-                # Create a File object from the downloaded file
-                with open(file_path, 'rb') as f:
-                    file = ContentFile(f.read())
-                    file.name = os.path.basename(file_path)
-
+                    return JsonResponse({'error': f'Error processing Kaggle dataset: {str(e)}'}, status=400)
             else:
                 return JsonResponse({'error': 'Invalid data source selected.'}, status=400)
 
-            # Validate that target_class exists in columns
-            if target_class not in df.columns:
-                return JsonResponse({'error': f'Selected target class "{target_class}" is not a valid column in the dataset'}, status=400)
+            # Clean column names and print them for debugging
+            df.columns = df.columns.str.strip()
+            print("Available columns:", list(df.columns))
+            print("Target class:", target_class)
+
+            # Case-insensitive column matching
+            column_map = {col.lower(): col for col in df.columns}
+            target_class_lower = target_class.lower()
+            
+            if target_class_lower in column_map:
+                # Use the original column name
+                target_class = column_map[target_class_lower]
+            else:
+                return JsonResponse({
+                    'error': f'Selected target class "{target_class}" is not a valid column. Available columns: {", ".join(df.columns)}'
+                }, status=400)
 
             # Save the dataset
             dataset = Dataset.objects.create(
@@ -1139,16 +1502,16 @@ def upload_page(request):
     return render(request, 'upload.html')
 
 @csrf_exempt
+@csrf_exempt
 def get_columns_target(request):
     print("get_columns_target called")  # Debug log
     if request.method == 'POST':
         try:
             if request.FILES.get('file'):
-                # Handle file upload
+                # Handle file upload (existing code remains the same)
                 file = request.FILES['file']
-                print(f"Processing file: {file.name}")  # Debug log
+                print(f"Processing file: {file.name}")
                 
-                # Read the file based on extension
                 try:
                     if file.name.endswith('.csv'):
                         df = pd.read_csv(file, encoding='utf-8')
@@ -1174,36 +1537,81 @@ def get_columns_target(request):
                     
                     print(f"Processing Kaggle URL: {kaggle_url}")  # Debug log
                     
-                    # Extract dataset identifier from Kaggle link
-                    dataset_id = '/'.join(kaggle_url.rstrip('/').split('/')[-2:])
+                    # Create datasets directory if it doesn't exist
                     datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
                     os.makedirs(datasets_dir, exist_ok=True)
                     
-                    # Use Kaggle API to download the dataset
+                    # Download file directly using requests
                     try:
-                        import kaggle
-                        kaggle.api.dataset_download_files(dataset_id, path=datasets_dir, unzip=True)
-                    except Exception as e:
-                        return JsonResponse({'error': f'Error downloading dataset from Kaggle: {str(e)}'}, status=400)
-                    
-                    # Locate the downloaded file
-                    downloaded_files = [
-                        os.path.join(datasets_dir, f) for f in os.listdir(datasets_dir)
-                        if f.endswith('.csv') or f.endswith(('.xls', '.xlsx'))
-                    ]
-                    if not downloaded_files:
-                        return JsonResponse({'error': 'No valid CSV or Excel files found in the downloaded dataset.'}, status=400)
-                    
-                    file_path = downloaded_files[0]  # Use the first valid file
-                    
-                    # Load the dataset
-                    try:
+                        import requests
+                        import zipfile
+                        from urllib.parse import urlparse
+                        
+                        # Download to a temporary zip file
+                        zip_path = os.path.join(datasets_dir, 'temp_dataset.zip')
+                        
+                        # Download the file with proper headers
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                        }
+                        
+                        response = requests.get(kaggle_url, headers=headers, stream=True)
+                        response.raise_for_status()
+                        
+                        # Save the downloaded zip file
+                        with open(zip_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                        
+                        # Extract the zip file
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            # List all files in the zip
+                            files = zip_ref.namelist()
+                            print(f"Files in zip: {files}")  # Debug log
+                            
+                            # Find the first CSV or Excel file
+                            data_file = None
+                            for file in files:
+                                if file.endswith(('.csv', '.xlsx', '.xls')):
+                                    data_file = file
+                                    break
+                            
+                            if not data_file:
+                                raise Exception("No CSV or Excel files found in the downloaded dataset")
+                            
+                            # Extract the file
+                            zip_ref.extract(data_file, datasets_dir)
+                            file_path = os.path.join(datasets_dir, data_file)
+                        
+                        # Try to read the file with different encodings
                         if file_path.endswith('.csv'):
-                            df = pd.read_csv(file_path)
-                        elif file_path.endswith(('.xls', '.xlsx')):
+                            encodings = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+                            df = None
+                            last_error = None
+                            for encoding in encodings:
+                                try:
+                                    df = pd.read_csv(file_path, encoding=encoding)
+                                    print(f"Successfully read CSV with encoding: {encoding}")  # Debug log
+                                    break
+                                except Exception as e:
+                                    last_error = e
+                                    continue
+                            
+                            if df is None:
+                                raise Exception(f"Unable to read the CSV file with any supported encoding. Last error: {str(last_error)}")
+                        elif file_path.endswith(('.xlsx', '.xls')):
                             df = pd.read_excel(file_path)
+                        
+                        # Clean up temporary files
+                        os.remove(zip_path)
+                        os.remove(file_path)
+                        
+                    except requests.exceptions.RequestException as e:
+                        return JsonResponse({'error': f'Error downloading dataset: {str(e)}'}, status=400)
                     except Exception as e:
-                        return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
+                        return JsonResponse({'error': f'Error processing dataset: {str(e)}'}, status=400)
                     
                 except json.JSONDecodeError:
                     return JsonResponse({'error': 'Invalid JSON data'}, status=400)
@@ -1211,11 +1619,16 @@ def get_columns_target(request):
                     print(f"Error processing Kaggle URL: {str(e)}")  # Debug log
                     return JsonResponse({'error': str(e)}, status=400)
             
+            # Clean up column names
+            df.columns = df.columns.str.strip()  # Remove leading/trailing whitespace
+            
             # Get column names and their data types
             columns = list(df.columns)
             dtypes = {col: str(df[col].dtype) for col in columns}
             
             print(f"Found columns: {columns}")  # Debug log
+            print(f"First few rows of data:")  # Debug log
+            print(df.head())  # Debug log
             
             response_data = {
                 'columns': columns,
@@ -1237,6 +1650,88 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Dataset, MLModel, DataPreprocessingLog
 from django.db.models.functions import TruncMonth
+
+import matplotlib.pyplot as plt
+import io
+import base64
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+def create_simple_distribution_plot(clean_count, unclean_count):
+    # Ensure we're working with integers, defaulting to 0 for NaN values
+    clean_count = int(clean_count) if pd.notna(clean_count) else 0
+    unclean_count = int(unclean_count) if pd.notna(unclean_count) else 0
+    
+    # Only create plot if there's data to show
+    if clean_count == 0 and unclean_count == 0:
+        # Create an empty plot with a message
+        plt.figure(figsize=(8, 6))
+        plt.text(0.5, 0.5, 'No datasets available', horizontalalignment='center', verticalalignment='center')
+        plt.axis('off')
+    else:
+        # Create figure and axis
+        plt.figure(figsize=(8, 6))
+        
+        # Data
+        labels = ['Clean', 'Unclean']
+        sizes = [clean_count, unclean_count]
+        colors = ['#22c55e', '#ef4444']  # Green and Red
+        
+        # Create pie chart
+        plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+        plt.title('Dataset Distribution', pad=20)
+    
+    # Save plot to base64 string
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight', transparent=True)
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    plt.close()
+    
+    # Encode the bytes as base64
+    return base64.b64encode(image_png).decode('utf-8')
+
+
+def create_category_distribution_plot(datasets):
+    plt.figure(figsize=(8, 4))
+    
+    # Define categories based on your data
+    categories = {
+        'Pending': datasets.filter(status='pending').count(),
+        'Processed': datasets.filter(status='processed').count(),
+        'With Target': datasets.exclude(target_class__isnull=True).count(),
+        'Without Target': datasets.filter(target_class__isnull=True).count(),
+        'Has Graphs': datasets.exclude(graphs__exact=[]).count(),
+    }
+    
+    # Colors for each category
+    colors = ['#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#ef4444']
+    
+    # Create bar chart
+    plt.bar(categories.keys(), categories.values(), color=colors)
+    plt.title('Dataset Categories')
+    plt.xticks(rotation=45, ha='right')
+    plt.ylabel('Number of Datasets')
+    
+    # Add value labels on top of each bar
+    for i, v in enumerate(categories.values()):
+        plt.text(i, v, str(v), ha='center', va='bottom')
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save to base64
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight', transparent=True)
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    plt.close()
+    
+    return base64.b64encode(image_png).decode('utf-8')
+
+
+
 
 def general_dashboard(request):
     if not request.user.is_authenticated:
