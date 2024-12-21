@@ -24,14 +24,20 @@ urlpatterns = [
     path('train_model/', views.train_model, name='train_model'),
     path('train_model_nn/', views.train_model_nn, name='train_model_nn'),
     path('model_training/', views.training_page, name='model_training'),
-
+    path('upload/', views.upload_file, name='upload'),
+    path('index/', views.index, name='index'),
+    path('save_graph/', views.save_graph, name='save_graph'),
     path('get_columns/', views.get_columns, name='get_columns'),
     path('get_columns_target/', views.get_columns_target, name='get_columns_target'),
     path('get_columns_graphs/', views.get_columns_graphs, name='get_columns_graphs'),
     # path('dataset/show_all/', views.all_datasets, name='all_datasets'),
+    path('get_columns_graphs/', views.get_columns_graphs, name='get_columns_graphs'),
+    path('dataset/<int:dataset_id>/graphs/', views.display_graphs, name='display_graphs'),
+    path('save_graph/', views.save_graph, name='save_graph'),
     path('predictions/', views.render_predictions_view, name='predictions'),
     path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
     path('fetch-columns/', views.fetch_columns, name='fetch_columns'),
+    path('download_model/', views.download_model, name='download_model'),
 
 
     # Predictions logic
@@ -52,6 +58,6 @@ urlpatterns = [
 
 ]
 
-
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

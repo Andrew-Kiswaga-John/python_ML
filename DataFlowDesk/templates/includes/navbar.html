@@ -1,0 +1,88 @@
+{% load static %}
+
+<!-- Navigation -->
+    <nav id="main-nav" class="bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg backdrop-blur-lg border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo Section -->
+                <div class="flex items-center justify-center h-20 px-6 border-b -mt-2 border-white/10 mb-6">
+                    <a href="/" class="flex items-center justify-center w-full">
+                        <img src="{% static 'images/navbar.png' %}" alt="ML Analyzer Logo" class="h-12 w-auto object-contain">
+                    </a>
+                </div>
+    
+                <!-- Desktop Navigation -->
+                <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-2">
+                    <a href="/" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                        <span class="relative z-10">Home</span>
+                        <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </a>
+                    
+                    <a href="{% url 'general_dashboard' %}" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                        <span class="relative z-10">My datasets</span>
+                        <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </a>
+                    
+                    <a href="#" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                        <span class="relative z-10">Documentation</span>
+                        <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </a>
+                    
+                    <a href="#" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                        <span class="relative z-10">About</span>
+                        <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </a>
+    
+                    {% if user.is_authenticated %}
+                        <div class="flex items-center space-x-4 ml-4 border-l border-white/10 pl-4">
+                            <span class="text-sm font-medium">
+                                <span class="text-white/80">Welcome,</span>
+                                <span class="text-white">{{ user.username }}</span>
+                            </span>
+                            <a href="{% url 'signout' %}" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                                <span class="relative z-10">Sign Out</span>
+                                <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+    
+                <!-- Mobile menu button -->
+                <div class="flex items-center sm:hidden">
+                    <button type="button" class="inline-flex items-center justify-center p-2 rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Mobile menu, show/hide based on menu state -->
+        <div class="sm:hidden bg-gradient-to-r from-blue-600/95 to-indigo-700/95 backdrop-blur-lg border-t border-white/10" id="mobile-menu" style="display: none;">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="/" class="block px-3 py-2 rounded-lg text-base font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">Home</a>
+                <a href="{% url 'general_dashboard' %}" class="block px-3 py-2 rounded-lg text-base font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">My datasets</a>
+                <a href="#" class="block px-3 py-2 rounded-lg text-base font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">Documentation</a>
+                <a href="#" class="block px-3 py-2 rounded-lg text-base font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">About</a>
+                {% if user.is_authenticated %}
+                    <div class="border-t border-white/10 pt-2 mt-2">
+                        <span class="block px-3 py-2 text-base font-medium text-white/80">Welcome, {{ user.username }}</span>
+                        <a href="{% url 'signout' %}" class="block px-3 py-2 rounded-lg text-base font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors duration-200">Sign Out</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const mobileMenuButton = document.querySelector('#main-nav button');
+        const mobileMenu = document.querySelector('#mobile-menu');
+        
+        mobileMenuButton.addEventListener('click', function() {
+            const isHidden = mobileMenu.style.display === 'none';
+            mobileMenu.style.display = isHidden ? 'block' : 'none';
+        });
+    });
+    </script>

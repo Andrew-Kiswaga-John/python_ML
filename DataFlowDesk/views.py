@@ -1,3 +1,32 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+from django.conf import settings
+from datetime import datetime
+from .models import Dataset, MLModel, DataPreprocessingLog, Profile
+from django.db.models.functions import TruncMonth
+from django.db.models import Avg
+from django.db import models
+import json
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
+from matplotlib.backends.backend_agg import FigureCanvas
+
+from django.conf import settings
+
+def fig_to_base64(fig):
+    """Convert matplotlib figure to base64 string"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
 from django.shortcuts import render
 from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
@@ -42,6 +71,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def index(request) :
+    return render( request, "index.html")
+
+
 @ensure_csrf_cookie
 def signin(request):
     if request.method == 'POST':
@@ -51,11 +85,342 @@ def signin(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return JsonResponse({'success': True})
+            return JsonResponse({'success': True, 'redirect_url': '/general_dashboard/'})
         else:
             return JsonResponse({'success': False, 'error': 'Invalid credentials'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+from django.shortcuts import render
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+from .models import Dataset, MLModel, DataPreprocessingLog, ModelResult
+from django.db.models.functions import TruncMonth
+
+import matplotlib.pyplot as plt
+import io
+import base64
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+
+def general_dashboard(request):
+    if not request.user.is_authenticated:
+        return redirect('signin')
+        
+    # Get all datasets for the current user
+    datasets = Dataset.objects.filter(user=request.user)
+    
+    # Basic Statistics
+    total_datasets = datasets.count()
+    clean_datasets = datasets.filter(status='processed').count()
+    unclean_datasets = total_datasets - clean_datasets
+    total_models = MLModel.objects.count()
+    
+    # Calculate percentages
+    clean_datasets_percentage = (clean_datasets / total_datasets * 100) if total_datasets > 0 else 0
+    unclean_datasets_percentage = (unclean_datasets / total_datasets * 100) if total_datasets > 0 else 0
+    
+    # Calculate usage percentage for each dataset
+    for dataset in datasets:
+        usage_count = MLModel.objects.filter(dataset=dataset).count()
+        max_usage = MLModel.objects.count() or 1  # Avoid division by zero
+        dataset.usage_percentage = (usage_count / max_usage) * 100
+    
+    # Get current and previous month for comparison
+    current_date = timezone.now()
+    current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+    
+    # Dataset categories analysis (current month)
+    current_month_stats = {
+        'Diagnostic Imaging': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='diagnostic imaging'
+        ).count(),
+        'Data.Gov': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='data.gov'
+        ).count(),
+        'Image Net': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='image net'
+        ).count(),
+        'MNIST': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='mnist'
+        ).count(),
+        'MHLDDS': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='mhldds'
+        ).count(),
+        'HES': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='hes'
+        ).count(),
+    }
+
+    # Previous month statistics using the same categories
+    previous_month_stats = {}
+    for category, _ in current_month_stats.items():
+        previous_month_stats[category] = datasets.filter(
+            uploaded_at__gte=previous_month_start,
+            uploaded_at__lt=current_month_start,
+            description__icontains=category.lower()
+        ).count()
+    
+    # Quality and Completeness Analysis
+    last_6_months = current_date - timedelta(days=180)
+    monthly_stats = datasets.filter(
+        uploaded_at__gte=last_6_months
+    ).annotate(
+        month=TruncMonth('uploaded_at')
+    ).values('month').annotate(
+        total=Count('id'),
+        clean=Count('id', filter=models.Q(status='processed'))
+    ).order_by('month')
+    
+    quality_labels = []
+    completeness_data = []
+    quality_data = []
+    
+    for stat in monthly_stats:
+        quality_labels.append(stat['month'].strftime('%b %Y'))
+        total = stat['total']
+        clean = stat['clean']
+        completeness = (clean / total * 100) if total > 0 else 0
+        quality = completeness * 0.8  # Simplified quality metric
+        completeness_data.append(completeness)
+        quality_data.append(quality)
+    
+    # Generate matplotlib visualizations
+    plt.style.use('fivethirtyeight')  # Using a built-in style
+    
+    # Set global font size
+    plt.rcParams.update({'font.size': 10})
+    
+    # 1. Missing Values Bar Chart
+    missing_data = datasets.filter(status='processed').count()
+    total_data = datasets.count()
+    
+    fig_missing = plt.figure(figsize=(10, 6))
+    plt.bar(['Complete Data', 'Missing Data'], 
+           [total_data - missing_data, missing_data],
+           color=['#10B981', '#EF4444'])
+    plt.title('Data Completeness Overview', pad=20)
+    plt.ylabel('Number of Datasets')
+    for i, v in enumerate([total_data - missing_data, missing_data]):
+        plt.text(i, v, str(v), ha='center', va='bottom')
+    plt.tight_layout()
+    dataset_dist_plot = fig_to_base64(fig_missing)
+    plt.close(fig_missing)
+    
+    # 2. Data Types Distribution Pie Chart
+    fig_types = plt.figure(figsize=(10, 6))
+    data_types = {
+        'CSV Files': datasets.filter(file_path__endswith='.csv').count(),
+        'Excel Files': datasets.filter(file_path__endswith='.xlsx').count() + 
+                      datasets.filter(file_path__endswith='.xls').count(),
+        'Text Files': datasets.filter(file_path__endswith='.txt').count(),
+    }
+    
+    plt.pie(data_types.values(), 
+           labels=data_types.keys(),
+           autopct='%1.1f%%',
+           colors=['#4F46E5', '#10B981', '#F59E0B'],
+           explode=[0.05] * len(data_types))
+    plt.title('Dataset Types Distribution', pad=20)
+    plt.tight_layout()
+    quality_trend_plot = fig_to_base64(fig_types)
+    plt.close(fig_types)
+    
+    # Dataset Usage Statistics
+    datasets_usage = []
+    for dataset in datasets:
+        usage_count = MLModel.objects.filter(dataset=dataset).count()
+        if usage_count > 0:
+            datasets_usage.append({
+                'title': dataset.name,
+                'usage_percentage': min((usage_count / total_datasets * 100), 100),
+                'count': usage_count
+            })
+    
+    # Sort datasets_usage by count in descending order
+    datasets_usage = sorted(datasets_usage, key=lambda x: x['count'], reverse=True)[:10]
+    
+    # 3. Dataset Usage Heatmap
+    if datasets_usage:
+        usage_data = [[d['usage_percentage']] for d in datasets_usage[:8]]
+        labels = [d['title'] for d in datasets_usage[:8]]
+        
+        fig_heatmap = plt.figure(figsize=(12, 4))
+        plt.imshow([usage_data[0]], cmap='YlOrRd', aspect='auto')
+        plt.colorbar(label='Usage %')
+        plt.yticks(range(len(labels)), labels)
+        plt.xticks([])  # Hide x-axis ticks
+        plt.title('Dataset Usage Intensity', pad=20)
+        plt.tight_layout()
+        usage_heatmap = fig_to_base64(fig_heatmap)
+        plt.close(fig_heatmap)
+    else:
+        usage_heatmap = None
+    
+    # 4. Processing Status Donut Chart
+    fig_status = plt.figure(figsize=(8, 8))
+    colors = ['#10B981', '#EF4444']
+    plt.pie([clean_datasets, unclean_datasets], 
+           labels=['Clean', 'Unclean'], 
+           autopct='%1.1f%%',
+           colors=colors,
+           wedgeprops=dict(width=0.5, edgecolor='white'),
+           textprops={'color': '#374151', 'fontsize': 12})
+    plt.title('Dataset Processing Status', pad=20)
+    processing_status_plot = fig_to_base64(fig_status)
+    plt.close(fig_status)
+    
+    # Calculate average completeness and quality
+    avg_completeness = sum(completeness_data) / len(completeness_data) if completeness_data else 0
+    avg_quality = sum(quality_data) / len(quality_data) if quality_data else 0
+    
+    # Model Performance Metrics (average across all models)
+    model_metrics = MLModel.objects.all()
+    model_performance = [0, 0, 0, 0, 0]  # Default values
+    
+    if model_metrics.exists():
+        total_models = 0
+        accuracy_sum = 0
+        precision_sum = 0
+        recall_sum = 0
+        f1_sum = 0
+        roc_auc_sum = 0
+        
+        for model in model_metrics:
+            if model.results:  # Check if results exist
+                try:
+                    results = model.results
+                    if isinstance(results, str):
+                        results = json.loads(results)
+                    
+                    # Extract metrics from results
+                    accuracy_sum += float(results.get('accuracy', 0))
+                    precision_sum += float(results.get('precision', 0))
+                    recall_sum += float(results.get('recall', 0))
+                    f1_sum += float(results.get('f1_score', 0))
+                    roc_auc_sum += float(results.get('roc_auc', 0))
+                    total_models += 1
+                except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
+                    continue
+        
+        # Calculate averages if we have valid models
+        if total_models > 0:
+            model_performance = [
+                (accuracy_sum / total_models) * 100,
+                (precision_sum / total_models) * 100,
+                (recall_sum / total_models) * 100,
+                (f1_sum / total_models) * 100,
+                (roc_auc_sum / total_models) * 100
+            ]
+    
+    # Recent Activities
+    recent_activities = []
+    
+    # Dataset activities
+    dataset_activities = datasets.order_by('-uploaded_at')[:5]
+    for dataset in dataset_activities:
+        recent_activities.append({
+            'timestamp': dataset.uploaded_at,
+            'description': f'Dataset "{dataset.name}" was uploaded'
+        })
+    
+    # Model training activities
+    model_activities = MLModel.objects.order_by('-created_at')[:5]
+    for model in model_activities:
+        recent_activities.append({
+            'timestamp': model.created_at,
+            'description': f'this model was trained on dataset "{model.dataset.name}"'
+        })
+    
+    # Sort activities by timestamp
+    recent_activities = sorted(recent_activities, key=lambda x: x['timestamp'], reverse=True)[:5]
+    
+   # Get trained models data
+    trained_models = MLModel.objects.filter(dataset__user=request.user).select_related('dataset').order_by('-created_at')
+    models_data = []
+    
+    for model in trained_models:
+        # Get all results for this model
+        model_results = ModelResult.objects.filter(
+            model=model
+        ).order_by('-generated_at')
+
+        # Create a dictionary to store all metrics
+        metrics = {}
+        for result in model_results:
+            metrics[result.metric_name.lower()] = result.metric_value
+
+        model_data = {
+            'id': model.id,
+            'name': model.algorithm,
+            'dataset_name': model.dataset.name,
+            'dataset_id': model.dataset.id,
+            'type': 'classification' if 'class' in model.algorithm.lower() else 'regression',
+            'created_at': model.created_at,
+            'accuracy': metrics.get('accuracy', None),  # Get accuracy if it exists
+            'precision': metrics.get('precision', None),
+            'recall': metrics.get('recall', None),
+            'f1_score': metrics.get('f1_score', None)
+        }
+        models_data.append(model_data)
+
+    # Group models by dataset
+    dataset_results = {}
+    for model_data in models_data:
+        dataset_id = model_data['dataset_id']
+        if dataset_id not in dataset_results:
+            dataset_results[dataset_id] = {
+                'dataset_name': model_data['dataset_name'],
+                'models': []
+            }
+        dataset_results[dataset_id]['models'].append(model_data)
+    
+    context = {
+        'datasets': datasets,
+        'total_datasets': total_datasets,
+        'clean_datasets': clean_datasets,
+        'unclean_datasets': unclean_datasets,
+        'total_models': total_models,
+        'clean_datasets_percentage': round(clean_datasets_percentage, 1),
+        'unclean_datasets_percentage': round(unclean_datasets_percentage, 1),
+        'completeness': round(avg_completeness, 1),
+        'quality': round(avg_quality, 1),
+        'datasets_analysis_current': list(current_month_stats.values()),
+        'datasets_analysis_previous': list(previous_month_stats.values()),
+        'quality_labels': quality_labels,
+        'completeness_data': completeness_data,
+        'quality_data': quality_data,
+        'datasets_usage': datasets_usage,
+        'dataset_dist_plot': dataset_dist_plot,
+        'quality_trend_plot': quality_trend_plot,
+        'usage_heatmap': usage_heatmap,
+        'processing_status_plot': processing_status_plot,
+        'model_performance': model_performance,
+        'recent_activities': recent_activities,
+        'trained_models': models_data,
+        'dataset_results': dataset_results,
+        'trained_models': models_data,
+    }
+    
+    return render(request, "general_dashboard.html", context)
+
+
+def fig_to_base64(fig):
+    """Convert matplotlib figure to base64 string"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
 
 @ensure_csrf_cookie
 def signup(request):
@@ -79,19 +444,11 @@ def signup(request):
             if user is not None:
                 login(request, user)
             
-            return JsonResponse({'success': True})
+            return JsonResponse({'success': True, 'redirect_url': '/general_dashboard/'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
-
-
-def generate_plot_base64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
-    buf.seek(0)
-    plt.close(fig)  # Close the figure to free memory
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 
 def dashboard(request,dataset_id):
@@ -166,19 +523,21 @@ def dashboard(request,dataset_id):
 
         
         # Create target class distribution plot
-        plt.figure(figsize=(8, 6))
+        plt.style.use('fivethirtyeight')
+        fig = plt.figure(figsize=(8, 6))
         target_column = dataset.target_class  # Get the actual target column name
-        target_counts = data[target_column].value_counts()
-        sns.barplot(x=target_counts.index, y=target_counts.values)
-        plt.title(f'Distribution of {target_column}')
-        plt.xlabel(target_column)
-        plt.ylabel('Count')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        # Convert plot to base64 string
-        target_dist_plot = generate_plot_base64(plt.gcf())
-        plt.close()
+        if target_column and target_column in data.columns:
+            target_counts = data[target_column].value_counts()
+            plt.bar(range(len(target_counts)), target_counts.values, alpha=0.7)
+            plt.xticks(range(len(target_counts)), target_counts.index, rotation=45)
+            plt.title(f'Distribution of {target_column}', pad=20)
+            plt.xlabel(target_column)
+            plt.ylabel('Count')
+            plt.tight_layout()
+            target_dist_plot = fig_to_base64(fig)
+            plt.close(fig)
+        else:
+            target_dist_plot = None
 
         return render(request, 'dashboard.html', {
             'dataset': dataset,
@@ -237,7 +596,6 @@ from django.conf import settings
 import os
 import csv
 from datetime import datetime
-from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Dataset
@@ -251,7 +609,7 @@ def create_dataset_step2(request):
             # Get all the form data
             data = request.POST.getlist('data')
             dataset_meta = json.loads(request.POST.get('dataset_meta', '{}'))
-            
+            target_class = request.POST.get('target_class')  # Get target class from form
             if not dataset_meta:
                 return JsonResponse({"error": "Missing dataset metadata"}, status=400)
 
@@ -327,6 +685,7 @@ def create_dataset_step2(request):
                 description=dataset_meta.get('description', ''),
                 file_path=file_path,  # Path relative to MEDIA_ROOT
                 columns_info=columns,
+                target_class=target_class,
                 status="uploaded"
             )
 
@@ -511,216 +870,33 @@ from django.shortcuts import render, get_object_or_404
 
 
 
+import os
+import io
+import json
+import base64
+import logging
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from datetime import datetime
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .models import Dataset
+
+
 @csrf_exempt
-def display_graphs(request, dataset_id=None):
-    if request.method == 'GET':
-        try:
-            dataset = Dataset.objects.get(pk=dataset_id)
-            return render(request, 'display_graphs.html', {'dataset': dataset})
-        except Dataset.DoesNotExist:
-            return render(request, 'display_graphs.html', {'error': 'Dataset not found'})
-
-    if request.method == 'POST':
-        logging.debug('POST request received for display_graphs')
-        try:
-            dataset_id = request.POST.get('dataset_id')
-            logging.debug(f'Dataset ID: {dataset_id}')
-            if not dataset_id:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No dataset ID provided'
-                })
-
-            try:
-                dataset_id = int(dataset_id)
-            except ValueError:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Invalid dataset ID format'
-                })
-
-            x_column = request.POST.get('x_column')
-            y_column = request.POST.get('y_column')
-            logging.debug(f'X Column: {x_column}, Y Column: {y_column}')
-            
-            if not x_column or not y_column:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Both X and Y columns must be provided'
-                })
-
-            try:
-                dataset = Dataset.objects.get(pk=dataset_id)
-            except Dataset.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Dataset with ID {dataset_id} not found'
-                })
-
-            # Read from cleaned file if available, otherwise from original file
-            try:
-                if dataset.cleaned_file:
-                    file_path = dataset.cleaned_file.path
-                elif dataset.file_path:
-                    file_path = dataset.file_path.path
-
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'No file found for this dataset'
-                    })
-
-                try:
-                    df = pd.read_csv(file_path)
-                except UnicodeDecodeError:
-                    # Try with different encoding if UTF-8 fails
-                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
-                except Exception as e:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Error reading file: {str(e)}'
-                    })
-
-                plt.figure(figsize=(12, 8))
-                plt.clf()
-                
-                # Get user choice for graph type
-                user_choice = request.POST.get('graph_type', 'bar_chart')
-                logging.debug(f'User choice for graph type: {user_choice}')
-
-                try:
-                    x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
-                    y_is_count = y_column == 'count'
-                    logging.debug(f'X is categorical: {x_is_cat}, Y is count: {y_is_count}')
-
-                    if y_is_count:
-                        # Handle count visualization
-                        value_counts = df[x_column].value_counts()
-                        if user_choice == 'pie_chart' and len(value_counts) <= 10:
-                            plt.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%')
-                            plt.axis('equal')
-                        else:  # Default to bar chart for counts
-                            plt.figure(figsize=(12, 6))
-                            value_counts.plot(kind='bar')
-                            plt.title(f'Count of {x_column}', pad=20, size=14)
-                            plt.xlabel(x_column, size=12)
-                            plt.ylabel('Count', size=12)
-                    else:
-                        if user_choice == 'box_plot' and not x_is_cat and not y_is_cat:
-                            sns.boxplot(x=x_column, y=y_column, data=df)
-                        elif user_choice == 'line_chart' and not x_is_cat and not y_is_cat:
-                            plt.plot(df[x_column], df[y_column], marker='o')
-                            plt.xticks(rotation=45)
-                        elif user_choice == 'scatter_chart' and not x_is_cat and not y_is_cat:
-                            sns.scatterplot(x=x_column, y=y_column, data=df)
-                        elif user_choice == 'histogram' and not y_is_cat:
-                            df[y_column].hist(bins=30)
-                            plt.xlabel(y_column)
-                            plt.ylabel('Frequency')
-                        elif user_choice == 'bar_chart':
-                            if x_is_cat:
-                                sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
-                                plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
-                            else:
-                                df[y_column].value_counts().plot(kind='bar')
-                        elif user_choice == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 5:
-                            plt.pie(df.groupby(x_column)[y_column].sum(), labels=df[x_column].unique(), autopct='%1.1f%%')
-                            plt.axis('equal')
-                        else:
-                            # Default to bar chart if invalid selection
-                            logging.debug('Invalid selection, defaulting to bar chart')
-                            sns.barplot(x=x_column, y=y_column, data=df, errorbar=None, palette='viridis', hue=x_column, dodge=False)
-                            plt.legend([],[], frameon=False)  # Hide the legend since hue is used for color
-                except Exception as e:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Error creating plot: {str(e)}'
-                    })
-                
-                plt.title(f'{y_column} vs {x_column}', pad=20, size=14)
-                plt.xlabel(x_column, size=12)
-                plt.ylabel(y_column, size=12)
-                plt.xticks(rotation=45, ha='right')
-                plt.grid(True, alpha=0.3)
-                plt.tight_layout()
-                
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png')
-                buffer.seek(0)
-                image_png = buffer.getvalue()
-                buffer.close()  # Close the figure to free memory
-                
-                graphic = base64.b64encode(image_png).decode('utf-8')
-                
-                return JsonResponse({
-                    'success': True,
-                    'graphic': graphic
-                })
-
-            except Exception as e:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error processing dataset: {str(e)}'
-                })
-
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Unexpected error: {str(e)}'
-            })
-    
-    # For GET request
-    try:
-        if dataset_id:
-            dataset = get_object_or_404(Dataset, id=dataset_id)
-            try:
-                if dataset.cleaned_file:
-                    file_path = dataset.cleaned_file.path
-                elif dataset.file_path:
-                    file_path = dataset.file_path.path
-                else:
-                    return render(request, 'display_graphs.html', {
-                        'datasets': Dataset.objects.all(),
-                        'error': 'No file found for this dataset'
-                    })
-
-                try:
-                    df = pd.read_csv(file_path)
-                except UnicodeDecodeError:
-                    df = pd.read_csv(file_path, encoding='ISO-8859-1')
-                
-                # Get plottable columns
-                plottable_columns = [col for col in df.columns if not (
-                    df[col].dtype == 'object' and df[col].str.len().mean() > 50
-                )]
-                
-                context = {
-                    'datasets': Dataset.objects.all(),
-                    'current_dataset': dataset,
-                    'columns': plottable_columns,
-                    'dataset_id': dataset_id
-                }
-            except Exception as e:
-                context = {
-                    'datasets': Dataset.objects.all(),
-                    'error': str(e)
-                }
-        else:
-            context = {
-                'datasets': Dataset.objects.all()
-            }
-        
-        return render(request, 'display_graphs.html', context)
-    except Exception as e:
-        return render(request, 'display_graphs.html', {
-            'datasets': Dataset.objects.all(),
-            'error': str(e)
-        })
-
 def get_columns_graphs(request):
+    logging.debug(f"get_columns_graphs called with request.GET: {request.GET}")  # Add debug logging
+    
     try:
-        dataset_id = request.GET.get('dataset_id')
+        # Check both GET and POST for dataset_id
+        dataset_id = request.GET.get('dataset_id') or request.POST.get('dataset_id')
+        logging.debug(f"Received dataset_id: {dataset_id}")  # Debug log
+        
         if not dataset_id:
+            logging.warning("No dataset ID provided")  # Warning log
             return JsonResponse({
                 'success': False,
                 'error': 'No dataset ID provided'
@@ -730,6 +906,7 @@ def get_columns_graphs(request):
         try:
             dataset_id = int(dataset_id)
         except ValueError:
+            logging.error(f"Invalid dataset ID format: {dataset_id}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid dataset ID format'
@@ -737,7 +914,9 @@ def get_columns_graphs(request):
             
         try:
             dataset = Dataset.objects.get(pk=dataset_id)
+            logging.debug(f"Found dataset: {dataset.name}")  # Debug log
         except Dataset.DoesNotExist:
+            logging.error(f"Dataset not found with ID: {dataset_id}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': f'Dataset with ID {dataset_id} not found'
@@ -747,46 +926,539 @@ def get_columns_graphs(request):
         try:
             if dataset.cleaned_file:
                 file_path = dataset.cleaned_file.path
+                logging.debug(f"Using cleaned file: {file_path}")  # Debug log
             elif dataset.file_path:
                 file_path = dataset.file_path.path
+                logging.debug(f"Using original file: {file_path}")  # Debug log
             else:
+                logging.error("No file found for dataset")  # Error log
                 return JsonResponse({
                     'success': False,
                     'error': 'No file found for this dataset'
                 })
                 
             try:
-                df = pd.read_csv(file_path)
-            except UnicodeDecodeError:
-                # Try with different encoding if UTF-8 fails
-                df = pd.read_csv(file_path, encoding='ISO-8859-1')
+                # Try different encodings
+                encodings = ['utf-8', 'ISO-8859-1', 'latin1']
+                df = None
+                last_error = None
+                
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding, low_memory=False)
+                        logging.debug(f"Successfully read file with encoding: {encoding}")  # Debug log
+                        break
+                    except UnicodeDecodeError:
+                        last_error = f"Failed to read with encoding: {encoding}"
+                        continue
+                    except Exception as e:
+                        last_error = str(e)
+                        break
+                
+                if df is None:
+                    raise Exception(f"Failed to read file with any encoding. Last error: {last_error}")
+                
             except Exception as e:
+                logging.error(f"Error reading file: {str(e)}")  # Error log
                 return JsonResponse({
                     'success': False,
                     'error': f'Error reading file: {str(e)}'
                 })
             
-            # Filter out text-heavy columns
-            columns = [col for col in df.columns if not (
-                df[col].dtype == 'object' and df[col].str.len().mean() > 50
-            )]
+            # Filter out text-heavy columns and get column types
+            columns = []
+            column_types = {}
+            
+            for col in df.columns:
+                try:
+                    if df[col].dtype == 'object':
+                        # Check if it's a text-heavy column
+                        if df[col].str.len().mean() <= 50:
+                            columns.append(col)
+                            column_types[col] = 'categorical'
+                    else:
+                        columns.append(col)
+                        column_types[col] = 'numerical' if pd.api.types.is_numeric_dtype(df[col]) else 'other'
+                except Exception as e:
+                    logging.warning(f"Error processing column {col}: {str(e)}")
+                    continue
+            
+            logging.debug(f"Found columns: {columns}")  # Debug log
             
             return JsonResponse({
                 'success': True,
-                'columns': columns
+                'columns': columns,
+                'column_types': column_types
             })
             
         except Exception as e:
+            logging.error(f"Error accessing file: {str(e)}")  # Error log
             return JsonResponse({
                 'success': False,
                 'error': f'Error accessing file: {str(e)}'
             })
             
     except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")  # Error log
         return JsonResponse({
             'success': False,
             'error': str(e)
         })
+
+
+import os
+import io
+import json
+import base64
+import logging
+from datetime import datetime
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .models import Dataset
+
+@csrf_exempt
+def display_graphs(request, dataset_id=None):
+    logging.debug(f"display_graphs called with dataset_id: {dataset_id}")
+    
+    if not dataset_id:
+        return render(request, 'display_graphs.html', {
+            'error': 'No dataset ID provided'
+        })
+
+    try:
+        dataset = get_object_or_404(Dataset, id=dataset_id)
+        logging.debug(f"Found dataset: {dataset.name}")
+
+        if request.method == 'POST':
+            logging.debug('Processing POST request for graph generation')
+            try:
+                # Validate POST data
+                x_column = request.POST.get('x_column')
+                y_column = request.POST.get('y_column')
+                graph_type = request.POST.get('graph_type', 'bar_chart')
+                
+                logging.debug(f'Parameters - X: {x_column}, Y: {y_column}, Type: {graph_type}')
+                
+                if not x_column:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'X-axis column must be provided'
+                    })
+
+                if graph_type != 'histogram' and not y_column:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Y-axis column must be provided for non-histogram graphs'
+                    })
+
+                # Get file path
+                if dataset.cleaned_file:
+                    file_path = dataset.cleaned_file.path
+                elif dataset.file_path:
+                    file_path = dataset.file_path.path
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No file found for this dataset'
+                    })
+
+                # Read dataset with multiple encoding attempts
+                encodings = ['utf-8', 'ISO-8859-1', 'latin1']
+                df = None
+                last_error = None
+
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding, low_memory=False)
+                        logging.debug(f"Successfully read file with encoding: {encoding}")
+                        break
+                    except UnicodeDecodeError:
+                        last_error = f"Failed to read with encoding: {encoding}"
+                        continue
+                    except Exception as e:
+                        last_error = str(e)
+                        break
+
+                if df is None:
+                    raise Exception(f"Failed to read file with any encoding. Last error: {last_error}")
+
+                try:
+                    # Determine column types
+                    x_is_cat = df[x_column].dtype == 'object' or len(df[x_column].unique()) <= 10
+                    y_is_count = y_column == 'count'
+                    y_is_cat = False if y_is_count else (df[y_column].dtype == 'object' or len(df[y_column].unique()) <= 10)
+
+                    logging.debug(f'Column types - X categorical: {x_is_cat}, Y count: {y_is_count}, Y categorical: {y_is_cat}')
+
+                    # Set style with a valid style name
+                    plt.style.use('default')
+                    
+                    # Create figure with a white background
+                    plt.figure(figsize=(12, 8), facecolor='white')
+                    plt.clf()
+
+                    # Set the color palette
+                    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+                    
+                    if y_is_count:
+                        # Handle count visualization
+                        value_counts = df[x_column].value_counts()
+                        if graph_type == 'pie_chart' and len(value_counts) <= 10:
+                            plt.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%', 
+                                  colors=colors[:len(value_counts)])
+                            plt.title(f'Distribution of {x_column}', pad=20, size=14)
+                            plt.axis('equal')
+                        else:
+                            ax = value_counts.plot(kind='bar', color=colors[0])
+                            plt.title(f'Count of {x_column}', pad=20, size=14)
+                            plt.xlabel(x_column, size=12)
+                            plt.ylabel('Count', size=12)
+                            
+                            # Add value labels on top of bars
+                            for i, v in enumerate(value_counts):
+                                ax.text(i, v, str(v), ha='center', va='bottom')
+                    else:
+                        if graph_type == 'box_plot' and not x_is_cat and not y_is_cat:
+                            sns.boxplot(x=x_column, y=y_column, data=df, color=colors[0])
+                            plt.title(f'Box Plot of {y_column} by {x_column}', pad=20, size=14)
+                        
+                        elif graph_type == 'line_chart' and not x_is_cat and not y_is_cat:
+                            plt.plot(df[x_column], df[y_column], marker='o', color=colors[0])
+                            plt.title(f'Line Chart of {y_column} vs {x_column}', pad=20, size=14)
+                            plt.xticks(rotation=45)
+                        
+                        elif graph_type == 'scatter_chart' and not x_is_cat and not y_is_cat:
+                            plt.scatter(df[x_column], df[y_column], color=colors[0], alpha=0.5)
+                            plt.title(f'Scatter Plot of {y_column} vs {x_column}', pad=20, size=14)
+                        
+                        elif graph_type == 'histogram':
+                            plt.hist(df[x_column], bins=30, color=colors[0], alpha=0.7)
+                            plt.title(f'Histogram of {x_column}', pad=20, size=14)
+                            plt.xlabel(x_column)
+                            plt.ylabel('Frequency')
+                        
+                        elif graph_type == 'bar_chart':
+                            if x_is_cat:
+                                ax = sns.barplot(x=x_column, y=y_column, data=df, color=colors[0])
+                                plt.title(f'Bar Chart of {y_column} by {x_column}', pad=20, size=14)
+                                
+                                # Add value labels on top of bars
+                                for i in ax.containers:
+                                    ax.bar_label(i, padding=3)
+                            else:
+                                ax = df[y_column].value_counts().plot(kind='bar', color=colors[0])
+                                plt.title(f'Bar Chart of {y_column}', pad=20, size=14)
+                                
+                                # Add value labels
+                                for i, v in enumerate(df[y_column].value_counts()):
+                                    ax.text(i, v, str(v), ha='center', va='bottom')
+                        
+                        elif graph_type == 'pie_chart' and x_is_cat and len(df[x_column].unique()) <= 10:
+                            grouped_data = df.groupby(x_column)[y_column].sum()
+                            plt.pie(grouped_data, labels=grouped_data.index, autopct='%1.1f%%',
+                                  colors=colors[:len(grouped_data)])
+                            plt.title(f'Pie Chart of {y_column} by {x_column}', pad=20, size=14)
+                            plt.axis('equal')
+                        
+                        else:
+                            logging.debug('Invalid selection, defaulting to bar chart')
+                            ax = sns.barplot(x=x_column, y=y_column, data=df, color=colors[0])
+                            plt.title(f'Bar Chart of {y_column} by {x_column}', pad=20, size=14)
+                            
+                            # Add value labels
+                            for i in ax.containers:
+                                ax.bar_label(i, padding=3)
+
+                    # Common plot settings
+                    plt.xlabel(x_column, size=12)
+                    plt.ylabel(y_column if not y_is_count else 'Count', size=12)
+                    plt.xticks(rotation=45, ha='right')
+                    plt.grid(True, alpha=0.3)
+                    
+                    # Adjust layout to prevent label cutoff
+                    plt.tight_layout()
+
+                    # Save plot to buffer
+                    buffer = io.BytesIO()
+                    plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight', 
+                              facecolor='white', edgecolor='none')
+                    buffer.seek(0)
+                    image_png = buffer.getvalue()
+                    buffer.close()
+                    plt.close('all')  # Close all figures to free memory
+
+                    # Convert to base64
+                    graphic = base64.b64encode(image_png).decode('utf-8')
+
+                    return JsonResponse({
+                        'success': True,
+                        'graphic': graphic
+                    })
+
+                except Exception as e:
+                    logging.error(f'Error creating plot: {str(e)}')
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error creating plot: {str(e)}'
+                    })
+
+            except Exception as e:
+                logging.error(f'Error processing POST request: {str(e)}')
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        # Handle GET request
+        try:
+            # Get file path
+            if dataset.cleaned_file:
+                file_path = dataset.cleaned_file.path
+            elif dataset.file_path:
+                file_path = dataset.file_path.path
+            else:
+                return render(request, 'display_graphs.html', {
+                    'error': 'No file found for this dataset',
+                    'dataset': dataset,
+                    'dataset_id': dataset_id
+                })
+
+            # Read dataset
+            try:
+                df = pd.read_csv(file_path, low_memory=False)
+            except UnicodeDecodeError:
+                df = pd.read_csv(file_path, encoding='ISO-8859-1', low_memory=False)
+
+            # Get plottable columns
+            plottable_columns = []
+            column_types = {}
+
+            for col in df.columns:
+                try:
+                    if df[col].dtype == 'object':
+                        if df[col].str.len().mean() <= 50:
+                            plottable_columns.append(col)
+                            column_types[col] = 'categorical'
+                    else:
+                        plottable_columns.append(col)
+                        column_types[col] = 'numerical' if pd.api.types.is_numeric_dtype(df[col]) else 'other'
+                except Exception as e:
+                    logging.warning(f"Error processing column {col}: {str(e)}")
+                    continue
+
+            # Sort saved graphs
+            saved_graphs = sorted(dataset.graphs, key=lambda x: x.get('created_at', ''), reverse=True) if dataset.graphs else []
+
+            context = {
+                'dataset': dataset,
+                'dataset_id': dataset_id,
+                'columns': plottable_columns,
+                'column_types': column_types,
+                'saved_graphs': saved_graphs,
+                'graph_types': [
+                    ('bar_chart', 'Bar Chart'),
+                    ('line_chart', 'Line Chart'),
+                    ('scatter_chart', 'Scatter Plot'),
+                    ('pie_chart', 'Pie Chart'),
+                    ('histogram', 'Histogram'),
+                    ('box_plot', 'Box Plot')
+                ]
+            }
+
+            return render(request, 'display_graphs.html', context)
+
+        except Exception as e:
+            logging.error(f"Error preparing display context: {str(e)}")
+            return render(request, 'display_graphs.html', {
+                'error': str(e),
+                'dataset': dataset,
+                'dataset_id': dataset_id
+            })
+
+    except Dataset.DoesNotExist:
+        logging.error(f"Dataset not found with ID: {dataset_id}")
+        return render(request, 'display_graphs.html', {
+            'error': f'Dataset with ID {dataset_id} not found'
+        })
+    except Exception as e:
+        logging.error(f"Unexpected error in display_graphs: {str(e)}")
+        return render(request, 'display_graphs.html', {
+            'error': str(e)
+        })
+    
+
+@csrf_exempt
+def save_graph(request):
+    logging.debug("save_graph view called")
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Only POST method is allowed'
+        })
+
+    try:
+        # Get and validate required parameters
+        graph_data = request.POST.get('graph_image')
+        dataset_id = request.POST.get('dataset_id')
+        x_column = request.POST.get('x_column')
+        y_column = request.POST.get('y_column')
+        graph_type = request.POST.get('graph_type')
+
+        logging.debug(f"Received parameters - Dataset ID: {dataset_id}, X: {x_column}, Y: {y_column}, Type: {graph_type}")
+
+        # Validate required fields
+        if not all([graph_data, dataset_id, x_column, graph_type]):
+            missing_fields = []
+            if not graph_data: missing_fields.append('graph_image')
+            if not dataset_id: missing_fields.append('dataset_id')
+            if not x_column: missing_fields.append('x_column')
+            if not graph_type: missing_fields.append('graph_type')
+            
+            return JsonResponse({
+                'success': False,
+                'error': f'Missing required fields: {", ".join(missing_fields)}'
+            })
+
+        # Validate dataset_id format
+        try:
+            dataset_id = int(dataset_id)
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid dataset ID format'
+            })
+
+        # Get dataset
+        try:
+            dataset = Dataset.objects.get(pk=dataset_id)
+            logging.debug(f"Found dataset: {dataset.name}")
+        except Dataset.DoesNotExist:
+            logging.error(f"Dataset not found with ID: {dataset_id}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Dataset not found'
+            })
+
+        # Generate timestamp and clean filename components
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Clean filename components to remove special characters
+        def clean_filename(s):
+            return "".join(c for c in s if c.isalnum() or c in ('-', '_')).lower()
+
+        x_column_clean = clean_filename(x_column)
+        y_column_clean = clean_filename(y_column) if y_column else 'count'
+        graph_type_clean = clean_filename(graph_type)
+
+        # Create filename and paths
+        filename = f"graph_{dataset_id}_{graph_type_clean}_{x_column_clean}_vs_{y_column_clean}_{timestamp}.png"
+        relative_path = f'datasets/graphs/{filename}'
+        
+        # Ensure media directories exist
+        graphs_dir = os.path.join(settings.MEDIA_ROOT, 'datasets', 'graphs')
+        os.makedirs(graphs_dir, exist_ok=True)
+        
+        file_path = os.path.join(graphs_dir, filename)
+        logging.debug(f"Saving graph to: {file_path}")
+
+        # Process and save the image
+        try:
+            # Remove data URL prefix if present
+            if 'base64,' in graph_data:
+                graph_data = graph_data.split('base64,')[1]
+
+            # Decode and save the image
+            try:
+                image_data = base64.b64decode(graph_data)
+            except Exception as e:
+                logging.error(f"Error decoding base64 data: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid image data'
+                })
+
+            # Save the file
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
+
+            # Verify file was saved
+            if not os.path.exists(file_path):
+                raise Exception("File was not saved successfully")
+
+            # Create graph info dictionary
+            graph_info = {
+                'file_path': relative_path,
+                'graph_type': graph_type,
+                'x_column': x_column,
+                'y_column': y_column,
+                'created_at': timestamp,
+                'file_size': os.path.getsize(file_path)
+            }
+
+            # Update dataset's graphs list
+            try:
+                graphs = dataset.graphs or []
+                graphs.append(graph_info)
+                
+                # Keep only the last 50 graphs to prevent excessive storage
+                if len(graphs) > 50:
+                    # Delete old graph files
+                    for old_graph in graphs[:-50]:
+                        old_file_path = os.path.join(settings.MEDIA_ROOT, old_graph['file_path'])
+                        try:
+                            if os.path.exists(old_file_path):
+                                os.remove(old_file_path)
+                        except Exception as e:
+                            logging.warning(f"Error deleting old graph file: {str(e)}")
+                    
+                    # Keep only the latest 50 graphs
+                    graphs = graphs[-50:]
+
+                dataset.graphs = graphs
+                dataset.save()
+                logging.debug("Dataset updated successfully")
+
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Graph saved successfully',
+                    'data': {
+                        'filename': filename,
+                        'file_path': relative_path,
+                        'created_at': timestamp
+                    }
+                })
+
+            except Exception as e:
+                # If there's an error saving to the database, delete the saved file
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as delete_error:
+                    logging.error(f"Error deleting file after database error: {str(delete_error)}")
+                
+                raise Exception(f"Error updating dataset: {str(e)}")
+
+        except Exception as e:
+            logging.error(f"Error saving graph: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Error saving graph: {str(e)}'
+            })
+
+    except Exception as e:
+        logging.error(f"Unexpected error in save_graph: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}'
+        })
+
 
 from io import StringIO
 from django.core.files.base import ContentFile
@@ -798,8 +1470,6 @@ from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
-from .models import *
-from django.core.files.storage import default_storage
 from datetime import datetime
 import json
 # from autoclean import autoclean
@@ -842,17 +1512,18 @@ def upload_file(request):
                 try:
                     if file.name.endswith('.csv'):
                         try:
-                            df = pd.read_csv(file, on_bad_lines='skip')  # Default UTF-8
+                            # Add low_memory=False to handle mixed types warning
+                            df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
                         except UnicodeDecodeError:
                             try:
-                                df = pd.read_csv(file, on_bad_lines='skip', encoding='ISO-8859-1')  # Fallback to Latin-1
+                                df = pd.read_csv(file, on_bad_lines='skip', encoding='ISO-8859-1', low_memory=False)
                             except Exception as e:
                                 return JsonResponse({'error': f'CSV File reading error: {str(e)}'}, status=400)
 
                         # Handle cases where the delimiter isn't a comma
-                        if df.empty or len(df.columns) == 1:  # Single-column issue
+                        if df.empty or len(df.columns) == 1:
                             try:
-                                df = pd.read_csv(file, delimiter=';')  # Try a semicolon
+                                df = pd.read_csv(file, delimiter=';', low_memory=False)
                             except Exception as e:
                                 return JsonResponse({'error': f'CSV Parsing Error with fallback delimiter: {str(e)}'}, status=400)
                     elif file.name.endswith('.xlsx'):
@@ -870,48 +1541,92 @@ def upload_file(request):
                 if not kaggle_link:
                     return JsonResponse({'error': 'No Kaggle link provided.'}, status=400)
 
-                # Extract dataset identifier from Kaggle link
-                dataset_id = '/'.join(kaggle_link.rstrip('/').split('/')[-2:])
-                datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
-                os.makedirs(datasets_dir, exist_ok=True)
-
-                # Use Kaggle API to download the dataset
                 try:
-                    import kaggle
-                    kaggle.api.dataset_download_files(dataset_id, path=datasets_dir, unzip=True)
+                    import requests
+                    import zipfile
+                    from urllib.parse import urlparse
+                    
+                    # Create datasets directory
+                    datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
+                    os.makedirs(datasets_dir, exist_ok=True)
+                    
+                    # Download to a temporary zip file
+                    zip_path = os.path.join(datasets_dir, 'temp_dataset.zip')
+                    
+                    # Download the file with proper headers
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                    }
+                    
+                    response = requests.get(kaggle_link, headers=headers, stream=True)
+                    response.raise_for_status()
+                    
+                    # Save the downloaded zip file
+                    with open(zip_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    
+                    # Extract the zip file
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        # List all files in the zip
+                        files = zip_ref.namelist()
+                        print(f"Files in zip: {files}")  # Debug log
+                        
+                        # Find the first CSV or Excel file
+                        data_file = None
+                        for file in files:
+                            if file.endswith(('.csv', '.xlsx', '.xls')):
+                                data_file = file
+                                break
+                        
+                        if not data_file:
+                            raise Exception("No CSV or Excel files found in the downloaded dataset")
+                        
+                        # Extract the file
+                        zip_ref.extract(data_file, datasets_dir)
+                        file_path = os.path.join(datasets_dir, data_file)
+
+                    # Load the dataset with low_memory=False
+                    try:
+                        if file_path.endswith('.csv'):
+                            df = pd.read_csv(file_path, low_memory=False)
+                        elif file_path.endswith(('.xls', '.xlsx')):
+                            df = pd.read_excel(file_path)
+                    except Exception as e:
+                        return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
+
+                    # Create a File object from the downloaded file
+                    with open(file_path, 'rb') as f:
+                        file = ContentFile(f.read())
+                        file.name = os.path.basename(file_path)
+
+                    # Clean up temporary files
+                    os.remove(zip_path)
+                    os.remove(file_path)
+
                 except Exception as e:
-                    return JsonResponse({'error': f'Error downloading dataset from Kaggle: {str(e)}'}, status=400)
-
-                # Locate the downloaded file
-                downloaded_files = [
-                    os.path.join(datasets_dir, f) for f in os.listdir(datasets_dir)
-                    if f.endswith('.csv') or f.endswith(('.xls', '.xlsx'))
-                ]
-                if not downloaded_files:
-                    return JsonResponse({'error': 'No valid CSV or Excel files found in the downloaded dataset.'}, status=400)
-
-                file_path = downloaded_files[0]  # Use the first valid file
-
-                # Load the dataset
-                try:
-                    if file_path.endswith('.csv'):
-                        df = pd.read_csv(file_path)
-                    elif file_path.endswith(('.xls', '.xlsx')):
-                        df = pd.read_excel(file_path)
-                except Exception as e:
-                    return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
-
-                # Create a File object from the downloaded file
-                with open(file_path, 'rb') as f:
-                    file = ContentFile(f.read())
-                    file.name = os.path.basename(file_path)
-
+                    return JsonResponse({'error': f'Error processing Kaggle dataset: {str(e)}'}, status=400)
             else:
                 return JsonResponse({'error': 'Invalid data source selected.'}, status=400)
 
-            # Validate that target_class exists in columns
-            if target_class not in df.columns:
-                return JsonResponse({'error': f'Selected target class "{target_class}" is not a valid column in the dataset'}, status=400)
+            # Clean column names and print them for debugging
+            df.columns = df.columns.str.strip()
+            print("Available columns:", list(df.columns))
+            print("Target class:", target_class)
+
+            # Case-insensitive column matching
+            column_map = {col.lower(): col for col in df.columns}
+            target_class_lower = target_class.lower()
+            
+            if target_class_lower in column_map:
+                # Use the original column name
+                target_class = column_map[target_class_lower]
+            else:
+                return JsonResponse({
+                    'error': f'Selected target class "{target_class}" is not a valid column. Available columns: {", ".join(df.columns)}'
+                }, status=400)
 
             # Save the dataset
             dataset = Dataset.objects.create(
@@ -951,16 +1666,37 @@ def clean_dataset(df, delete_header=False):
     """
     print("Starting dataset cleaning...")
     
-    # Keep track of categorical columns
+    # Store original column information
+    original_columns = df.columns.tolist()
+    
+    # Keep track of categorical columns and target column
     categorical_columns = []
+    target_column = None
 
     # If user wants to delete header
     if delete_header:
         print("Deleting header and using first data row as new header...")
+        
+        # Check if target_class exists and store its index if it does
+        target_column_index = None
+        new_target_column = None
+        if 'target_class' in df.columns:
+            target_column_index = df.columns.get_loc('target_class')
+            new_target_column = df.iloc[0, target_column_index]
+            print(f"Found target_class column at index {target_column_index}")
+        
         new_headers = df.iloc[0].values.tolist()
         df = df.iloc[1:].reset_index(drop=True)
         df.columns = new_headers
-        print("Header replaced with first data row.")
+        
+        # Store the column mapping information
+        df.attrs['original_columns'] = original_columns
+        if target_column_index is not None:
+            df.attrs['new_target_column'] = new_target_column
+            df.attrs['target_column_index'] = target_column_index
+            print(f"Header replaced with first data row. Target column renamed from 'target_class' to '{new_target_column}'")
+        else:
+            print("Header replaced with first data row. No target_class column found.")
 
     # Remove duplicates
     initial_rows = df.shape[0]
@@ -968,18 +1704,29 @@ def clean_dataset(df, delete_header=False):
     removed_duplicates = initial_rows - df.shape[0]
     print(f"Removed {removed_duplicates} duplicate rows.")
 
+    # First identify if we have a class or target_class column
+    target_column = None
+    if 'class' in df.columns:
+        target_column = 'class'
+    elif 'target_class' in df.columns:
+        target_column = 'target_class'
+
     # Process each column
     for col in df.columns:
         print(f"Processing column: {col} (Type: {df[col].dtype})")
+
+        # Skip processing if this is the target column
+        if col == target_column:
+            print(f"Skipping encoding for target column: {col}")
+            continue
 
         # Handle boolean columns
         if pd.api.types.is_bool_dtype(df[col]):
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
                 print(f"Filling {num_missing} missing values in boolean column '{col}' with 'False'.")
-                df[col].fillna(False, inplace=True)  # Default strategy: replace with `False`
+                df[col].fillna(False, inplace=True)
 
-            # Convert boolean to numeric if needed
             print(f"Converting boolean column '{col}' to numeric (1 for True, 0 for False).")
             df[col] = df[col].astype(int)
 
@@ -1016,10 +1763,11 @@ def clean_dataset(df, delete_header=False):
             # Ensure all entries are strings and strip whitespace
             df[col] = df[col].astype(str).str.strip()
 
-            # Encode categorical data
-            print(f"Encoding categorical column '{col}' using Label Encoding.")
-            le = LabelEncoder()
-            df[col] = le.fit_transform(df[col])
+            # Encode categorical data (skip for target column)
+            if col != target_column:
+                print(f"Encoding categorical column '{col}' using Label Encoding.")
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col])
 
         # Handle other types
         else:
@@ -1027,11 +1775,11 @@ def clean_dataset(df, delete_header=False):
 
     # Store categorical column information in the DataFrame attributes
     df.attrs['categorical_columns'] = categorical_columns
+    if target_column:
+        df.attrs['target_column'] = target_column
     
     print("Dataset cleaning completed.")
     return df
-
-
 
 def perform_data_cleaning(request, dataset_id):
     if request.method != 'POST':
@@ -1065,16 +1813,50 @@ def perform_data_cleaning(request, dataset_id):
         os.makedirs(cleaned_datasets_dir, exist_ok=True)
         cleaned_file_name = os.path.basename(file_path).replace('.csv', cleaned_file_suffix).replace('.xls', cleaned_file_suffix).replace('.xlsx', cleaned_file_suffix)
         cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
+        
+        # Before saving, capture the important attributes
+        target_column = cleaned_df.attrs.get('target_column')
+        categorical_columns = cleaned_df.attrs.get('categorical_columns', [])
+        
+        # Save the cleaned DataFrame
         cleaned_df.to_csv(cleaned_file_path, index=False)
 
-        # Update the dataset object to reflect the cleaned dataset
-        dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+        # Update the dataset object with the cleaned file path
+        relative_cleaned_path = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+        dataset.cleaned_file = relative_cleaned_path
+        dataset.file_path = relative_cleaned_path  # Update the main file path to point to cleaned file
         dataset.status = 'processed'
+        
+        # Update column information
+        column_types = {col: str(cleaned_df[col].dtype) for col in cleaned_df.columns}
+        dataset.column_info = json.dumps(column_types)
+        
+        # Update target class based on the captured information
+        if target_column:
+            dataset.target_class = target_column
+        elif 'class' in cleaned_df.columns:
+            dataset.target_class = 'class'
+        elif 'target_class' in cleaned_df.columns:
+            dataset.target_class = 'target_class'
+        
+        # Store categorical columns information
+        if categorical_columns:
+            dataset.categorical_columns = json.dumps(categorical_columns)
+        
         dataset.save()
+
+        # Log the changes
+        print(f"Updated dataset {dataset_id}:")
+        print(f"- Target class: {dataset.target_class}")
+        print(f"- Column info: {dataset.column_info}")
+        print(f"- File path: {relative_cleaned_path}")
 
         return JsonResponse({
             'message': 'Data cleaned and saved successfully!',
-            'rows_affected': len(df) - len(cleaned_df)
+            'rows_affected': len(df) - len(cleaned_df),
+            'new_columns': list(cleaned_df.columns),
+            'new_target_class': dataset.target_class,
+            'new_file_path': relative_cleaned_path  # Use string path instead of FieldFile
         })
 
     except Dataset.DoesNotExist:
@@ -1082,8 +1864,8 @@ def perform_data_cleaning(request, dataset_id):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
     except Exception as e:
+        logger.error(f"Error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
-
 
 def data_cleaning_preview(request, dataset_id):
     """
@@ -1157,16 +1939,16 @@ def upload_page(request):
     return render(request, 'upload.html')
 
 @csrf_exempt
+@csrf_exempt
 def get_columns_target(request):
     print("get_columns_target called")  # Debug log
     if request.method == 'POST':
         try:
             if request.FILES.get('file'):
-                # Handle file upload
+                # Handle file upload (existing code remains the same)
                 file = request.FILES['file']
-                print(f"Processing file: {file.name}")  # Debug log
+                print(f"Processing file: {file.name}")
                 
-                # Read the file based on extension
                 try:
                     if file.name.endswith('.csv'):
                         df = pd.read_csv(file, encoding='utf-8')
@@ -1192,36 +1974,81 @@ def get_columns_target(request):
                     
                     print(f"Processing Kaggle URL: {kaggle_url}")  # Debug log
                     
-                    # Extract dataset identifier from Kaggle link
-                    dataset_id = '/'.join(kaggle_url.rstrip('/').split('/')[-2:])
+                    # Create datasets directory if it doesn't exist
                     datasets_dir = os.path.join(settings.MEDIA_ROOT, 'datasets')
                     os.makedirs(datasets_dir, exist_ok=True)
                     
-                    # Use Kaggle API to download the dataset
+                    # Download file directly using requests
                     try:
-                        import kaggle
-                        kaggle.api.dataset_download_files(dataset_id, path=datasets_dir, unzip=True)
-                    except Exception as e:
-                        return JsonResponse({'error': f'Error downloading dataset from Kaggle: {str(e)}'}, status=400)
-                    
-                    # Locate the downloaded file
-                    downloaded_files = [
-                        os.path.join(datasets_dir, f) for f in os.listdir(datasets_dir)
-                        if f.endswith('.csv') or f.endswith(('.xls', '.xlsx'))
-                    ]
-                    if not downloaded_files:
-                        return JsonResponse({'error': 'No valid CSV or Excel files found in the downloaded dataset.'}, status=400)
-                    
-                    file_path = downloaded_files[0]  # Use the first valid file
-                    
-                    # Load the dataset
-                    try:
+                        import requests
+                        import zipfile
+                        from urllib.parse import urlparse
+                        
+                        # Download to a temporary zip file
+                        zip_path = os.path.join(datasets_dir, 'temp_dataset.zip')
+                        
+                        # Download the file with proper headers
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                        }
+                        
+                        response = requests.get(kaggle_url, headers=headers, stream=True)
+                        response.raise_for_status()
+                        
+                        # Save the downloaded zip file
+                        with open(zip_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                        
+                        # Extract the zip file
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            # List all files in the zip
+                            files = zip_ref.namelist()
+                            print(f"Files in zip: {files}")  # Debug log
+                            
+                            # Find the first CSV or Excel file
+                            data_file = None
+                            for file in files:
+                                if file.endswith(('.csv', '.xlsx', '.xls')):
+                                    data_file = file
+                                    break
+                            
+                            if not data_file:
+                                raise Exception("No CSV or Excel files found in the downloaded dataset")
+                            
+                            # Extract the file
+                            zip_ref.extract(data_file, datasets_dir)
+                            file_path = os.path.join(datasets_dir, data_file)
+                        
+                        # Try to read the file with different encodings
                         if file_path.endswith('.csv'):
-                            df = pd.read_csv(file_path)
-                        elif file_path.endswith(('.xls', '.xlsx')):
+                            encodings = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+                            df = None
+                            last_error = None
+                            for encoding in encodings:
+                                try:
+                                    df = pd.read_csv(file_path, encoding=encoding)
+                                    print(f"Successfully read CSV with encoding: {encoding}")  # Debug log
+                                    break
+                                except Exception as e:
+                                    last_error = e
+                                    continue
+                            
+                            if df is None:
+                                raise Exception(f"Unable to read the CSV file with any supported encoding. Last error: {str(last_error)}")
+                        elif file_path.endswith(('.xlsx', '.xls')):
                             df = pd.read_excel(file_path)
+                        
+                        # Clean up temporary files
+                        os.remove(zip_path)
+                        os.remove(file_path)
+                        
+                    except requests.exceptions.RequestException as e:
+                        return JsonResponse({'error': f'Error downloading dataset: {str(e)}'}, status=400)
                     except Exception as e:
-                        return JsonResponse({'error': f'Error reading Kaggle dataset: {str(e)}'}, status=400)
+                        return JsonResponse({'error': f'Error processing dataset: {str(e)}'}, status=400)
                     
                 except json.JSONDecodeError:
                     return JsonResponse({'error': 'Invalid JSON data'}, status=400)
@@ -1229,11 +2056,16 @@ def get_columns_target(request):
                     print(f"Error processing Kaggle URL: {str(e)}")  # Debug log
                     return JsonResponse({'error': str(e)}, status=400)
             
+            # Clean up column names
+            df.columns = df.columns.str.strip()  # Remove leading/trailing whitespace
+            
             # Get column names and their data types
             columns = list(df.columns)
             dtypes = {col: str(df[col].dtype) for col in columns}
             
             print(f"Found columns: {columns}")  # Debug log
+            print(f"First few rows of data:")  # Debug log
+            print(df.head())  # Debug log
             
             response_data = {
                 'columns': columns,
@@ -1249,168 +2081,7 @@ def get_columns_target(request):
     print("Invalid request received")  # Debug log
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-from django.shortcuts import render
-from django.db.models import Count
-from django.utils import timezone
-from datetime import timedelta
-from .models import Dataset, MLModel, DataPreprocessingLog
-from django.db.models.functions import TruncMonth
 
-def general_dashboard(request):
-    if not request.user.is_authenticated:
-        return redirect('signin')
-        
-    # Get all datasets for the current user
-    datasets = Dataset.objects.filter(user=request.user)
-    
-    # Basic Statistics
-    total_datasets = datasets.count()
-    clean_datasets = datasets.filter(status='processed').count()
-    unclean_datasets = total_datasets - clean_datasets
-    total_models = MLModel.objects.count()
-    
-    # Calculate percentages
-    clean_datasets_percentage = (clean_datasets / total_datasets * 100) if total_datasets > 0 else 0
-    unclean_datasets_percentage = (unclean_datasets / total_datasets * 100) if total_datasets > 0 else 0
-    
-    # Calculate usage percentage for each dataset
-    for dataset in datasets:
-        # You can customize this based on your needs
-        # For example, count how many times the dataset has been used in models
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        max_usage = MLModel.objects.count() or 1  # Avoid division by zero
-        dataset.usage_percentage = (usage_count / max_usage) * 100
-    
-    # Get current and previous month for comparison
-    current_date = timezone.now()
-    current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-    
-    # Dataset categories analysis (current month)
-    current_month_stats = {
-        'Diagnostic Imaging': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='diagnostic imaging'
-        ).count(),
-        'Data.Gov': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='data.gov'
-        ).count(),
-        'Image Net': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='image net'
-        ).count(),
-        'MNIST': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='mnist'
-        ).count(),
-        'MHLDDS': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='mhldds'
-        ).count(),
-        'HES': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='hes'
-        ).count(),
-    }
-    
-    # Previous month stats
-    previous_month_stats = {
-        'Diagnostic Imaging': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='diagnostic imaging'
-        ).count(),
-        'Data.Gov': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='data.gov'
-        ).count(),
-        'Image Net': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='image net'
-        ).count(),
-        'MNIST': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='mnist'
-        ).count(),
-        'MHLDDS': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='mhldds'
-        ).count(),
-        'HES': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='hes'
-        ).count(),
-    }
-    
-    # Quality and Completeness Analysis
-    # Get last 6 months of data
-    last_6_months = current_date - timedelta(days=180)
-    monthly_stats = datasets.filter(
-        uploaded_at__gte=last_6_months
-    ).annotate(
-        month=TruncMonth('uploaded_at')
-    ).values('month').annotate(
-        total=Count('id'),
-        clean=Count('id', filter=models.Q(status='processed'))
-    ).order_by('month')
-    
-    quality_labels = []
-    completeness_data = []
-    quality_data = []
-    
-    for stat in monthly_stats:
-        quality_labels.append(stat['month'].strftime('%b %Y'))
-        total = stat['total']
-        clean = stat['clean']
-        completeness = (clean / total * 100) if total > 0 else 0
-        # Assuming quality is based on some metrics in columns_info
-        quality = completeness * 0.8  # Simplified quality metric
-        completeness_data.append(completeness)
-        quality_data.append(quality)
-    
-    # Dataset Usage Statistics
-    datasets_usage = []
-    for dataset in datasets:
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        if usage_count > 0:
-            datasets_usage.append({
-                'title': dataset.name,
-                'usage_percentage': min((usage_count / total_datasets * 100), 100),
-                'count': usage_count
-            })
-    
-    # Sort datasets_usage by count in descending order
-    datasets_usage = sorted(datasets_usage, key=lambda x: x['count'], reverse=True)[:10]
-    
-    # Calculate average completeness and quality
-    avg_completeness = sum(completeness_data) / len(completeness_data) if completeness_data else 0
-    avg_quality = sum(quality_data) / len(quality_data) if quality_data else 0
-    
-    context = {
-        'datasets': datasets,  # Changed from 'dataset' to 'datasets' to match template
-        'total_datasets': total_datasets,
-        'clean_datasets': clean_datasets,
-        'unclean_datasets': unclean_datasets,
-        'total_models': total_models,
-        'clean_datasets_percentage': round(clean_datasets_percentage, 1),
-        'unclean_datasets_percentage': round(unclean_datasets_percentage, 1),
-        'completeness': round(avg_completeness, 1),
-        'quality': round(avg_quality, 1),
-        'datasets_analysis_current': list(current_month_stats.values()),
-        'datasets_analysis_previous': list(previous_month_stats.values()),
-        'quality_labels': quality_labels,
-        'completeness_data': completeness_data,
-        'quality_data': quality_data,
-        'datasets_usage': datasets_usage
-    }
-    
-    return render(request, "general_dashboard.html", context)
 
 ### MODEL TRAINING PART ###
 
@@ -1901,7 +2572,7 @@ def train_model(request):
                 }
                 y_pred = model.predict(X_test)
 
-                # Generate visualizations
+                # Generate decision tree visualization (if applicable)
                 feature_names = feature_columns  # Feature names from the dataset
                 class_names = df[target_column].unique().astype(str)  # Class names based on unique target labels
                 results = generate_visualizations(
@@ -2052,7 +2723,7 @@ def train_model(request):
                     dataset=dataset,
                     algorithm='Random Forest',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
 
                 # Save results to ModelResult table
@@ -2999,3 +3670,53 @@ def delete_dataset(request, dataset_id):
         return redirect('general_dashboard')
     
     return redirect('general_dashboard')
+
+
+
+@login_required
+def download_model(request):
+    import logging
+    logger = logging.getLogger(__name__)
+    if request.method == 'POST':
+        try:
+            logger.info("Starting model download process")
+            # Get the latest model for the user from the MLModel table
+            latest_model = MLModel.objects.filter(
+                dataset__user=request.user,
+                training_status='completed'
+            ).latest('created_at')
+            
+            logger.info(f"Found latest model: {latest_model.model_path}")
+            
+            if not latest_model or not latest_model.model_path:
+                logger.error("No model path found")
+                return JsonResponse({'error': 'No trained model found'}, status=404)
+            
+            model_file = latest_model.model_path.path  # Use .path to get the full filesystem path
+            logger.info(f"Model file path: {model_file}")
+            
+            if not os.path.exists(model_file):
+                logger.error(f"Model file not found at path: {model_file}")
+                return JsonResponse({'error': 'Model file not found'}, status=404)
+            
+            # Read the model file and serve it
+            try:
+                with open(model_file, 'rb') as f:
+                    response = HttpResponse(f.read(), content_type='application/octet-stream')
+                    filename = os.path.basename(model_file)
+                    response['Content-Disposition'] = f'attachment; filename={filename}'
+                    logger.info(f"Successfully prepared response with filename: {filename}")
+                    return response
+            except IOError as e:
+                logger.error(f"Error reading model file: {str(e)}")
+                return JsonResponse({'error': f'Error reading model file: {str(e)}'}, status=500)
+                
+        except MLModel.DoesNotExist:
+            logger.error("No trained model found in database")
+            return JsonResponse({'error': 'No trained model found'}, status=404)
+        except Exception as e:
+            logger.error(f"Unexpected error in download_model: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    logger.error("Invalid request method")
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
