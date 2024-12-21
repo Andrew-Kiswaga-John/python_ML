@@ -320,13 +320,17 @@
                     const visualizationCard = document.createElement('div');
                     visualizationCard.className = 'bg-white p-4 rounded-lg shadow-md';
 
+                    // Replace the path with the media URL path
+                    const mediaUrl = `/media/${visualizations[key]}`;
+
                     visualizationCard.innerHTML = `
                         <h5 class="text-lg font-semibold text-gray-700 mb-2">Visualization: ${key.replace('_', ' ')}</h5>
-                        <img src="${visualizations[key]}" alt="Model Visualization ${index + 1}" class="max-w-full h-auto mx-auto">
+                        <img src="${mediaUrl}" alt="Model Visualization ${index + 1}" class="max-w-full h-auto mx-auto">
                     `;
 
                     visualizationGrid.appendChild(visualizationCard);
                 });
+
 
                 // Show the results section
                 document.getElementById('results').classList.remove('hidden');

@@ -1,0 +1,146 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make Predictions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 font-sans leading-normal tracking-normal overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-8 shadow-lg relative">
+        <div class="container mx-auto text-center">
+            <h1 class="text-5xl font-extrabold mb-2" id="headerTitle">✨ AI Prediction Wizard ✨</h1>
+            <p class="text-lg font-light animate-fade-in">Unleash the power of AI with your own models!</p>
+        </div>
+        <!-- <div class="absolute -bottom-4 w-full">
+            <svg class="wave" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
+                <path fill="#ffffff" fill-opacity="1" d="M0,128L1440,320L1440,320L0,320Z"></path>
+            </svg>
+        </div> -->
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto mt-12 p-6 space-y-12 relative">
+        <!-- Model Details -->
+        <section class="bg-white shadow-lg rounded-xl p-8 transition-transform transform ">
+            <h2 class="text-3xl font-bold text-indigo-600 border-b-4 border-indigo-500 inline-block pb-2">Model Details</h2>
+            <div class="mt-4 space-y-2">
+                <p class="text-lg text-gray-700">
+                    <span class="font-semibold">Algorithm:</span> 
+                    <span id="modelAlgorithm" class="text-purple-600">Loading...</span>
+                </p>
+                <p class="text-lg text-gray-700">
+                    <span class="font-semibold">Trained on:</span> 
+                    <span id="modelDate" class="text-purple-600">Loading...</span>
+                </p>
+            </div>
+        </section>
+
+        <!-- Prediction Form -->
+        <section class="bg-gradient-to-r from-green-100 via-blue-100 to-purple-100 shadow-lg rounded-xl p-8 space-y-6 transition-transform transform ">
+            <h2 class="text-3xl font-bold text-indigo-600 border-b-4 border-indigo-500 inline-block pb-2">Enter Input Data</h2>
+            <form id="predictionForm" class="space-y-6">
+                {% csrf_token %}
+                <!-- Dynamic fields go here -->
+            </form>
+            <button id="predictButton" class="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xl font-semibold rounded shadow-lg hover:scale-105 transform transition-all duration-300 hover:shadow-2xl">
+                ⚡ Make Prediction
+            </button>
+        </section>
+
+        <!-- Prediction Result -->
+        <section id="resultSection" class="hidden bg-gradient-to-br from-yellow-50 to-orange-100 shadow-lg rounded-xl p-8 text-center space-y-4 transition-all duration-300 ease-in-out">
+            <h2 class="text-3xl font-bold text-orange-600 animate-pulse">Prediction Result</h2>
+            <div class="flex justify-center">
+                <p id="predictionResult" class="text-4xl font-extrabold text-orange-800 bg-orange-50 shadow-inner px-6 py-4 rounded-lg inline-block transform scale-100 hover:scale-110 transition-transform"></p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white text-center py-6 mt-16 relative">
+        <p class="text-sm">&copy; 2024 Your AI Project. Crafted with 💖.</p>
+
+    </footer>
+
+    <!-- Script for Animations -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelId = urlParams.get("id");
+
+            if (!modelId) {
+                alert("Invalid model ID.");
+                return;
+            }
+
+            // Header animation
+            gsap.from("#headerTitle", { duration: 2, y: -50, opacity: 0, ease: "bounce" });
+
+            // Fetch model details and input fields
+            fetch(`/fetch-model-details/?id=${modelId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Display model details
+                    document.getElementById("modelAlgorithm").textContent = data.algorithm;
+                    document.getElementById("modelDate").textContent = data.created_at;
+
+                    // Generate input fields based on model features
+                    const form = document.getElementById("predictionForm");
+                    data.features.forEach(feature => {
+                        const inputGroup = document.createElement("div");
+                        inputGroup.className = "space-y-2";
+
+                        inputGroup.innerHTML = `
+                            <label for="${feature.name}" class="text-gray-800 font-semibold text-lg">${feature.name}</label>
+                            <input type="number" id="${feature.name}" name="${feature.name}" 
+                                class="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="Suggested: ${feature.suggested_range}">
+                        `;
+
+                        form.appendChild(inputGroup);
+                    });
+                })
+                .catch(error => {
+                    console.error("Error fetching model details:", error);
+                    alert("Failed to load model details. Please try again later.");
+                });
+
+            // Handle prediction request
+            document.getElementById("predictButton").addEventListener("click", function () {
+                const form = document.getElementById("predictionForm");
+                const formData = new FormData(form);
+                const payload = {};
+                formData.forEach((value, key) => {
+                    payload[key] = parseFloat(value);
+                });
+
+                fetch(`/make-prediction/?id=${modelId}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        document.getElementById("resultSection").classList.remove("hidden");
+                        document.getElementById("predictionResult").textContent = `🌟 ${result.prediction} 🌟`;
+                        gsap.from("#predictionResult", { duration: 1.5, scale: 0.5, opacity: 0, ease: "elastic" });
+                    })
+                    .catch(error => {
+                        console.error("Error making prediction:", error);
+                        alert("Failed to make prediction. Please try again.");
+                    });
+            });
+        });
+    </script>
+</body>
+
+</html>

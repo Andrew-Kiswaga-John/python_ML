@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Visualizations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body class="bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 font-sans leading-normal tracking-normal">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-6 shadow-lg">
+        <h1 class="text-4xl font-extrabold text-center">Model Visualizations</h1>
+        <p class="text-center mt-2 text-lg font-light">Explore the visual insights of your selected model</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto mt-8 p-6">
+        <div id="visualizationsGrid" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- Visualization cards will be dynamically loaded here -->
+        </div>
+
+        <!-- Download All Button -->
+        <div class="mt-6 text-center">
+            <button id="downloadAll"
+                class="px-6 py-3 bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 text-white font-semibold rounded shadow hover:opacity-90 transition duration-300">
+                Download All Visualizations
+            </button>
+        </div>
+
+        <!-- Back Button -->
+        <div class="mt-8 text-center">
+            <button onclick="navigateBack()"
+                class="px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white font-semibold rounded shadow hover:opacity-90 transition duration-300">
+                Back to Models
+            </button>
+        </div>
+    </main>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
+        <div class="relative bg-white rounded-lg shadow-lg overflow-hidden">
+            <button id="closeModal" class="absolute top-2 right-2 text-white bg-red-500 rounded-full px-2 py-1">
+                &times;
+            </button>
+            <img id="modalImage" src="" alt="Visualization" class="max-w-full max-h-screen object-contain">
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white text-center py-6 mt-16 relative">
+        <p class="text-sm">&copy; 2024 Your AI Project. Crafted with 💖.</p>
+
+    </footer>
+
+    <script>
+        // Fetch visualizations for the selected model
+        document.addEventListener("DOMContentLoaded", function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelId = urlParams.get("id");
+
+            if (!modelId) {
+                alert("Invalid model ID.");
+                return;
+            }
+
+            fetch(`/fetch-visualizations/?id=${modelId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const visualizationsGrid = document.getElementById("visualizationsGrid");
+                    visualizationsGrid.innerHTML = "";
+
+                    if (data.visualizations.length === 0) {
+                        visualizationsGrid.innerHTML = `
+                            <div class="col-span-full text-center text-gray-700 text-lg">
+                                <p>No visualizations found for this model.</p>
+                            </div>`;
+                        return;
+                    }
+
+                    data.visualizations.forEach((imagePath, index) => {
+                        const card = document.createElement("div");
+                        card.className = "relative bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 ease-in-out";
+
+                        card.innerHTML = `
+                            <img src="${imagePath}" alt="Visualization" class="w-full object-cover cursor-pointer" onclick="openModal('${imagePath}')">
+                        `;
+
+                        visualizationsGrid.appendChild(card);
+
+                        gsap.fromTo(card, { opacity: 0, y: 30 }, {
+                            opacity: 1,
+                            y: 0,
+                            delay: index * 0.1,
+                            duration: 0.6,
+                            ease: "power3.out"
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error("Error fetching visualizations:", error);
+                    const visualizationsGrid = document.getElementById("visualizationsGrid");
+                    visualizationsGrid.innerHTML = `
+                        <div class="col-span-full text-center text-red-700">
+                            <p>Failed to load visualizations. Please try again later.</p>
+                        </div>`;
+                });
+
+            // Set up the download button
+            const downloadAllBtn = document.getElementById("downloadAll");
+            downloadAllBtn.addEventListener("click", function () {
+                window.location.href = `/download-visualizations/?id=${modelId}`;
+            });
+
+        });
+
+
+        
+        // Open Modal
+        function openModal(imagePath) {
+            const modal = document.getElementById("imageModal");
+            const modalImage = document.getElementById("modalImage");
+            modalImage.src = imagePath;
+            modal.classList.remove("hidden");
+        }
+
+        // Close Modal
+        document.getElementById("closeModal").addEventListener("click", function () {
+            const modal = document.getElementById("imageModal");
+            modal.classList.add("hidden");
+        });
+
+        // Navigate back to models page
+        function navigateBack() {
+            window.location.href = "/predictions/";
+        }
+    </script>
+</body>
+
+</html>

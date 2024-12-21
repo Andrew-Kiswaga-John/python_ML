@@ -1,192 +1,104 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Make Predictions</title>
+    <title>Models Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+<body class="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 font-sans leading-normal tracking-normal">
 
     <!-- Header -->
-    <header class="bg-indigo-600 text-white p-4 shadow-md">
-        <h1 class="text-2xl font-bold text-center">Make Predictions with a Model</h1>
+    <header class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-6 shadow-lg">
+        <h1 class="text-4xl font-extrabold text-center animate-bounce">Your Trained Models</h1>
+        <p class="text-center mt-2 text-lg font-light">Select a model to make predictions or view visualizations</p>
     </header>
 
     <!-- Main Content -->
-    <main class="container mx-auto mt-10 p-4 bg-white rounded-lg shadow-md">
-        <!-- Form for Dataset Upload -->
-        <form id="predictionForm" enctype="multipart/form-data" class="mb-8">
-            {% csrf_token %}
-            <div class="flex flex-col items-center">
-                <!-- Dataset Upload -->
-                <label for="dataset" class="text-lg font-medium mb-2">Upload Your Dataset (CSV)</label>
-                <input 
-                    type="file" 
-                    name="dataset" 
-                    id="dataset"
-                    accept=".csv" 
-                    required
-                    class="block w-1/2 text-sm text-gray-700 border border-gray-300 rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-
-                <!-- Model Selection -->
-                <label for="model" class="text-lg font-medium mb-2">Select a Trained Model</label>
-                <select 
-                    name="model" 
-                    id="model" 
-                    required
-                    class="block w-1/2 text-sm text-gray-700 border border-gray-300 rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="" disabled selected>Select a Model</option>
-                    {% for model in models %}
-                    <option value="{{ model.id }}">{{ model.algorithm }} (Trained on {{ model.created_at|date:"Y-m-d" }})</option>
-                    {% endfor %}
-                </select>
-
-                <!-- Target Column Selection -->
-                <div id="targetColumnSection" class="hidden w-1/2">
-                    <label for="target" class="text-lg font-medium mb-2">Select a Target Column</label>
-                    <select 
-                        name="target" 
-                        id="target" 
-                        required
-                        class="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        <!-- Options will be dynamically added here -->
-                    </select>
-                </div>
-
-                <!-- Submit Button -->
-                <button 
-                    type="button" 
-                    id="submitPrediction" 
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition duration-200">
-                    Make Predictions
-                </button>
-            </div>
-        </form>
-
-        <!-- Metrics Display -->
-        <div id="metricsSection" class="mt-4 hidden">
-            <h2 class="text-xl font-semibold mb-4 text-center">Model Performance Metrics</h2>
-            <div id="metricsContent" class="p-4 border rounded-lg bg-gray-50">
-                <!-- Metrics will be dynamically added here -->
-            </div>
-        </div>
-
-        <!-- Results Table -->
-        <div id="resultsSection" class="mt-4 hidden">
-            <h2 class="text-xl font-semibold mb-4 text-center">Prediction Results</h2>
-            <div class="overflow-x-auto">
-                <div id="resultsContent" class="p-4 border rounded-lg bg-gray-50">
-                    <!-- Results will be dynamically added here -->
-                </div>
-            </div>
+    <main class="container mx-auto mt-8 p-6">
+        <div id="modelsGrid" class="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            <!-- Model cards will be dynamically loaded here -->
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white text-center p-4 mt-10">
-        <p>&copy; 2024 Your AI Project. All Rights Reserved.</p>
+    <footer class="bg-gray-900 text-white text-center py-6 mt-16 relative">
+        <p class="text-sm">&copy; 2024 Your AI Project. Crafted with 💖.</p>
+
     </footer>
 
-    <!-- JavaScript -->
     <script>
-        // Fetch columns when a dataset is uploaded
-        document.getElementById('dataset').addEventListener('change', function () {
-            const fileInput = this.files[0];
-            const targetColumnSection = document.getElementById('targetColumnSection');
-            const targetSelect = document.getElementById('target');
-
-            if (fileInput) {
-                const formData = new FormData();
-                formData.append('dataset', fileInput);
-
-                // Perform POST request to fetch columns
-                fetch('/fetch-columns/', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    }
-                })
+        // Fetch existing models and display them in individual cards
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch('/fetch-models/')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.error) {
-                        alert(`Error: ${data.error}`);
-                        targetColumnSection.classList.add('hidden'); // Hide target section on error
+                    const modelsGrid = document.getElementById("modelsGrid");
+                    modelsGrid.innerHTML = ""; // Clear the grid
+
+                    if (data.models.length === 0) {
+                        modelsGrid.innerHTML = `
+                            <div class="col-span-full text-center text-gray-700 text-lg">
+                                <p>No trained models available yet. Start training to see models here!</p>
+                            </div>`;
                         return;
                     }
 
-                    // Populate target column dropdown
-                    targetSelect.innerHTML = '<option value="" disabled selected>Select Target Column</option>';
-                    data.columns.forEach(column => {
-                        const option = document.createElement('option');
-                        option.value = column;
-                        option.textContent = column;
-                        targetSelect.appendChild(option);
-                    });
+                    data.models.forEach((model, index) => {
+                        const card = document.createElement("div");
+                        card.className = "relative bg-white rounded-lg shadow-lg transform hover:scale-105 transition duration-300 ease-in-out";
 
-                    // Show the target column section
-                    targetColumnSection.classList.remove('hidden');
+                        card.innerHTML = `
+                            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 to-pink-400"></div>
+                            <div class="p-6 space-y-4">
+                                <h2 class="text-2xl font-bold text-gray-800">${model.algorithm}</h2>
+                                <p class="text-gray-600 text-sm">Trained on: <span class="font-medium">${model.created_at}</span></p>
+                                <p class="text-gray-600 text-sm">ID: <span class="font-mono">${model.id}</span></p>
+                                <div class="mt-4 space-x-4">
+                                    <button onclick="navigateTo('/model-predictions/?id=${model.id}')" 
+                                        class="px-4 py-2 bg-indigo-500 hover:bg-indigo-700 text-white font-semibold rounded shadow transition duration-300">
+                                        Predictions
+                                    </button>
+                                    <button onclick="navigateTo('/visualizations/?id=${model.id}')" 
+                                        class="px-4 py-2 bg-pink-500 hover:bg-pink-700 text-white font-semibold rounded shadow transition duration-300">
+                                        Visualizations
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-400 to-pink-400"></div>
+                        `;
+
+                        modelsGrid.appendChild(card);
+
+                        // Apply animation for card appearance
+                        gsap.fromTo(card, { opacity: 0, y: 30 }, {
+                            opacity: 1,
+                            y: 0,
+                            delay: index * 0.1,
+                            duration: 0.6,
+                            ease: "power3.out"
+                        });
+                    });
                 })
                 .catch(error => {
-                    alert(`Unexpected error: ${error}`);
-                    targetColumnSection.classList.add('hidden'); // Hide target section on error
+                    console.error("Error fetching models:", error);
+                    const modelsGrid = document.getElementById("modelsGrid");
+                    modelsGrid.innerHTML = `
+                        <div class="col-span-full text-center text-red-700">
+                            <p>Failed to load models. Please try again later.</p>
+                        </div>`;
                 });
-            } else {
-                targetColumnSection.classList.add('hidden'); // Hide target section if no file is selected
-            }
         });
 
-
-        // Submit the prediction form
-        document.getElementById('submitPrediction').addEventListener('click', function () {
-            const form = document.getElementById('predictionForm');
-            const formData = new FormData(form);
-            const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
-
-            fetch('/perform_predictions/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                },
-                body: formData,
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(`Error: ${data.error}`);
-                    return;
-                }
-
-                // Update Metrics Section
-                const metricsSection = document.getElementById('metricsSection');
-                const metricsContent = document.getElementById('metricsContent');
-                metricsSection.classList.remove('hidden');
-                metricsContent.innerHTML = '';
-
-                if (data.metrics.type === 'classification') {
-                    metricsContent.innerHTML += `<p class="text-gray-700 text-lg">Accuracy: <span class="font-bold">${data.metrics.accuracy}</span></p>`;
-                    metricsContent.innerHTML += `<h3 class="font-semibold text-gray-800 mb-2">Confusion Matrix:</h3>`;
-                    const cm = data.metrics.confusion_matrix.map(row => `<tr>${row.map(cell => `<td class="border px-4 py-2">${cell}</td>`).join('')}</tr>`).join('');
-                    metricsContent.innerHTML += `<table class="table-auto border-collapse w-full text-center">${cm}</table>`;
-                } else if (data.metrics.type === 'regression') {
-                    metricsContent.innerHTML += `<p class="text-gray-700 text-lg">Mean Squared Error: <span class="font-bold">${data.metrics.mse}</span></p>`;
-                    metricsContent.innerHTML += `<p class="text-gray-700 text-lg">R² Score: <span class="font-bold">${data.metrics.r2}</span></p>`;
-                } else if (data.metrics.type === 'clustering') {
-                    metricsContent.innerHTML += `<p class="text-gray-700 text-lg">Silhouette Score: <span class="font-bold">${data.metrics.silhouette_score}</span></p>`;
-                    metricsContent.innerHTML += `<p class="text-gray-700 text-lg">Inertia: <span class="font-bold">${data.metrics.inertia}</span></p>`;
-                }
-
-                // Update Results Section
-                // const resultsSection = document.getElementById('resultsSection');
-                // const resultsContent = document.getElementById('resultsContent');
-                // resultsSection.classList.remove('hidden');
-                // resultsContent.innerHTML = data.results;
-            })
-            .catch(error => alert(`Unexpected error: ${error}`));
-        });
+        // Navigate to a specific page
+        function navigateTo(url) {
+            window.location.href = url;
+        }
     </script>
 </body>
+
 </html>

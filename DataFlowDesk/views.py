@@ -17,6 +17,8 @@ from sklearn.tree import plot_tree
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, mean_squared_error, r2_score, confusion_matrix
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
+from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 import matplotlib.pyplot as plt
@@ -30,6 +32,8 @@ import json
 import logging
 
 import logging
+import zipfile
+from django.http import HttpResponse
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1559,14 +1563,44 @@ def train_model_nn(request):
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
                 model = MultinomialNB(alpha=var_smoothing)
                 model.fit(X_train_tfidf, y_train)
-                
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }               
                 y_pred = model.predict(X_test_tfidf)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'Neural_network_model_classification_{dataset_id}'
                 )
+                # Save the trained model as a .pkl file
+                model_filename = f"Neural_network_model_classification_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Neural Network',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
             else:
                 # For numerical data, use Gaussian NB
                 scaler = StandardScaler()
@@ -1576,14 +1610,44 @@ def train_model_nn(request):
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
                 model = GaussianNB(var_smoothing=var_smoothing)
                 model.fit(X_train_scaled, y_train)
-                
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }                
                 y_pred = model.predict(X_test_scaled)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'Neural_network_model_classification_{dataset_id}'
                 )
+                # Save the trained model as a .pkl file
+                model_filename = f"Neural_network_model_classification_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Neural Network',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
         else:
             # Handle neural network case
             hidden_layers = request.POST.get('hiddenLayers', '8,4')
@@ -1609,14 +1673,47 @@ def train_model_nn(request):
                     solver=request.POST.get('solver', 'lbfgs')
                 )
                 model.fit(X_train_scaled, y_train)
-                
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                } 
+
                 y_pred = model.predict(X_test_scaled)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'Neural_network_model_classification_{dataset_id}'
                 )
+
+                # Save the trained model as a .pkl file
+                model_filename = f"Neural_network_model_classification_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Neural Network',
+                    training_status='completed',
+                    model_path = model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='accuracy',
+                    metric_value=results['metrics']['accuracy'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
+
             else:
                 model = MLPRegressor(
                     hidden_layer_sizes=hidden_layers,
@@ -1625,38 +1722,45 @@ def train_model_nn(request):
                     solver=request.POST.get('solver', 'lbfgs')
                 )
                 model.fit(X_train_scaled, y_train)
-                
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+                               
                 y_pred = model.predict(X_test_scaled)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='regression',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained regression model
+                    y_true=y_test,  # True target values
+                    y_pred=y_pred,  # Predicted values from the model
+                    X=X_test,  # Features used for predictions
+                    model_identifier= f'Neural_network_model_regression_{dataset_id}'
+                )
+                # Save the trained model as a .pkl file
+                model_filename = f"Neural_network_model_regression_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm='Neural Network',
+                    training_status='completed',
+                    model_path = model_path
                 )
 
-        # Save the trained model as a .pkl file
-        model_filename = f"Neural_network_model_{dataset_id}.pkl"
-        models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
-        os.makedirs(models_dir, exist_ok=True)
-        model_path = os.path.join(models_dir, model_filename)
-        with open(model_path, 'wb') as f:
-            joblib.dump(model, f)
-
-        # Save to MLModel table
-        ml_model = MLModel.objects.create(
-            dataset=dataset,
-            algorithm='Neural Network',
-            training_status='completed',
-            model_path = model_path
-        )
-
-        # Save results to ModelResult table
-        ModelResult.objects.create(
-            model=ml_model,
-            metric_name='accuracy',
-            metric_value=results['metrics']['accuracy'],
-            # visualization_path=f'data:image/png;base64,{image_base64}',
-        )
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='mean_squared_error',
+                    metric_value=results['metrics']['mean_squared_error'],
+                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                )
 
         return JsonResponse({
             'success': True,
@@ -1716,8 +1820,8 @@ def train_model(request):
             scaler = StandardScaler()
 
             # Convert to NumPy arrays
-            X = np.array(X)
-            y = np.array(y)
+            # X = np.array(X)
+            # y = np.array(y)
 
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1 - train_test_split_ratio, random_state=42)
@@ -1737,14 +1841,22 @@ def train_model(request):
 
                 # Fit the model on the log-transformed target
                 model.fit(X_train, y_train)
+                # Add feature_names_in_ attribute to the model
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
                 y_pred = model.predict(X_test)
 
                 # Evaluate metrics on the original scale
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='regression',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained regression model
+                    y_true=y_test,  # True target values
+                    y_pred=y_pred,  # Predicted values from the model
+                    X=X_test, # Features used for predictions
+                    model_identifier= f'linear_regression_model_{dataset_id}'
                 )
                 # print(f"Metrics: {results}")
 
@@ -1782,6 +1894,11 @@ def train_model(request):
                 X_test = scaler.transform(X_test)
 
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
                 y_pred = model.predict(X_test)
 
                 # Generate visualizations
@@ -1793,7 +1910,10 @@ def train_model(request):
                     y_pred=y_pred,
                     model=model,
                     feature_names=feature_names,
-                    class_names=class_names
+                    class_names=class_names,
+                    X=X_test,
+                    model_identifier= f'decision_tree_model_{dataset_id}'
+                    
                 )
 
                 # Save the trained model as a .pkl file
@@ -1830,15 +1950,25 @@ def train_model(request):
                 X_test = scaler.transform(X_test)
 
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+
                 y_pred = model.predict(X_test)
                 
                 try:
                     # Generate Visualizations
                     results = generate_visualizations(
                         model_type='classification',
-                        y_true=y_test,
-                        y_pred=y_pred
+                        model=model,  # Trained Naive Bayes model
+                        y_true=y_test,  # True labels from the test dataset
+                        y_pred=y_pred,  # Predicted labels
+                        X=X_test,  # Test dataset features
+                        model_identifier= f'svm_model_{dataset_id}'
                     )
+
                 except Exception as e:
                     # If an exception occurs, calculate alternative metrics
                     print(f"Accuracy score could not be calculated: {str(e)}")
@@ -1891,13 +2021,23 @@ def train_model(request):
                 X_test = scaler.transform(X_test)
 
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+
                 y_pred = model.predict(X_test)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'random_forest_model_{dataset_id}'
                 )
+
 
                 # Save the trained model as a .pkl file
                 model_filename = f"random_forest_model_{dataset_id}.pkl"
@@ -1941,13 +2081,23 @@ def train_model(request):
 
                 model = KNeighborsClassifier(n_neighbors=n_neighbors)
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+
                 y_pred = model.predict(X_test)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'knn_model_{dataset_id}'
                 )
+
 
                 # Save the trained model as a .pkl file
                 model_filename = f"knn_model_{dataset_id}.pkl"
@@ -2006,6 +2156,12 @@ def train_model(request):
                 print("Initializing and training LinearRegression model...")
                 model = LinearRegression()
                 model.fit(X_train_poly, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+
                 print("Model training complete.")
 
                 # Make predictions and log predictions shape
@@ -2019,8 +2175,11 @@ def train_model(request):
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='regression',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained regression model
+                    y_true=y_test,  # True target values
+                    y_pred=y_pred,  # Predicted values from the model
+                    X=X_test,  # Features used for predictions
+                    model_identifier= f'Polynomial_regression_model_{dataset_id}'
                 )
 
                 # Save the trained model as a .pkl file
@@ -2062,12 +2221,20 @@ def train_model(request):
                 X_test = scaler.transform(X_test)
 
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
                 y_pred = model.predict(X_test)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'logistic_regression_model_{dataset_id}'
                 )
 
                 # Save the trained model as a .pkl file
@@ -2103,12 +2270,21 @@ def train_model(request):
                 X_test = scaler.transform(X_test)
 
                 model.fit(X_train, y_train)
+
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
+
                 y_pred = model.predict(X_test)
                 # Generate Visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    y_true=y_test,
-                    y_pred=y_pred
+                    model=model,  # Trained Naive Bayes model
+                    y_true=y_test,  # True labels from the test dataset
+                    y_pred=y_pred,  # Predicted labels
+                    X=X_test,  # Test dataset features
+                    model_identifier= f'naive_bayes_model_{dataset_id}'
                 )
 
                 # Save the trained model as a .pkl file
@@ -2148,7 +2324,10 @@ def train_model(request):
                 # Initialize and train the KMeans model
                 model = KMeans(n_clusters=n_clusters, random_state=42)
                 model.fit(X_train)  # Fit on training data only
-
+                model.feature_names_in_ = feature_columns  # Add feature names
+                model.suggested_ranges = {  # Add suggested input ranges
+                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                }
                 # Predict clusters for both training and test data
                 y_train_pred = model.predict(X_train)
                 y_test_pred = model.predict(X_test)
@@ -2174,7 +2353,9 @@ def train_model(request):
                     pca_data=X_test_pca,
                     cluster_centers_pca=cluster_centers_pca,
                     inertia=model.inertia_,
-                    silhouette_score=silhouette_test
+                    n_clusters=n_clusters,
+                    silhouette_score=silhouette_test,
+                    model_identifier= f'kmeans_model_{dataset_id}'
                 )
 
                 # Save the trained model as a .pkl file
@@ -2205,8 +2386,6 @@ def train_model(request):
                     metric_value=silhouette_test,
                 )
 
-
-
             else:
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
 
@@ -2221,29 +2400,35 @@ def train_model(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
-def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, feature_names=None, class_names=None, X=None, clusters=None, **kwargs):
+def generate_visualizations(
+        model_type, y_true=None, y_pred=None, model=None, 
+        feature_names=None, model_identifier=None,
+        class_names=None, X=None, clusters=None, 
+        n_clusters=None, cluster_centers_pca=None, 
+        pca_data=None, silhouette_score=None, inertia=None):
 
-    buffer = io.BytesIO()
+    # Create a unique directory for the model's visualizations
+    model_dir = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier or str(uuid.uuid4()))
+    os.makedirs(model_dir, exist_ok=True)
     visualizations = {}
     additional_metrics = {}
 
     if model_type == 'classification':
         # Generate confusion matrix
         cm = confusion_matrix(y_true, y_pred)
-        buffer = io.BytesIO()
+        cm_path = os.path.join(model_dir, 'confusion_matrix.png')
         plt.figure(figsize=(10, 8))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
         plt.title('Confusion Matrix')
         plt.xlabel('Predicted')
         plt.ylabel('Actual')
-        plt.savefig(buffer, format='png', bbox_inches='tight')
-        buffer.seek(0)
-        visualizations['confusion_matrix'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+        plt.savefig(cm_path, format='png', bbox_inches='tight')
+        visualizations['confusion_matrix'] = cm_path
         plt.close()
 
         # Generate decision tree visualization (if applicable)
         if model and isinstance(model, DecisionTreeClassifier):
-            buffer = io.BytesIO()
+            tree_path = os.path.join(model_dir, 'decision_tree.png')
             plt.figure(figsize=(20, 12))
             plot_tree(
                 model,
@@ -2254,17 +2439,93 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
                 fontsize=10
             )
             plt.title('Decision Tree Visualization')
-            plt.savefig(buffer, format='png', bbox_inches='tight')
-            buffer.seek(0)
-            visualizations['decision_tree'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            plt.savefig(tree_path, format='png', bbox_inches='tight')
+            visualizations['decision_tree'] = tree_path
+            plt.close()
+
+        # ROC Curve
+        if hasattr(model, 'predict_proba') and y_true is not None and y_pred is not None:
+            y_score = model.predict_proba(X)[:, 1]  # Probability scores for the positive class
+            fpr, tpr, _ = roc_curve(y_true, y_score)
+            roc_auc = auc(fpr, tpr)
+
+            roc_path = os.path.join(model_dir, 'roc_curve.png')
+            plt.figure(figsize=(10, 6))
+            plt.plot(fpr, tpr, color='blue', lw=2, label=f'ROC Curve (AUC = {roc_auc:.2f})')
+            plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+            plt.title('Receiver Operating Characteristic (ROC) Curve')
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.legend(loc='lower right')
+            plt.savefig(roc_path, format='png', bbox_inches='tight')
+            visualizations['roc_curve'] = roc_path
+            plt.close()
+
+        # Precision-Recall Curve
+        if hasattr(model, 'predict_proba') and y_true is not None and y_pred is not None:
+            precision, recall, _ = precision_recall_curve(y_true, y_score)
+            pr_auc = auc(recall, precision)
+
+            pr_path = os.path.join(model_dir, 'precision_recall_curve.png')
+            plt.figure(figsize=(10, 6))
+            plt.plot(recall, precision, color='green', lw=2, label=f'Precision-Recall Curve (AUC = {pr_auc:.2f})')
+            plt.title('Precision-Recall Curve')
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.legend(loc='lower left')
+            plt.savefig(pr_path, format='png', bbox_inches='tight')
+            visualizations['precision_recall_curve'] = pr_path
+            plt.close()
+
+        # Feature Importance Plot
+        if hasattr(model, 'feature_importances_') and feature_names is not None:
+            importances = model.feature_importances_
+            sorted_indices = np.argsort(importances)[::-1]
+            sorted_features = np.array(feature_names)[sorted_indices]
+            sorted_importances = importances[sorted_indices]
+
+            feature_importance_path = os.path.join(model_dir, 'feature_importance.png')
+            plt.figure(figsize=(12, 8))
+            sns.barplot(x=sorted_importances, y=sorted_features, palette='viridis')
+            plt.title('Feature Importance Plot')
+            plt.xlabel('Importance Score')
+            plt.ylabel('Features')
+            plt.savefig(feature_importance_path, format='png', bbox_inches='tight')
+            visualizations['feature_importance'] = feature_importance_path
+            plt.close()
+
+        # Learning Curve
+        if X is not None and y_true is not None:
+            train_sizes, train_scores, test_scores = learning_curve(
+                model, X, y_true, cv=5, scoring='accuracy', n_jobs=-1
+            )
+            train_mean = np.mean(train_scores, axis=1)
+            train_std = np.std(train_scores, axis=1)
+            test_mean = np.mean(test_scores, axis=1)
+            test_std = np.std(test_scores, axis=1)
+
+            learning_curve_path = os.path.join(model_dir, 'learning_curve.png')
+            plt.figure(figsize=(10, 6))
+            plt.plot(train_sizes, train_mean, label='Training Score', color='blue')
+            plt.fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.2, color='blue')
+            plt.plot(train_sizes, test_mean, label='Cross-Validation Score', color='green')
+            plt.fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.2, color='green')
+            plt.title('Learning Curve')
+            plt.xlabel('Training Set Size')
+            plt.ylabel('Accuracy Score')
+            plt.legend(loc='lower right')
+            plt.savefig(learning_curve_path, format='png', bbox_inches='tight')
+            visualizations['learning_curve'] = learning_curve_path
             plt.close()
 
         # Accuracy metric
         accuracy = accuracy_score(y_true, y_pred)
         additional_metrics['accuracy'] = round(accuracy, 3)
 
+
     elif model_type == 'regression':
         # Scatter Plot: Actual vs Predicted
+        lin_path = os.path.join(model_dir, 'linear_graph.png')
         plt.figure(figsize=(10, 6))
         plt.scatter(y_true, y_pred, alpha=0.5, label='Predicted vs Actual')
         plt.plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--', lw=2, label='Ideal Fit')
@@ -2272,9 +2533,51 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
         plt.xlabel('Actual Values')
         plt.ylabel('Predicted Values')
         plt.legend()
-        plt.savefig(buffer, format='png', bbox_inches='tight')
-        buffer.seek(0)
-        visualizations['linear_graph'] = base64.b64encode(buffer.getvalue()).decode()
+        plt.savefig(lin_path, format='png', bbox_inches='tight')
+        visualizations['linear_graph'] = lin_path
+        plt.close()
+
+        # Residuals Plot
+        residuals = y_true - y_pred
+        residuals_path = os.path.join(model_dir, 'residuals_plot.png')
+        plt.figure(figsize=(10, 6))
+        plt.scatter(y_pred, residuals, alpha=0.5)
+        plt.axhline(y=0, color='r', linestyle='--', lw=2)
+        plt.title('Residuals Plot')
+        plt.xlabel('Predicted Values')
+        plt.ylabel('Residuals (Actual - Predicted)')
+        plt.savefig(residuals_path, format='png', bbox_inches='tight')
+        visualizations['residuals_plot'] = residuals_path
+        plt.close()
+
+        # Histogram of Residuals
+        plt.figure(figsize=(10, 6))
+        histo_path = os.path.join(model_dir, 'histogram.png')
+        plt.hist(residuals, bins=20, alpha=0.7, color='blue', edgecolor='black')
+        plt.title('Histogram of Residuals')
+        plt.xlabel('Residuals')
+        plt.ylabel('Frequency')
+        plt.savefig(histo_path, format='png', bbox_inches='tight')
+        visualizations['histogram_residuals'] = histo_path
+        plt.close()
+
+        # Learning Curve
+        train_sizes, train_scores, test_scores = learning_curve(
+            model, X, y_true, cv=5, scoring='r2', n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 10)
+        )
+        train_scores_mean = np.mean(train_scores, axis=1)
+        test_scores_mean = np.mean(test_scores, axis=1)
+        learning_curve_path = os.path.join(model_dir, 'learning_curve.png')
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(train_sizes, train_scores_mean, 'o-', color='blue', label='Training Score')
+        plt.plot(train_sizes, test_scores_mean, 'o-', color='green', label='Cross-Validation Score')
+        plt.title('Learning Curve')
+        plt.xlabel('Training Examples')
+        plt.ylabel('Score (R²)')
+        plt.legend()
+        plt.savefig(learning_curve_path, format='png', bbox_inches='tight')
+        visualizations['learning_curve'] = learning_curve_path
         plt.close()
 
         # Metrics
@@ -2285,10 +2588,11 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
             'r2_score': round(r2, 3)
         }
 
+
     elif model_type == 'clustering':
         # PCA Visualization for Clusters
-        if 'pca_data' in kwargs and clusters is not None:
-            pca_data = kwargs['pca_data']
+        if pca_data is not None and clusters is not None and cluster_centers_pca is not None:
+            clusters_path = os.path.join(model_dir, 'clusters_plot.png')
             plt.figure(figsize=(10, 6))
             sns.scatterplot(
                 x=pca_data[:, 0],
@@ -2298,8 +2602,8 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
                 alpha=0.7
             )
             plt.scatter(
-                kwargs.get('cluster_centers_pca')[:, 0],
-                kwargs.get('cluster_centers_pca')[:, 1],
+                cluster_centers_pca[:, 0],
+                cluster_centers_pca[:, 1],
                 c='red',
                 s=200,
                 marker='X',
@@ -2309,16 +2613,49 @@ def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, fe
             plt.xlabel('PCA Component 1')
             plt.ylabel('PCA Component 2')
             plt.legend(title="Cluster")
-            plt.savefig(buffer, format='png', bbox_inches='tight')
-            buffer.seek(0)
-            visualizations['clusters_visual'] = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            plt.savefig(clusters_path, format='png', bbox_inches='tight')
+            visualizations['clusters_visual'] = clusters_path
+            plt.close()
+
+        # Silhouette Score Plot
+        if X is not None and clusters is not None and silhouette_score is not None and n_clusters is not None:
+            from sklearn.metrics import silhouette_samples
+
+            silhouette_vals = silhouette_samples(X, clusters)
+            y_lower = 0
+
+            silhouette_path = os.path.join(model_dir, 'silhouette_score.png')
+            plt.figure(figsize=(10, 6))
+            for i in range(n_clusters):
+                cluster_silhouette_vals = silhouette_vals[clusters == i]
+                cluster_silhouette_vals.sort()
+                y_upper = y_lower + len(cluster_silhouette_vals)
+                plt.barh(
+                    range(y_lower, y_upper),
+                    cluster_silhouette_vals,
+                    height=1.0,
+                    edgecolor='none',
+                    label=f"Cluster {i + 1}"
+                )
+                y_lower += len(cluster_silhouette_vals)
+
+            plt.axvline(silhouette_score, color='red', linestyle='--', label='Average Silhouette Score')
+            plt.xlabel('Silhouette Coefficient Values')
+            plt.ylabel('Cluster')
+            plt.title('Silhouette Plot')
+            plt.legend()
+            plt.savefig(silhouette_path, format='png', bbox_inches='tight')
+            visualizations['silhouette_plot'] = silhouette_path
             plt.close()
 
         # Additional Clustering Metrics
-        additional_metrics = {
-            'inertia': kwargs.get('inertia'),
-            'silhouette_score': kwargs.get('silhouette_score')
-        }
+        if inertia is not None and silhouette_score is not None:
+            additional_metrics = {
+                'inertia': inertia,
+                'silhouette_score': silhouette_score
+            }
+
+
 
     return {
         'visualizations': visualizations,
@@ -2360,6 +2697,145 @@ def render_predictions_view(request):
         'results': None,         # No predictions yet
         'metrics': None,         # No metrics yet
     })
+
+def fetch_models(request):
+    models = MLModel.objects.all().values('id', 'algorithm', 'created_at')
+    return JsonResponse({'models': list(models)})
+
+# API endpoint to fetch visualizations for a specific model
+def fetch_visualizations(request):
+    model_id = request.GET.get("id")
+    try:
+        model = MLModel.objects.get(id=model_id)
+        model_path = os.path.splitext(os.path.basename(model.model_path.path))[0]
+        print(f"visualizations folder name is {model_path}")
+        visualizations_dir = os.path.join(settings.MEDIA_ROOT, "visualizations", model_path)
+        print(f"visualizations folder directory is {visualizations_dir}")
+        
+        # Ensure directory exists
+        if not os.path.exists(visualizations_dir):
+            return JsonResponse({"visualizations": []})  # No visualizations found
+        
+        # List all PNG files in the directory
+        visualizations = [
+            f"/media/visualizations/{model_path}/{file}"
+            for file in os.listdir(visualizations_dir) if file.endswith(".png")
+        ]
+        return JsonResponse({"visualizations": visualizations})
+    except MLModel.DoesNotExist:
+        return JsonResponse({"error": "Model not found"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+# View to render the model_visualizations.html page
+def model_visualizations(request):
+    return render(request, 'model_visualizations.html')
+
+def model_predictions(request):
+    return render(request, 'model_predictions.html')
+
+def download_visualizations(request):
+    model_id = request.GET.get('id')
+    if not model_id:
+        return HttpResponse("Model ID not provided.", status=400)
+
+    model = MLModel.objects.get(id=model_id)
+    model_path = os.path.splitext(os.path.basename(model.model_path.path))[0]
+    print(f"visualizations folder name is {model_path}")
+    visualizations_dir = os.path.join(settings.MEDIA_ROOT, "visualizations", model_path)
+    print(f"visualizations folder directory is {visualizations_dir}")
+
+    if not os.path.exists(visualizations_dir):
+        return HttpResponse("No visualizations found.", status=404)
+
+    zip_filename = f"visualizations_model_{model_id}.zip"
+    zip_path = os.path.join(settings.MEDIA_ROOT, zip_filename)
+
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        for root, _, files in os.walk(visualizations_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                zipf.write(file_path, os.path.relpath(file_path, visualizations_dir))
+
+    # Serve the ZIP file
+    response = HttpResponse(open(zip_path, 'rb'), content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename="{zip_filename}"'
+
+    # Optional: Clean up the ZIP file after serving
+    os.remove(zip_path)
+
+    return response
+
+def fetch_model_details(request):
+    model_id = request.GET.get('id')
+    if not model_id:
+        return JsonResponse({"error": "Model ID not provided"}, status=400)
+
+    try:
+        # Fetch the ML model from the database
+        ml_model = MLModel.objects.get(id=model_id)
+        model = joblib.load(ml_model.model_path.path)
+
+        # Ensure the model contains feature_names_in_ and suggested_ranges
+        if not hasattr(model, 'feature_names_in_') or not hasattr(model, 'suggested_ranges'):
+            return JsonResponse({"error": "Model does not contain feature metadata. Retrain the model with updated code."}, status=500)
+
+        # Prepare feature details
+        features = [
+            {
+                "name": feature_name,
+                "suggested_range": model.suggested_ranges.get(feature_name, "Unknown")
+            }
+            for feature_name in model.feature_names_in_
+        ]
+
+        return JsonResponse({
+            "algorithm": ml_model.algorithm,
+            "created_at": ml_model.created_at.strftime("%Y-%m-%d"),
+            "features": features
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def make_prediction(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    model_id = request.GET.get('id')
+    if not model_id:
+        return JsonResponse({"error": "Model ID not provided"}, status=400)
+
+    try:
+        # Fetch the ML model from the database
+        ml_model = MLModel.objects.get(id=model_id)
+        model = joblib.load(ml_model.model_path.path)
+
+        # Ensure the model contains feature_names_in_
+        if not hasattr(model, 'feature_names_in_'):
+            return JsonResponse({"error": "Model does not contain feature metadata. Retrain the model with updated code."}, status=500)
+
+        # Parse the input data
+        payload = json.loads(request.body)
+        input_data = []
+
+        for feature in model.feature_names_in_:
+            if feature not in payload:
+                return JsonResponse({"error": f"Missing input for feature: {feature}"}, status=400)
+            input_data.append(payload[feature])
+
+        # Make prediction
+        prediction = model.predict([input_data])[0]
+
+        # Convert prediction to a standard Python data type
+        if isinstance(prediction, (np.integer, np.floating)):
+            prediction = prediction.item()  # Converts to Python int or float
+
+        return JsonResponse({"prediction": prediction})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 
 @csrf_exempt
