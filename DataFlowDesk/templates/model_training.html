@@ -1,174 +1,229 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mx-auto mt-10 p-6 bg-white shadow-md rounded-lg">
-    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Train a Machine Learning Model</h2>
-    
-    <form id="trainForm" method="post" enctype="multipart/form-data" class="space-y-6">
-        {% csrf_token %}
-        <!-- Dataset Selection -->
-        <div>
-            <label for="datasetId" class="block text-sm font-medium text-gray-700">Select Dataset:</label>
-            <select id="datasetId" name="datasetId" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                {% for data in dataset %}
-                    <option value="{{ data.id }}">{{ data.name }} 🎁</option>
-                {% endfor %}
-            </select>
-        </div>
+<!-- Include Sidebar -->
+{% include 'includes/sidebar.html' %}
 
-        <!-- Target Column Selection -->
-        <div>
-            <label for="targetColumn" class="block text-sm font-medium text-gray-700">Select Target Column:</label>
-            <select id="targetColumn" name="targetColumn" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                <option value="" disabled selected>Choose a dataset first...</option>
-            </select>
+<!-- Main Content Area -->
+<div class="ml-64 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">Model Training</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-600">{{ user.username }}</span>
+                    <img src="{% static 'images/avatar.png' %}" alt="User Avatar" class="h-8 w-8 rounded-full">
+                </div>
+            </div>
         </div>
+    </nav>
 
-        <!-- Model Selection -->
-        <div>
-            <label for="model" class="block text-sm font-medium text-gray-700">Select Model:</label>
-            <select id="model" name="model" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                <optgroup label="Regression">
-                    <option value="linear_regression">Linear Regression</option>
-                    <option value="polynomial_regression">Polynomial Regression</option>
-                    <option value="logistic_regression">Logistic Regression</option>
-                </optgroup>
-                <optgroup label="Classification">
-                    <option value="decision_tree">Decision Tree</option>
-                    <option value="naive_bayes">Naive Bayes</option>
-                    <option value="svm">SVM</option>
-                    <option value="random_forest">Random Forest</option>
-                    <option value="knn">k-Nearest Neighbors</option>
-                </optgroup>
-                <optgroup label="Clustering">
-                    <option value="kmeans">K-Means</option>
-                </optgroup>
-                <optgroup label="Neural Networks">
-                    <option value="neural_network">Neural Network</option>
-                </optgroup>
-            </select>
-        </div>
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="bg-white/80 backdrop-blur-md shadow-xl rounded-2xl p-8 border border-gray-100">
+            <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500 text-center mb-8">Train Your Machine Learning Model</h2>
+            
+            <form id="trainForm" method="post" enctype="multipart/form-data" class="space-y-8">
+                {% csrf_token %}
+                
+                <!-- Dataset Selection -->
+                <div>
+                    <label for="datasetId" class="block text-sm font-medium text-gray-700">Select Dataset:</label>
+                    <select id="datasetId" name="datasetId" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        {% for data in dataset %}
+                            <option value="{{ data.id }}">{{ data.name }} 🎁</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-        <!-- Parameters -->
-        <div id="parametersField">
-            <label for="parameters" class="block text-sm font-medium text-gray-700">Enter Parameters (JSON Format):</label>
-            <textarea id="parameters" name="parameters" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                placeholder='{"parameter1": value1, "parameter2": value2}' rows="4"></textarea>
-        </div>
+                <!-- Target Column Selection -->
+                <div>
+                    <label for="targetColumn" class="block text-sm font-medium text-gray-700">Select Target Column:</label>
+                    <select id="targetColumn" name="targetColumn" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        <option value="" disabled selected>Choose a dataset first...</option>
+                    </select>
+                </div>
 
-        <!-- Dynamic Parameters for Linear Regression -->
-        <div id="linearRegressionParams" class="hidden">
-            <label for="fitIntercept" class="block text-sm font-medium text-gray-700">Fit Intercept:</label>
-            <select id="fitIntercept" name="fitIntercept" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                <option value="true">True</option>
-                <option value="false">False</option>
-            </select>
-        </div>
+                <!-- Model Selection -->
+                <div>
+                    <label for="model" class="block text-sm font-medium text-gray-700">Select Model:</label>
+                    <select id="model" name="model" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        <optgroup label="Regression">
+                            <option value="linear_regression">Linear Regression</option>
+                            <option value="polynomial_regression">Polynomial Regression</option>
+                            <option value="logistic_regression">Logistic Regression</option>
+                        </optgroup>
+                        <optgroup label="Classification">
+                            <option value="decision_tree">Decision Tree</option>
+                            <option value="naive_bayes">Naive Bayes</option>
+                            <option value="svm">SVM</option>
+                            <option value="random_forest">Random Forest</option>
+                            <option value="knn">k-Nearest Neighbors</option>
+                        </optgroup>
+                        <optgroup label="Clustering">
+                            <option value="kmeans">K-Means</option>
+                        </optgroup>
+                        <optgroup label="Neural Networks">
+                            <option value="neural_network">Neural Network</option>
+                        </optgroup>
+                    </select>
+                </div>
 
-        <!-- Parameters for Decision Tree -->
-        <div id="decisionTreeParams" class="hidden">
-            <label for="maxDepth" class="block text-sm font-medium text-gray-700">Max Depth:</label>
-            <input type="number" id="maxDepth" name="maxDepth" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 5">
-        </div>
+                <!-- Parameters -->
+                <div id="parametersField">
+                    <label for="parameters" class="block text-sm font-medium text-gray-700">Enter Parameters (JSON Format):</label>
+                    <textarea id="parameters" name="parameters" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        placeholder='{"parameter1": value1, "parameter2": value2}' rows="4"></textarea>
+                </div>
 
-        <!-- Parameters for Random Forest -->
-        <div id="randomForestParams" class="hidden">
-            <label for="nEstimators" class="block text-sm font-medium text-gray-700">Number of Estimators:</label>
-            <input type="number" id="nEstimators" name="nEstimators" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 100">
-        </div>
+                <!-- Dynamic Parameters for Linear Regression -->
+                <div id="linearRegressionParams" class="hidden">
+                    <label for="fitIntercept" class="block text-sm font-medium text-gray-700">Fit Intercept:</label>
+                    <select id="fitIntercept" name="fitIntercept" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                </div>
 
-        <!-- Parameters for k-Nearest Neighbors -->
-        <div id="knnParams" class="hidden">
-            <label for="nNeighbors" class="block text-sm font-medium text-gray-700">Number of Neighbors:</label>
-            <input type="number" id="nNeighbors" name="nNeighbors" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 5">
-        </div>
+                <!-- Parameters for Decision Tree -->
+                <div id="decisionTreeParams" class="hidden">
+                    <label for="maxDepth" class="block text-sm font-medium text-gray-700">Max Depth:</label>
+                    <input type="number" id="maxDepth" name="maxDepth" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 5">
+                </div>
 
-        <!-- Parameters for SVM -->
-        <div id="svmParams" class="hidden">
-            <label for="kernel" class="block text-sm font-medium text-gray-700">Kernel:</label>
-            <select id="kernel" name="kernel" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                <option value="linear">Linear</option>
-                <option value="poly">Polynomial</option>
-                <option value="rbf">RBF</option>
-            </select>
-        </div>
+                <!-- Parameters for Random Forest -->
+                <div id="randomForestParams" class="hidden">
+                    <label for="nEstimators" class="block text-sm font-medium text-gray-700">Number of Estimators:</label>
+                    <input type="number" id="nEstimators" name="nEstimators" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 100">
+                </div>
 
-        <!-- Polynomial Regression Parameters -->
-        <div id="polynomialRegressionParams" class="hidden">
-            <label for="degree" class="block text-sm font-medium text-gray-700">Degree:</label>
-            <input type="number" id="degree" name="degree" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                placeholder="e.g., 2">
-        </div>
+                <!-- Parameters for k-Nearest Neighbors -->
+                <div id="knnParams" class="hidden">
+                    <label for="nNeighbors" class="block text-sm font-medium text-gray-700">Number of Neighbors:</label>
+                    <input type="number" id="nNeighbors" name="nNeighbors" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" placeholder="e.g., 5">
+                </div>
 
-        <!-- Logistic Regression Parameters -->
-        <div id="logisticRegressionParams" class="hidden">
-            <label for="solver" class="block text-sm font-medium text-gray-700">Solver:</label>
-            <select id="solver" name="solver" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
-                <option value="lbfgs">lbfgs</option>
-                <option value="saga">saga</option>
-                <option value="liblinear">liblinear</option>
-            </select>
-        </div>
+                <!-- Parameters for SVM -->
+                <div id="svmParams" class="hidden">
+                    <label for="kernel" class="block text-sm font-medium text-gray-700">Kernel:</label>
+                    <select id="kernel" name="kernel" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        <option value="linear">Linear</option>
+                        <option value="poly">Polynomial</option>
+                        <option value="rbf">RBF</option>
+                    </select>
+                </div>
 
-        <!-- Naive Bayes Parameters -->
-        <div id="naiveBayesParams" class="hidden">
-            <label for="varSmoothing" class="block text-sm font-medium text-gray-700">Variance Smoothing:</label>
-            <input type="text" id="varSmoothing" name="varSmoothing" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                placeholder="e.g., 1e-9">
-        </div>
+                <!-- Polynomial Regression Parameters -->
+                <div id="polynomialRegressionParams" class="hidden">
+                    <label for="degree" class="block text-sm font-medium text-gray-700">Degree:</label>
+                    <input type="number" id="degree" name="degree" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        placeholder="e.g., 2">
+                </div>
 
-        <!-- K-Means Parameters -->
-        <div id="kmeansParams" class="hidden">
-            <label for="nClusters" class="block text-sm font-medium text-gray-700">Number of Clusters:</label>
-            <input type="number" id="nClusters" name="nClusters" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                placeholder="e.g., 3">
-        </div>
+                <!-- Logistic Regression Parameters -->
+                <div id="logisticRegressionParams" class="hidden">
+                    <label for="solver" class="block text-sm font-medium text-gray-700">Solver:</label>
+                    <select id="solver" name="solver" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300">
+                        <option value="lbfgs">lbfgs</option>
+                        <option value="saga">saga</option>
+                        <option value="liblinear">liblinear</option>
+                    </select>
+                </div>
 
-        <!-- Neural Network Parameters -->
-        <div id="neuralNetworkParams" class="hidden">
-            <label for="hiddenLayers" class="block text-sm font-medium text-gray-700">Hidden Layer Sizes:</label>
-            <input type="text" id="hiddenLayers" name="hiddenLayers" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                placeholder="e.g., (100,) or (50, 50)">
-        </div>
+                <!-- Naive Bayes Parameters -->
+                <div id="naiveBayesParams" class="hidden">
+                    <label for="varSmoothing" class="block text-sm font-medium text-gray-700">Variance Smoothing:</label>
+                    <input type="text" id="varSmoothing" name="varSmoothing" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        placeholder="e.g., 1e-9">
+                </div>
 
-        <!-- Train/Test Split -->
-        <div>
-            <label for="trainTestSplit" class="block text-sm font-medium text-gray-700">Train/Test Split (%):</label>
-            <input type="number" id="trainTestSplit" name="trainTestSplit" 
-                class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
-                min="10" max="90" value="80">
-        </div>
+                <!-- K-Means Parameters -->
+                <div id="kmeansParams" class="hidden">
+                    <label for="nClusters" class="block text-sm font-medium text-gray-700">Number of Clusters:</label>
+                    <input type="number" id="nClusters" name="nClusters" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        placeholder="e.g., 3">
+                </div>
 
-        <!-- Submit Button -->
-        <div class="text-center">
-            <button type="submit" 
-                class="w-full px-6 py-3 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition duration-300">
-                Train Model
-            </button>
-        </div>
-    </form>
+                <!-- Neural Network Parameters -->
+                <div id="neuralNetworkParams" class="hidden">
+                    <label for="hiddenLayers" class="block text-sm font-medium text-gray-700">Hidden Layer Sizes:</label>
+                    <input type="text" id="hiddenLayers" name="hiddenLayers" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        placeholder="e.g., (100,) or (50, 50)">
+                </div>
 
-    <!-- Results Section -->
-    <div id="results" class="mt-10 hidden">
-        <h3 class="text-2xl font-bold text-gray-800 mb-4">Training Results</h3>
-        <div id="metrics" class="bg-gray-100 p-4 rounded-md text-sm text-gray-700 font-mono mb-6"></div>
-        
-    <!-- Visualization Section -->
-    <div id="visualization-container" class="mt-6">
-        <h4 class="text-xl font-semibold text-gray-800 mb-3">Model Performance Visualizations</h4>
-        <div id="visualization-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Visualizations will be dynamically added here -->
+                <!-- Train/Test Split -->
+                <div>
+                    <label for="trainTestSplit" class="block text-sm font-medium text-gray-700">Train/Test Split (%):</label>
+                    <input type="number" id="trainTestSplit" name="trainTestSplit" 
+                        class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring focus:ring-blue-300" 
+                        min="10" max="90" value="80">
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex justify-center pt-6">
+                    <button type="submit" 
+                        class="group px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-lg font-semibold 
+                        hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200">
+                        <span class="flex items-center space-x-2">
+                            <span>Train Model</span>
+                            <span class="group-hover:translate-x-1 transition-transform duration-200">🚀</span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Results Section -->
+            <div id="results" class="mt-10 hidden animate-fade-in">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">Training Results</h3>
+                        <button id="downloadModelBtn" 
+                            class="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg 
+                            hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2">
+                            <span>Download Model</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Metrics -->
+                    <div id="metrics" class="prose max-w-none mb-8"></div>
+                    
+                    <!-- Visualizations -->
+                    <div id="visualization-container">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-4">Model Insights</h4>
+                        <div id="visualization-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Visualizations will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                <div class="bg-white p-8 rounded-xl shadow-xl">
+                    <div class="flex items-center space-x-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <p class="text-lg font-medium text-gray-700">Training your model...</p>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
     </div>
 </div>
 
+<!-- Previous Script Section Remains the Same -->
 <script>
     const datasetSelect = document.getElementById('datasetId');
     const targetColumnSelect = document.getElementById('targetColumn');
@@ -213,50 +268,50 @@
 
     // Handle dynamic display of parameters
     modelSelect.addEventListener('change', () => {
-    console.log("Model selected:", modelSelect.value); // Debugging
+        console.log("Model selected:", modelSelect.value); // Debugging
 
-    // Hide all parameter fields initially
-    decisionTreeParams.classList.add('hidden');
-    randomForestParams.classList.add('hidden');
-    knnParams.classList.add('hidden');
-    svmParams.classList.add('hidden');
-    polynomialRegressionParam.classList.add('hidden');
-    logisticRegressionParams.classList.add('hidden');
-    naiveBayesParams.classList.add('hidden');
-    kmeansParams.classList.add('hidden');
-    neuralNetworkParams.classList.add('hidden');
+        // Hide all parameter fields initially
+        decisionTreeParams.classList.add('hidden');
+        randomForestParams.classList.add('hidden');
+        knnParams.classList.add('hidden');
+        svmParams.classList.add('hidden');
+        polynomialRegressionParam.classList.add('hidden');
+        logisticRegressionParams.classList.add('hidden');
+        naiveBayesParams.classList.add('hidden');
+        kmeansParams.classList.add('hidden');
+        neuralNetworkParams.classList.add('hidden');
 
-    if (modelSelect.value === 'linear_regression') {
-        parametersField.classList.add('hidden');
-        linearRegressionParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'decision_tree') {
-        parametersField.classList.add('hidden');
-        decisionTreeParams.classList.remove('hidden');
-    }  else if (modelSelect.value === 'random_forest') {
-         parametersField.classList.add('hidden');
-         randomForestParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'knn') {
-         parametersField.classList.add('hidden');
-         knnParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'svm') {
-        parametersField.classList.add('hidden');
-        svmParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'polynomial_regression') {
-        parametersField.classList.add('hidden');
-        polynomialRegressionParam.classList.remove('hidden');
-    } else if (modelSelect.value === 'logistic_regression') {
-        parametersField.classList.add('hidden');
-        logisticRegressionParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'naive_bayes') {
-        parametersField.classList.add('hidden');
-        naiveBayesParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'kmeans') {
-        parametersField.classList.add('hidden');
-        kmeansParams.classList.remove('hidden');
-    } else if (modelSelect.value === 'neural_network') {
-        parametersField.classList.add('hidden');
-        neuralNetworkParams.classList.remove('hidden');
-    }
+        if (modelSelect.value === 'linear_regression') {
+            parametersField.classList.add('hidden');
+            linearRegressionParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'decision_tree') {
+            parametersField.classList.add('hidden');
+            decisionTreeParams.classList.remove('hidden');
+        }  else if (modelSelect.value === 'random_forest') {
+             parametersField.classList.add('hidden');
+             randomForestParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'knn') {
+             parametersField.classList.add('hidden');
+             knnParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'svm') {
+            parametersField.classList.add('hidden');
+            svmParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'polynomial_regression') {
+            parametersField.classList.add('hidden');
+            polynomialRegressionParam.classList.remove('hidden');
+        } else if (modelSelect.value === 'logistic_regression') {
+            parametersField.classList.add('hidden');
+            logisticRegressionParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'naive_bayes') {
+            parametersField.classList.add('hidden');
+            naiveBayesParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'kmeans') {
+            parametersField.classList.add('hidden');
+            kmeansParams.classList.remove('hidden');
+        } else if (modelSelect.value === 'neural_network') {
+            parametersField.classList.add('hidden');
+            neuralNetworkParams.classList.remove('hidden');
+        }
 
     });
 
@@ -296,6 +351,7 @@
                             <h4 class="font-bold text-purple-800">Clustering Results</h4>
                             <p class="text-purple-700">Silhouette Score: ${result.results.metrics.silhouette_score.toFixed(4)}</p>
                             
+
                             <p class="text-purple-700">Inertia: ${result.results.metrics.inertia.toFixed(4)}</p>
                         </div>`;
                 } else {
@@ -339,6 +395,56 @@
         }
     });
 
-
+    // Handle model download
+    document.getElementById('downloadModelBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/download_model/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'trained_model.pkl';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } else {
+                throw new Error('Download failed');
+            }
+        } catch (error) {
+            console.error('Error downloading model:', error);
+            alert('Failed to download the model. Please try again.');
+        }
+    });
 </script>
+
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Add responsive sidebar handling */
+@media (max-width: 768px) {
+    .ml-64 {
+        margin-left: 0;
+    }
+    aside {
+        transform: translateX(-100%);
+    }
+    aside.show {
+        transform: translateX(0);
+    }
+}
+</style>
 {% endblock %}

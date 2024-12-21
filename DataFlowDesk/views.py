@@ -1,3 +1,32 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+from django.conf import settings
+from datetime import datetime
+from .models import Dataset, MLModel, DataPreprocessingLog, Profile
+from django.db.models.functions import TruncMonth
+from django.db.models import Avg
+from django.db import models
+import json
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
+from matplotlib.backends.backend_agg import FigureCanvas
+
+from django.conf import settings
+
+def fig_to_base64(fig):
+    """Convert matplotlib figure to base64 string"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
 from django.shortcuts import render
 from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
@@ -39,9 +68,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 def index(request) :
     return render( request, "index.html")
+
 
 @ensure_csrf_cookie
 def signin(request):
@@ -57,6 +86,337 @@ def signin(request):
             return JsonResponse({'success': False, 'error': 'Invalid credentials'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+from django.shortcuts import render
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+from .models import Dataset, MLModel, DataPreprocessingLog, ModelResult
+from django.db.models.functions import TruncMonth
+
+import matplotlib.pyplot as plt
+import io
+import base64
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+
+def general_dashboard(request):
+    if not request.user.is_authenticated:
+        return redirect('signin')
+        
+    # Get all datasets for the current user
+    datasets = Dataset.objects.filter(user=request.user)
+    
+    # Basic Statistics
+    total_datasets = datasets.count()
+    clean_datasets = datasets.filter(status='processed').count()
+    unclean_datasets = total_datasets - clean_datasets
+    total_models = MLModel.objects.count()
+    
+    # Calculate percentages
+    clean_datasets_percentage = (clean_datasets / total_datasets * 100) if total_datasets > 0 else 0
+    unclean_datasets_percentage = (unclean_datasets / total_datasets * 100) if total_datasets > 0 else 0
+    
+    # Calculate usage percentage for each dataset
+    for dataset in datasets:
+        usage_count = MLModel.objects.filter(dataset=dataset).count()
+        max_usage = MLModel.objects.count() or 1  # Avoid division by zero
+        dataset.usage_percentage = (usage_count / max_usage) * 100
+    
+    # Get current and previous month for comparison
+    current_date = timezone.now()
+    current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+    
+    # Dataset categories analysis (current month)
+    current_month_stats = {
+        'Diagnostic Imaging': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='diagnostic imaging'
+        ).count(),
+        'Data.Gov': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='data.gov'
+        ).count(),
+        'Image Net': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='image net'
+        ).count(),
+        'MNIST': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='mnist'
+        ).count(),
+        'MHLDDS': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='mhldds'
+        ).count(),
+        'HES': datasets.filter(
+            uploaded_at__gte=current_month_start,
+            description__icontains='hes'
+        ).count(),
+    }
+
+    # Previous month statistics using the same categories
+    previous_month_stats = {}
+    for category, _ in current_month_stats.items():
+        previous_month_stats[category] = datasets.filter(
+            uploaded_at__gte=previous_month_start,
+            uploaded_at__lt=current_month_start,
+            description__icontains=category.lower()
+        ).count()
+    
+    # Quality and Completeness Analysis
+    last_6_months = current_date - timedelta(days=180)
+    monthly_stats = datasets.filter(
+        uploaded_at__gte=last_6_months
+    ).annotate(
+        month=TruncMonth('uploaded_at')
+    ).values('month').annotate(
+        total=Count('id'),
+        clean=Count('id', filter=models.Q(status='processed'))
+    ).order_by('month')
+    
+    quality_labels = []
+    completeness_data = []
+    quality_data = []
+    
+    for stat in monthly_stats:
+        quality_labels.append(stat['month'].strftime('%b %Y'))
+        total = stat['total']
+        clean = stat['clean']
+        completeness = (clean / total * 100) if total > 0 else 0
+        quality = completeness * 0.8  # Simplified quality metric
+        completeness_data.append(completeness)
+        quality_data.append(quality)
+    
+    # Generate matplotlib visualizations
+    plt.style.use('fivethirtyeight')  # Using a built-in style
+    
+    # Set global font size
+    plt.rcParams.update({'font.size': 10})
+    
+    # 1. Missing Values Bar Chart
+    missing_data = datasets.filter(status='processed').count()
+    total_data = datasets.count()
+    
+    fig_missing = plt.figure(figsize=(10, 6))
+    plt.bar(['Complete Data', 'Missing Data'], 
+           [total_data - missing_data, missing_data],
+           color=['#10B981', '#EF4444'])
+    plt.title('Data Completeness Overview', pad=20)
+    plt.ylabel('Number of Datasets')
+    for i, v in enumerate([total_data - missing_data, missing_data]):
+        plt.text(i, v, str(v), ha='center', va='bottom')
+    plt.tight_layout()
+    dataset_dist_plot = fig_to_base64(fig_missing)
+    plt.close(fig_missing)
+    
+    # 2. Data Types Distribution Pie Chart
+    fig_types = plt.figure(figsize=(10, 6))
+    data_types = {
+        'CSV Files': datasets.filter(file_path__endswith='.csv').count(),
+        'Excel Files': datasets.filter(file_path__endswith='.xlsx').count() + 
+                      datasets.filter(file_path__endswith='.xls').count(),
+        'Text Files': datasets.filter(file_path__endswith='.txt').count(),
+    }
+    
+    plt.pie(data_types.values(), 
+           labels=data_types.keys(),
+           autopct='%1.1f%%',
+           colors=['#4F46E5', '#10B981', '#F59E0B'],
+           explode=[0.05] * len(data_types))
+    plt.title('Dataset Types Distribution', pad=20)
+    plt.tight_layout()
+    quality_trend_plot = fig_to_base64(fig_types)
+    plt.close(fig_types)
+    
+    # Dataset Usage Statistics
+    datasets_usage = []
+    for dataset in datasets:
+        usage_count = MLModel.objects.filter(dataset=dataset).count()
+        if usage_count > 0:
+            datasets_usage.append({
+                'title': dataset.name,
+                'usage_percentage': min((usage_count / total_datasets * 100), 100),
+                'count': usage_count
+            })
+    
+    # Sort datasets_usage by count in descending order
+    datasets_usage = sorted(datasets_usage, key=lambda x: x['count'], reverse=True)[:10]
+    
+    # 3. Dataset Usage Heatmap
+    if datasets_usage:
+        usage_data = [[d['usage_percentage']] for d in datasets_usage[:8]]
+        labels = [d['title'] for d in datasets_usage[:8]]
+        
+        fig_heatmap = plt.figure(figsize=(12, 4))
+        plt.imshow([usage_data[0]], cmap='YlOrRd', aspect='auto')
+        plt.colorbar(label='Usage %')
+        plt.yticks(range(len(labels)), labels)
+        plt.xticks([])  # Hide x-axis ticks
+        plt.title('Dataset Usage Intensity', pad=20)
+        plt.tight_layout()
+        usage_heatmap = fig_to_base64(fig_heatmap)
+        plt.close(fig_heatmap)
+    else:
+        usage_heatmap = None
+    
+    # 4. Processing Status Donut Chart
+    fig_status = plt.figure(figsize=(8, 8))
+    colors = ['#10B981', '#EF4444']
+    plt.pie([clean_datasets, unclean_datasets], 
+           labels=['Clean', 'Unclean'], 
+           autopct='%1.1f%%',
+           colors=colors,
+           wedgeprops=dict(width=0.5, edgecolor='white'),
+           textprops={'color': '#374151', 'fontsize': 12})
+    plt.title('Dataset Processing Status', pad=20)
+    processing_status_plot = fig_to_base64(fig_status)
+    plt.close(fig_status)
+    
+    # Calculate average completeness and quality
+    avg_completeness = sum(completeness_data) / len(completeness_data) if completeness_data else 0
+    avg_quality = sum(quality_data) / len(quality_data) if quality_data else 0
+    
+    # Model Performance Metrics (average across all models)
+    model_metrics = MLModel.objects.all()
+    model_performance = [0, 0, 0, 0, 0]  # Default values
+    
+    if model_metrics.exists():
+        total_models = 0
+        accuracy_sum = 0
+        precision_sum = 0
+        recall_sum = 0
+        f1_sum = 0
+        roc_auc_sum = 0
+        
+        for model in model_metrics:
+            if model.results:  # Check if results exist
+                try:
+                    results = model.results
+                    if isinstance(results, str):
+                        results = json.loads(results)
+                    
+                    # Extract metrics from results
+                    accuracy_sum += float(results.get('accuracy', 0))
+                    precision_sum += float(results.get('precision', 0))
+                    recall_sum += float(results.get('recall', 0))
+                    f1_sum += float(results.get('f1_score', 0))
+                    roc_auc_sum += float(results.get('roc_auc', 0))
+                    total_models += 1
+                except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
+                    continue
+        
+        # Calculate averages if we have valid models
+        if total_models > 0:
+            model_performance = [
+                (accuracy_sum / total_models) * 100,
+                (precision_sum / total_models) * 100,
+                (recall_sum / total_models) * 100,
+                (f1_sum / total_models) * 100,
+                (roc_auc_sum / total_models) * 100
+            ]
+    
+    # Recent Activities
+    recent_activities = []
+    
+    # Dataset activities
+    dataset_activities = datasets.order_by('-uploaded_at')[:5]
+    for dataset in dataset_activities:
+        recent_activities.append({
+            'timestamp': dataset.uploaded_at,
+            'description': f'Dataset "{dataset.name}" was uploaded'
+        })
+    
+    # Model training activities
+    model_activities = MLModel.objects.order_by('-created_at')[:5]
+    for model in model_activities:
+        recent_activities.append({
+            'timestamp': model.created_at,
+            'description': f'this model was trained on dataset "{model.dataset.name}"'
+        })
+    
+    # Sort activities by timestamp
+    recent_activities = sorted(recent_activities, key=lambda x: x['timestamp'], reverse=True)[:5]
+    
+   # Get trained models data
+    trained_models = MLModel.objects.filter(dataset__user=request.user).select_related('dataset').order_by('-created_at')
+    models_data = []
+    
+    for model in trained_models:
+        # Get all results for this model
+        model_results = ModelResult.objects.filter(
+            model=model
+        ).order_by('-generated_at')
+
+        # Create a dictionary to store all metrics
+        metrics = {}
+        for result in model_results:
+            metrics[result.metric_name.lower()] = result.metric_value
+
+        model_data = {
+            'id': model.id,
+            'name': model.algorithm,
+            'dataset_name': model.dataset.name,
+            'dataset_id': model.dataset.id,
+            'type': 'classification' if 'class' in model.algorithm.lower() else 'regression',
+            'created_at': model.created_at,
+            'accuracy': metrics.get('accuracy', None),  # Get accuracy if it exists
+            'precision': metrics.get('precision', None),
+            'recall': metrics.get('recall', None),
+            'f1_score': metrics.get('f1_score', None)
+        }
+        models_data.append(model_data)
+
+    # Group models by dataset
+    dataset_results = {}
+    for model_data in models_data:
+        dataset_id = model_data['dataset_id']
+        if dataset_id not in dataset_results:
+            dataset_results[dataset_id] = {
+                'dataset_name': model_data['dataset_name'],
+                'models': []
+            }
+        dataset_results[dataset_id]['models'].append(model_data)
+    
+    context = {
+        'datasets': datasets,
+        'total_datasets': total_datasets,
+        'clean_datasets': clean_datasets,
+        'unclean_datasets': unclean_datasets,
+        'total_models': total_models,
+        'clean_datasets_percentage': round(clean_datasets_percentage, 1),
+        'unclean_datasets_percentage': round(unclean_datasets_percentage, 1),
+        'completeness': round(avg_completeness, 1),
+        'quality': round(avg_quality, 1),
+        'datasets_analysis_current': list(current_month_stats.values()),
+        'datasets_analysis_previous': list(previous_month_stats.values()),
+        'quality_labels': quality_labels,
+        'completeness_data': completeness_data,
+        'quality_data': quality_data,
+        'datasets_usage': datasets_usage,
+        'dataset_dist_plot': dataset_dist_plot,
+        'quality_trend_plot': quality_trend_plot,
+        'usage_heatmap': usage_heatmap,
+        'processing_status_plot': processing_status_plot,
+        'model_performance': model_performance,
+        'recent_activities': recent_activities,
+        'trained_models': models_data,
+        'dataset_results': dataset_results,
+        'trained_models': models_data,
+    }
+    
+    return render(request, "general_dashboard.html", context)
+
+
+def fig_to_base64(fig):
+    """Convert matplotlib figure to base64 string"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
 
 @ensure_csrf_cookie
 def signup(request):
@@ -85,14 +445,6 @@ def signup(request):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
-
-
-def generate_plot_base64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
-    buf.seek(0)
-    plt.close(fig)  # Close the figure to free memory
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 
 def dashboard(request,dataset_id):
@@ -167,19 +519,21 @@ def dashboard(request,dataset_id):
 
         
         # Create target class distribution plot
-        plt.figure(figsize=(8, 6))
+        plt.style.use('fivethirtyeight')
+        fig = plt.figure(figsize=(8, 6))
         target_column = dataset.target_class  # Get the actual target column name
-        target_counts = data[target_column].value_counts()
-        sns.barplot(x=target_counts.index, y=target_counts.values)
-        plt.title(f'Distribution of {target_column}')
-        plt.xlabel(target_column)
-        plt.ylabel('Count')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        # Convert plot to base64 string
-        target_dist_plot = generate_plot_base64(plt.gcf())
-        plt.close()
+        if target_column and target_column in data.columns:
+            target_counts = data[target_column].value_counts()
+            plt.bar(range(len(target_counts)), target_counts.values, alpha=0.7)
+            plt.xticks(range(len(target_counts)), target_counts.index, rotation=45)
+            plt.title(f'Distribution of {target_column}', pad=20)
+            plt.xlabel(target_column)
+            plt.ylabel('Count')
+            plt.tight_layout()
+            target_dist_plot = fig_to_base64(fig)
+            plt.close(fig)
+        else:
+            target_dist_plot = None
 
         return render(request, 'dashboard.html', {
             'dataset': dataset,
@@ -238,7 +592,6 @@ from django.conf import settings
 import os
 import csv
 from datetime import datetime
-from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Dataset
@@ -252,7 +605,7 @@ def create_dataset_step2(request):
             # Get all the form data
             data = request.POST.getlist('data')
             dataset_meta = json.loads(request.POST.get('dataset_meta', '{}'))
-            
+            target_class = request.POST.get('target_class')  # Get target class from form
             if not dataset_meta:
                 return JsonResponse({"error": "Missing dataset metadata"}, status=400)
 
@@ -328,6 +681,7 @@ def create_dataset_step2(request):
                 description=dataset_meta.get('description', ''),
                 file_path=file_path,  # Path relative to MEDIA_ROOT
                 columns_info=columns,
+                target_class=target_class,
                 status="uploaded"
             )
 
@@ -1112,8 +1466,6 @@ from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
-from .models import *
-from django.core.files.storage import default_storage
 from datetime import datetime
 import json
 # from autoclean import autoclean
@@ -1310,16 +1662,37 @@ def clean_dataset(df, delete_header=False):
     """
     print("Starting dataset cleaning...")
     
-    # Keep track of categorical columns
+    # Store original column information
+    original_columns = df.columns.tolist()
+    
+    # Keep track of categorical columns and target column
     categorical_columns = []
+    target_column = None
 
     # If user wants to delete header
     if delete_header:
         print("Deleting header and using first data row as new header...")
+        
+        # Check if target_class exists and store its index if it does
+        target_column_index = None
+        new_target_column = None
+        if 'target_class' in df.columns:
+            target_column_index = df.columns.get_loc('target_class')
+            new_target_column = df.iloc[0, target_column_index]
+            print(f"Found target_class column at index {target_column_index}")
+        
         new_headers = df.iloc[0].values.tolist()
         df = df.iloc[1:].reset_index(drop=True)
         df.columns = new_headers
-        print("Header replaced with first data row.")
+        
+        # Store the column mapping information
+        df.attrs['original_columns'] = original_columns
+        if target_column_index is not None:
+            df.attrs['new_target_column'] = new_target_column
+            df.attrs['target_column_index'] = target_column_index
+            print(f"Header replaced with first data row. Target column renamed from 'target_class' to '{new_target_column}'")
+        else:
+            print("Header replaced with first data row. No target_class column found.")
 
     # Remove duplicates
     initial_rows = df.shape[0]
@@ -1327,18 +1700,29 @@ def clean_dataset(df, delete_header=False):
     removed_duplicates = initial_rows - df.shape[0]
     print(f"Removed {removed_duplicates} duplicate rows.")
 
+    # First identify if we have a class or target_class column
+    target_column = None
+    if 'class' in df.columns:
+        target_column = 'class'
+    elif 'target_class' in df.columns:
+        target_column = 'target_class'
+
     # Process each column
     for col in df.columns:
         print(f"Processing column: {col} (Type: {df[col].dtype})")
+
+        # Skip processing if this is the target column
+        if col == target_column:
+            print(f"Skipping encoding for target column: {col}")
+            continue
 
         # Handle boolean columns
         if pd.api.types.is_bool_dtype(df[col]):
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
                 print(f"Filling {num_missing} missing values in boolean column '{col}' with 'False'.")
-                df[col].fillna(False, inplace=True)  # Default strategy: replace with `False`
+                df[col].fillna(False, inplace=True)
 
-            # Convert boolean to numeric if needed
             print(f"Converting boolean column '{col}' to numeric (1 for True, 0 for False).")
             df[col] = df[col].astype(int)
 
@@ -1375,10 +1759,11 @@ def clean_dataset(df, delete_header=False):
             # Ensure all entries are strings and strip whitespace
             df[col] = df[col].astype(str).str.strip()
 
-            # Encode categorical data
-            print(f"Encoding categorical column '{col}' using Label Encoding.")
-            le = LabelEncoder()
-            df[col] = le.fit_transform(df[col])
+            # Encode categorical data (skip for target column)
+            if col != target_column:
+                print(f"Encoding categorical column '{col}' using Label Encoding.")
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col])
 
         # Handle other types
         else:
@@ -1386,11 +1771,11 @@ def clean_dataset(df, delete_header=False):
 
     # Store categorical column information in the DataFrame attributes
     df.attrs['categorical_columns'] = categorical_columns
+    if target_column:
+        df.attrs['target_column'] = target_column
     
     print("Dataset cleaning completed.")
     return df
-
-
 
 def perform_data_cleaning(request, dataset_id):
     if request.method != 'POST':
@@ -1424,16 +1809,50 @@ def perform_data_cleaning(request, dataset_id):
         os.makedirs(cleaned_datasets_dir, exist_ok=True)
         cleaned_file_name = os.path.basename(file_path).replace('.csv', cleaned_file_suffix).replace('.xls', cleaned_file_suffix).replace('.xlsx', cleaned_file_suffix)
         cleaned_file_path = os.path.join(cleaned_datasets_dir, cleaned_file_name)
+        
+        # Before saving, capture the important attributes
+        target_column = cleaned_df.attrs.get('target_column')
+        categorical_columns = cleaned_df.attrs.get('categorical_columns', [])
+        
+        # Save the cleaned DataFrame
         cleaned_df.to_csv(cleaned_file_path, index=False)
 
-        # Update the dataset object to reflect the cleaned dataset
-        dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+        # Update the dataset object with the cleaned file path
+        relative_cleaned_path = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
+        dataset.cleaned_file = relative_cleaned_path
+        dataset.file_path = relative_cleaned_path  # Update the main file path to point to cleaned file
         dataset.status = 'processed'
+        
+        # Update column information
+        column_types = {col: str(cleaned_df[col].dtype) for col in cleaned_df.columns}
+        dataset.column_info = json.dumps(column_types)
+        
+        # Update target class based on the captured information
+        if target_column:
+            dataset.target_class = target_column
+        elif 'class' in cleaned_df.columns:
+            dataset.target_class = 'class'
+        elif 'target_class' in cleaned_df.columns:
+            dataset.target_class = 'target_class'
+        
+        # Store categorical columns information
+        if categorical_columns:
+            dataset.categorical_columns = json.dumps(categorical_columns)
+        
         dataset.save()
+
+        # Log the changes
+        print(f"Updated dataset {dataset_id}:")
+        print(f"- Target class: {dataset.target_class}")
+        print(f"- Column info: {dataset.column_info}")
+        print(f"- File path: {relative_cleaned_path}")
 
         return JsonResponse({
             'message': 'Data cleaned and saved successfully!',
-            'rows_affected': len(df) - len(cleaned_df)
+            'rows_affected': len(df) - len(cleaned_df),
+            'new_columns': list(cleaned_df.columns),
+            'new_target_class': dataset.target_class,
+            'new_file_path': relative_cleaned_path  # Use string path instead of FieldFile
         })
 
     except Dataset.DoesNotExist:
@@ -1441,8 +1860,8 @@ def perform_data_cleaning(request, dataset_id):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
     except Exception as e:
+        logger.error(f"Error during cleaning: {str(e)}")
         return JsonResponse({'error': f"Error during cleaning: {str(e)}"}, status=500)
-
 
 def data_cleaning_preview(request, dataset_id):
     """
@@ -1658,250 +2077,7 @@ def get_columns_target(request):
     print("Invalid request received")  # Debug log
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-from django.shortcuts import render
-from django.db.models import Count
-from django.utils import timezone
-from datetime import timedelta
-from .models import Dataset, MLModel, DataPreprocessingLog
-from django.db.models.functions import TruncMonth
 
-import matplotlib.pyplot as plt
-import io
-import base64
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
-def create_simple_distribution_plot(clean_count, unclean_count):
-    # Ensure we're working with integers, defaulting to 0 for NaN values
-    clean_count = int(clean_count) if pd.notna(clean_count) else 0
-    unclean_count = int(unclean_count) if pd.notna(unclean_count) else 0
-    
-    # Only create plot if there's data to show
-    if clean_count == 0 and unclean_count == 0:
-        # Create an empty plot with a message
-        plt.figure(figsize=(8, 6))
-        plt.text(0.5, 0.5, 'No datasets available', horizontalalignment='center', verticalalignment='center')
-        plt.axis('off')
-    else:
-        # Create figure and axis
-        plt.figure(figsize=(8, 6))
-        
-        # Data
-        labels = ['Clean', 'Unclean']
-        sizes = [clean_count, unclean_count]
-        colors = ['#22c55e', '#ef4444']  # Green and Red
-        
-        # Create pie chart
-        plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
-        plt.title('Dataset Distribution', pad=20)
-    
-    # Save plot to base64 string
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png', bbox_inches='tight', transparent=True)
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
-    plt.close()
-    
-    # Encode the bytes as base64
-    return base64.b64encode(image_png).decode('utf-8')
-
-
-def create_category_distribution_plot(datasets):
-    plt.figure(figsize=(8, 4))
-    
-    # Define categories based on your data
-    categories = {
-        'Pending': datasets.filter(status='pending').count(),
-        'Processed': datasets.filter(status='processed').count(),
-        'With Target': datasets.exclude(target_class__isnull=True).count(),
-        'Without Target': datasets.filter(target_class__isnull=True).count(),
-        'Has Graphs': datasets.exclude(graphs__exact=[]).count(),
-    }
-    
-    # Colors for each category
-    colors = ['#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#ef4444']
-    
-    # Create bar chart
-    plt.bar(categories.keys(), categories.values(), color=colors)
-    plt.title('Dataset Categories')
-    plt.xticks(rotation=45, ha='right')
-    plt.ylabel('Number of Datasets')
-    
-    # Add value labels on top of each bar
-    for i, v in enumerate(categories.values()):
-        plt.text(i, v, str(v), ha='center', va='bottom')
-    
-    # Adjust layout to prevent label cutoff
-    plt.tight_layout()
-    
-    # Save to base64
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png', bbox_inches='tight', transparent=True)
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
-    plt.close()
-    
-    return base64.b64encode(image_png).decode('utf-8')
-
-
-
-
-def general_dashboard(request):
-    if not request.user.is_authenticated:
-        return redirect('signin')
-        
-    # Get all datasets for the current user
-    datasets = Dataset.objects.filter(user=request.user)
-    
-    # Basic Statistics
-    total_datasets = datasets.count()
-    clean_datasets = datasets.filter(status='processed').count()
-    unclean_datasets = total_datasets - clean_datasets
-    total_models = MLModel.objects.count()
-    
-    # Calculate percentages
-    clean_datasets_percentage = (clean_datasets / total_datasets * 100) if total_datasets > 0 else 0
-    unclean_datasets_percentage = (unclean_datasets / total_datasets * 100) if total_datasets > 0 else 0
-    
-    # Calculate usage percentage for each dataset
-    for dataset in datasets:
-        # You can customize this based on your needs
-        # For example, count how many times the dataset has been used in models
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        max_usage = MLModel.objects.count() or 1  # Avoid division by zero
-        dataset.usage_percentage = (usage_count / max_usage) * 100
-    
-    # Get current and previous month for comparison
-    current_date = timezone.now()
-    current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-    
-    # Dataset categories analysis (current month)
-    current_month_stats = {
-        'Diagnostic Imaging': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='diagnostic imaging'
-        ).count(),
-        'Data.Gov': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='data.gov'
-        ).count(),
-        'Image Net': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='image net'
-        ).count(),
-        'MNIST': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='mnist'
-        ).count(),
-        'MHLDDS': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='mhldds'
-        ).count(),
-        'HES': datasets.filter(
-            uploaded_at__gte=current_month_start,
-            description__icontains='hes'
-        ).count(),
-    }
-    
-    # Previous month stats
-    previous_month_stats = {
-        'Diagnostic Imaging': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='diagnostic imaging'
-        ).count(),
-        'Data.Gov': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='data.gov'
-        ).count(),
-        'Image Net': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='image net'
-        ).count(),
-        'MNIST': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='mnist'
-        ).count(),
-        'MHLDDS': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='mhldds'
-        ).count(),
-        'HES': datasets.filter(
-            uploaded_at__gte=previous_month_start,
-            uploaded_at__lt=current_month_start,
-            description__icontains='hes'
-        ).count(),
-    }
-    
-    # Quality and Completeness Analysis
-    # Get last 6 months of data
-    last_6_months = current_date - timedelta(days=180)
-    monthly_stats = datasets.filter(
-        uploaded_at__gte=last_6_months
-    ).annotate(
-        month=TruncMonth('uploaded_at')
-    ).values('month').annotate(
-        total=Count('id'),
-        clean=Count('id', filter=models.Q(status='processed'))
-    ).order_by('month')
-    
-    quality_labels = []
-    completeness_data = []
-    quality_data = []
-    
-    for stat in monthly_stats:
-        quality_labels.append(stat['month'].strftime('%b %Y'))
-        total = stat['total']
-        clean = stat['clean']
-        completeness = (clean / total * 100) if total > 0 else 0
-        # Assuming quality is based on some metrics in columns_info
-        quality = completeness * 0.8  # Simplified quality metric
-        completeness_data.append(completeness)
-        quality_data.append(quality)
-    
-    # Dataset Usage Statistics
-    datasets_usage = []
-    for dataset in datasets:
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        if usage_count > 0:
-            datasets_usage.append({
-                'title': dataset.name,
-                'usage_percentage': min((usage_count / total_datasets * 100), 100),
-                'count': usage_count
-            })
-    
-    # Sort datasets_usage by count in descending order
-    datasets_usage = sorted(datasets_usage, key=lambda x: x['count'], reverse=True)[:10]
-    
-    # Calculate average completeness and quality
-    avg_completeness = sum(completeness_data) / len(completeness_data) if completeness_data else 0
-    avg_quality = sum(quality_data) / len(quality_data) if quality_data else 0
-    
-    context = {
-        'datasets': datasets,  # Changed from 'dataset' to 'datasets' to match template
-        'total_datasets': total_datasets,
-        'clean_datasets': clean_datasets,
-        'unclean_datasets': unclean_datasets,
-        'total_models': total_models,
-        'clean_datasets_percentage': round(clean_datasets_percentage, 1),
-        'unclean_datasets_percentage': round(unclean_datasets_percentage, 1),
-        'completeness': round(avg_completeness, 1),
-        'quality': round(avg_quality, 1),
-        'datasets_analysis_current': list(current_month_stats.values()),
-        'datasets_analysis_previous': list(previous_month_stats.values()),
-        'quality_labels': quality_labels,
-        'completeness_data': completeness_data,
-        'quality_data': quality_data,
-        'datasets_usage': datasets_usage
-    }
-    
-    return render(request, "general_dashboard.html", context)
 
 ### MODEL TRAINING PART ###
 
@@ -2279,7 +2455,7 @@ def train_model(request):
                 model.fit(X_train, y_train)
                 y_pred = model.predict(X_test)
 
-                # Generate visualizations
+                # Generate decision tree visualization (if applicable)
                 feature_names = feature_columns  # Feature names from the dataset
                 class_names = df[target_column].unique().astype(str)  # Class names based on unique target labels
                 results = generate_visualizations(
@@ -2407,7 +2583,7 @@ def train_model(request):
                     dataset=dataset,
                     algorithm='Random Forest',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
 
                 # Save results to ModelResult table
@@ -2716,6 +2892,7 @@ def train_model(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
+
 def generate_visualizations(model_type, y_true=None, y_pred=None, model=None, feature_names=None, class_names=None, X=None, clusters=None, **kwargs):
 
     buffer = io.BytesIO()
@@ -3018,3 +3195,53 @@ def delete_dataset(request, dataset_id):
         return redirect('general_dashboard')
     
     return redirect('general_dashboard')
+
+
+
+@login_required
+def download_model(request):
+    import logging
+    logger = logging.getLogger(__name__)
+    if request.method == 'POST':
+        try:
+            logger.info("Starting model download process")
+            # Get the latest model for the user from the MLModel table
+            latest_model = MLModel.objects.filter(
+                dataset__user=request.user,
+                training_status='completed'
+            ).latest('created_at')
+            
+            logger.info(f"Found latest model: {latest_model.model_path}")
+            
+            if not latest_model or not latest_model.model_path:
+                logger.error("No model path found")
+                return JsonResponse({'error': 'No trained model found'}, status=404)
+            
+            model_file = latest_model.model_path.path  # Use .path to get the full filesystem path
+            logger.info(f"Model file path: {model_file}")
+            
+            if not os.path.exists(model_file):
+                logger.error(f"Model file not found at path: {model_file}")
+                return JsonResponse({'error': 'Model file not found'}, status=404)
+            
+            # Read the model file and serve it
+            try:
+                with open(model_file, 'rb') as f:
+                    response = HttpResponse(f.read(), content_type='application/octet-stream')
+                    filename = os.path.basename(model_file)
+                    response['Content-Disposition'] = f'attachment; filename={filename}'
+                    logger.info(f"Successfully prepared response with filename: {filename}")
+                    return response
+            except IOError as e:
+                logger.error(f"Error reading model file: {str(e)}")
+                return JsonResponse({'error': f'Error reading model file: {str(e)}'}, status=500)
+                
+        except MLModel.DoesNotExist:
+            logger.error("No trained model found in database")
+            return JsonResponse({'error': 'No trained model found'}, status=404)
+        except Exception as e:
+            logger.error(f"Unexpected error in download_model: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    logger.error("Invalid request method")
+    return JsonResponse({'error': 'Invalid request method'}, status=405)

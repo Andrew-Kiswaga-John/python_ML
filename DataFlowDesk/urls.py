@@ -37,6 +37,7 @@ urlpatterns = [
     path('predictions/', views.render_predictions_view, name='predictions'),
     path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
     path('fetch-columns/', views.fetch_columns, name='fetch_columns'),
+    path('download_model/', views.download_model, name='download_model'),
 
     # Add these URL patterns to your urls.py
     path('auth/signin/', views.signin, name='login'),
