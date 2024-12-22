@@ -1,33 +1,4 @@
-{% extends "base.html" %}
 
-{% block content %}
-<div class="relative group slide-in-left">
-    <div class="rounded-2xl bg-white/70 backdrop-blur-lg p-8 
-                shadow-[0_8px_30px_rgb(0,0,0,0.12)] 
-                hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] 
-                transition-all duration-300 ease-in-out 
-                transform hover:-translate-y-1 cursor-pointer 
-                border border-gray-100"
-         onclick="openDatasetModal('uploadModal')">
-        <div class="flex flex-col items-center">
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-3">
-                <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-            </div>
-            <h3 class="text-2xl font-semibold leading-7 text-gray-900 mb-3">Upload Dataset</h3>
-            <p class="text-gray-600 text-center">
-                Import your existing dataset files for immediate analysis
-            </p>
-            <span class="mt-4 inline-flex items-center text-blue-600 group-hover:text-blue-700">
-                Get Started
-                <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-            </span>
-        </div>
-    </div>
-</div>
 <div id="uploadModal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0 z-50">
     <div class="relative top-5 mx-auto p-8 border w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-xl transform transition-all duration-300 ease-out scale-90 -translate-y-20">
         <!-- Modal Header -->
@@ -140,11 +111,49 @@
     </div>
 </div>
 
-{% endblock %}
 
 
-{% block extra_js %}
 <script>
+
+    // Modal functions with animations
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('hidden');
+        
+        // Trigger a reflow to ensure the transitions work
+        void modal.offsetWidth;
+        
+        // Add the visible classes
+        modal.classList.remove('opacity-0');
+        modal.classList.add('opacity-100');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-95', 'translate-y-4');
+            modalContent.classList.add('scale-100', 'translate-y-0');
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        
+        // Start the closing animation
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-100', 'translate-y-0');
+            modalContent.classList.add('scale-95', 'translate-y-4');
+        }
+        
+        // Hide the modal after the animation completes
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+
     // Modal functions with animations
     function openModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -490,4 +499,3 @@ document.addEventListener('DOMContentLoaded', () => {
     animatedElements.forEach(el => observer.observe(el));
 });
 </script>
-{% endblock %}

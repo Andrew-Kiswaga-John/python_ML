@@ -32,54 +32,47 @@
     </footer>
 
     <script>
-    // Smart navigation that hides when not scrolling
-    let lastScroll = 0;
-    let isScrolling;
 
-    // Function to handle scroll events
-    function handleScroll() {
-        const nav = document.getElementById('main-nav');
-        const currentScroll = window.scrollY;
-
-        // Show/hide navigation based on scroll position
-        if (currentScroll > lastScroll) {
-            // Scrolling down
-            nav.classList.add('nav-hidden');
-        } else {
-            // Scrolling up
-            nav.classList.remove('nav-hidden');
+    // Modal functions with animations
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('hidden');
+        
+        // Trigger a reflow to ensure the transitions work
+        void modal.offsetWidth;
+        
+        // Add the visible classes
+        modal.classList.remove('opacity-0');
+        modal.classList.add('opacity-100');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-95', 'translate-y-4');
+            modalContent.classList.add('scale-100', 'translate-y-0');
         }
-
-        // Add sticky class if not at the top
-        if (currentScroll > 0) {
-            nav.classList.add('sticky-nav');
-        } else {
-            nav.classList.remove('sticky-nav');
-            nav.classList.remove('nav-hidden');
-        }
-
-        lastScroll = currentScroll;
-
-        // Clear the timeout
-        clearTimeout(isScrolling);
-
-        // Set a timeout to run after scrolling ends
-        isScrolling = setTimeout(() => {
-            // Show navigation when scrolling stops
-            nav.classList.remove('nav-hidden');
-        }, 1500); // Show after 1.5 seconds of no scrolling
     }
 
-    // Add scroll event listener
-    window.addEventListener('scroll', handleScroll);
-
-    // Show navigation when mouse moves near the top of the screen
-    document.addEventListener('mousemove', (e) => {
-        const nav = document.getElementById('main-nav');
-        if (e.clientY <= 60) { // Mouse is near the top
-            nav.classList.remove('nav-hidden');
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        
+        // Start the closing animation
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-100', 'translate-y-0');
+            modalContent.classList.add('scale-95', 'translate-y-4');
         }
-    });
+        
+        // Hide the modal after the animation completes
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+
+ 
     </script>
 
     {% block extra_js %}{% endblock %}

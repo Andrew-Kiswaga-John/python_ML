@@ -1,4 +1,7 @@
 {% load static %}
+
+{% include "../upload.html" %}
+{% include "../create_dataset.html" %}
 <!-- Sidebar -->
 <aside class="fixed inset-y-0 left-0 bg-gradient-to-b from-blue-700/90 to-blue-800 w-64 transition-transform duration-300 ease-in-out transform z-30">
     <style>
@@ -152,9 +155,9 @@
                 </svg>
             </div>
             <div class="nav-content ml-4">
-                <a href="{% url 'upload' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Upload Dataset</a>
+                <button onclick="openDatasetModal('uploadModal')" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Upload Dataset</button>
                 <a href="{% url 'my_datasets' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">My Datasets</a>
-                <a href="#" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Create Dataset</a>
+                <button  onclick="openDatasetModal('createModal')" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Create Dataset</button>
             </div>
         </div>
 

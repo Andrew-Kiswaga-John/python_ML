@@ -1,0 +1,291 @@
+<!-- Create Dataset Modal -->
+<div id="createModal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0 z-50">
+    <div class="relative top-20 mx-auto p-8 border w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-xl transform transition-all duration-300 ease-out scale-95 -translate-y-20">
+        <div class="flex justify-between items-center pb-6 border-b border-gray-200">
+            <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-700">Create Dataset</h3>
+            <button onclick="closeModal('createModal')" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 rounded-full p-2 hover:bg-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="step1-form" method="POST" action="{% url 'create_dataset_step1' %}" class="space-y-6 mt-6">
+            {% csrf_token %}
+            <div class="bg-gray-50/50 rounded-xl p-6 backdrop-blur-sm space-y-6">
+                <!-- Existing name and description fields -->
+                <div class="space-y-4">
+                    <label for="create_name" class="block text-sm font-medium text-gray-700">Dataset Name</label>
+                    <input type="text" id="create_name" name="name" required
+                        class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Enter dataset name">
+                </div>
+        
+                <div class="space-y-4">
+                    <label for="create_description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="create_description" name="description" required rows="3"
+                        class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Describe your dataset"></textarea>
+                </div>
+        
+            <!-- Grid for numbers only -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Number of Columns -->
+                <div class="space-y-4">
+                    <label for="num_columns" class="block text-sm font-medium text-gray-700">Number of Columns</label>
+                    <div class="relative">
+                        <input type="number" id="num_columns" name="num_columns" required min="1"
+                            class="block w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Enter number">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Number of Rows -->
+                <div class="space-y-4">
+                    <label for="num_rows" class="block text-sm font-medium text-gray-700">Number of Rows</label>
+                    <div class="relative">
+                        <input type="number" id="num_rows" name="num_rows" required min="1"
+                            class="block w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Enter number">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <button type="button" id="generate-columns" 
+                class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center space-x-2">
+                <span>Define Columns</span>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+            </button>
+            
+            <div id="column-details-container" class="mt-6 space-y-6"></div>
+            
+            <button type="submit" id="submit-form" style="display:none;" 
+                class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center space-x-2">
+                <span>Next Step</span>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+            </button>
+        </form>
+        
+
+    </div>
+</div>
+
+<!-- Create Dataset Step 2 Modal -->
+<div id="createStep2Modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0 z-50">
+    <div class="relative top-20 mx-auto p-8 border w-11/12 md:w-4/5 lg:w-3/4 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-xl transform transition-all duration-300 ease-out scale-95 translate-y-4">
+        <div class="flex justify-between items-center pb-6 border-b border-gray-200">
+            <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-700">Enter Dataset Values</h3>
+            <button onclick="closeModal('createStep2Modal')" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 rounded-full p-2 hover:bg-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="step2-form" method="POST" action="{% url 'create_dataset_step2' %}" class="space-y-6 mt-6">
+            {% csrf_token %}
+            
+
+            <div id="step2-content" class="overflow-x-auto rounded-xl bg-white/50 backdrop-blur-sm border border-gray-200">
+                <!-- Content will be dynamically populated -->
+            </div>
+            <button type="submit" 
+                class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center space-x-2">
+                <span>Create Dataset</span>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>
+
+
+<script>
+       // Create dataset form handling
+       document.getElementById('generate-columns').addEventListener('click', function () {
+        const numColumns = document.getElementById('num_columns').value;
+        const container = document.getElementById('column-details-container');
+        container.innerHTML = '';
+
+        for (let i = 0; i < numColumns; i++) {
+            const div = document.createElement('div');
+            div.classList.add('mb-6', 'p-6', 'border', 'border-gray-300', 'rounded-lg', 'bg-gray-50');
+            div.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Column ${i + 1}</h3>
+                <div class="mb-4">
+                    <label for="col_name_${i}" class="block text-sm font-medium text-gray-700">Column Name:</label>
+                    <input type="text" id="col_name_${i}" name="col_name_${i}" required 
+                        class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label for="col_type_${i}" class="block text-sm font-medium text-gray-700">Data Type:</label>
+                    <select id="col_type_${i}" name="col_type_${i}" required 
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="int">Integer</option>
+                        <option value="float">Float</option>
+                        <option value="string">String</option>
+                        <option value="date">Date</option>
+                        <option value="time">Time</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        document.getElementById('submit-form').style.display = 'block';
+    });
+
+// Handle step1 form submission
+document.getElementById('step1-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const columns = [];
+    
+    // Gather column information
+    const numColumns = document.getElementById('num_columns').value;
+    for (let i = 0; i < numColumns; i++) {
+        columns.push({
+            name: document.getElementById(`col_name_${i}`).value,
+            type: document.getElementById(`col_type_${i}`).value
+        });
+    }
+
+    // Store form data for step 2
+    const datasetMeta = {
+        name: document.getElementById('create_name').value,
+        description: document.getElementById('create_description').value,
+        num_rows: document.getElementById('num_rows').value,
+        columns: columns
+    };
+
+    // Generate step 2 table with target class selection at the top
+    const step2Content = document.getElementById('step2-content');
+    step2Content.innerHTML = `
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Select Target Class</h3>
+            <select id="target_class" name="target_class" required
+                class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select Target Column</option>
+                ${columns.map(col => `
+                    <option id="target_class_option" value="${col.name}">${col.name} (${col.type})</option>
+                `).join('')}
+            </select>
+            <p class="mt-2 text-sm text-gray-600">This column will be used as the target variable for your analysis</p>
+        </div>
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Enter Data for ${datasetMeta.name}</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full table-auto border-collapse border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-2 border-b">ID</th>
+                        ${columns.map(col => 
+                            `<th class="px-4 py-2 border-b">${col.name} (${col.type})</th>`
+                        ).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Array.from({length: datasetMeta.num_rows}, (_, rowIndex) => `
+                        <tr class="border-b">
+                            <td class="px-4 py-2">${rowIndex + 1}</td>
+                            ${columns.map((col, colIndex) => `
+                                <td class="px-4 py-2">
+                                    <input 
+                                        type="text" 
+                                        name="data" 
+                                        placeholder="${col.type}"
+                                        data-row="${rowIndex}"
+                                        data-col="${colIndex}"
+                                        required 
+                                        class="block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                </td>
+                            `).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Add hidden fields for metadata
+    const metadataInput = document.createElement('input');
+    metadataInput.type = 'hidden';
+    metadataInput.name = 'dataset_meta';
+    metadataInput.value = JSON.stringify(datasetMeta);
+    document.getElementById('step2-form').prepend(metadataInput);
+
+    // Close step 1 modal and open step 2
+    closeModal('createModal');
+    openModal('createStep2Modal');
+});
+
+// Update step2 form submission to include target class
+document.getElementById('step2-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Get target class selection
+    const targetClass = document.getElementById('target_class_option').value;
+    if (!targetClass) {
+        alert('Please select a target class');
+        return;
+    }
+
+    // Get all input fields
+    const inputs = document.querySelectorAll('#step2-content input[name="data"]');
+    const formData = new FormData();
+    
+    // Add target class to formData
+    formData.append('target_class', targetClass);
+    
+    // Add each input value to formData
+    inputs.forEach((input, index) => {
+        formData.append('data', input.value);
+    });
+
+    // Add the dataset metadata
+    const metadataInput = document.querySelector('input[name="dataset_meta"]');
+    if (metadataInput) {
+        formData.append('dataset_meta', metadataInput.value);
+    }
+
+    try {
+        const response = await fetch(this.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            }
+        });
+
+        const result = await response.json();
+        if (result.error) {
+            alert(result.error);
+        } else {
+            // Close modal and show success message
+            closeModal('createStep2Modal');
+            alert('Dataset created successfully!');
+            // Redirect to the dataset view page
+            if (result.dataset_id) {
+                window.location.href = `${result.dataset_id}/dashboard/`;
+            }
+        }
+    } catch (error) {
+        console.error('Error creating dataset:', error);
+        alert('An error occurred while creating the dataset. Please try again.');
+    }
+});
+</script>
