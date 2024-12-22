@@ -23,7 +23,7 @@ urlpatterns = [
     path('delete_dataset/<int:dataset_id>/', views.delete_dataset, name='delete_dataset'),
     path('train_model/', views.train_model, name='train_model'),
     path('train_model_nn/', views.train_model_nn, name='train_model_nn'),
-    path('model_training/', views.training_page, name='model_training'),
+    path('model_training/<int:id>/', views.training_page, name='model_training'),
     path('upload/', views.upload_file, name='upload'),
     path('my_datasets/', views.my_datasets, name='my_datasets'),
     path('save_graph/', views.save_graph, name='save_graph'),
@@ -38,7 +38,7 @@ urlpatterns = [
     path('perform_predictions/', views.perform_predictions, name='perform_predictions'),
     path('fetch-columns/', views.fetch_columns, name='fetch_columns'),
     path('download_model/', views.download_model, name='download_model'),
-
+    path('download_cleaned_data/<int:dataset_id>/', views.download_cleaned_data, name='download_cleaned_data'),
 
     # Predictions logic
     path('fetch-models/', views.fetch_models, name='fetch-models'),
@@ -48,7 +48,6 @@ urlpatterns = [
     path('fetch-model-details/', views.fetch_model_details, name='fetch_model_details'),
     path('make-prediction/', views.make_prediction, name='make_prediction'),
     path('model-predictions/', views.model_predictions, name='model_predictions'),
-
 
 
     # Add these URL patterns to your urls.py

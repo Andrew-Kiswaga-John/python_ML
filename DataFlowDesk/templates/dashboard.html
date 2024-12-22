@@ -32,7 +32,7 @@
                                 </svg>
                                 Create Graphs
                             </a>
-                            <a href="{% url 'model_training' %}" 
+                            <a href="{% url 'model_training' dataset.id %}" 
                                class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -62,22 +62,32 @@
                         </div>
                     </div>
         
-                    <!-- Data Normalization Card -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900">Data Normalization</h3>
-                                <p class="mt-1 text-sm text-gray-500">Normalize your dataset values</p>
-                            </div>
-                            <button id="normalize-data-btn" 
-                                    class="inline-flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
-                                Normalize
-                            </button>
-                        </div>
+            <!-- Download Cleaned Data Card -->
+            <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Download Cleaned Data</h3>
+                        <p class="mt-1 text-sm text-gray-500">Download your preprocessed dataset</p>
                     </div>
+                    {% if dataset.status == 'processed' %}
+                    <a href="{% url 'download_cleaned_data' dataset.id %}" 
+                       class="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download
+                    </a>
+                    {% else %}
+                    <button onclick="showCleanDataModal()" 
+                            class="inline-flex items-center px-4 py-2 bg-gray-400 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
                 </div>
         <!-- Filters -->
         <!-- Metrics Cards - First Row -->
@@ -141,19 +151,47 @@
 </div>
 
         <!-- Charts -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <!-- Median Chat Duration -->
-            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
-                <h3 class="text-lg font-medium mb-4">Target Class Distribution</h3>
-                <img src="data:image/png;base64,{{ target_dist_plot }}" alt="Target Class Distribution" class="w-full">
-            </div>
-            <!-- Number of Chats Chart -->
-            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
-                <h3 class="text-lg font-medium mb-4">Number of chats and chats successfully deflected</h3>
-                <canvas id="chatsDeflected" height="200"></canvas>
-            </div>
+<!-- Charts Section -->
+<!-- Charts Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- First Row -->
+    <div class="space-y-6">
+        <!-- Target Distribution -->
+        {% if target_dist_plot %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+            <h3 class="text-lg font-medium mb-4">Target Class Distribution</h3>
+            <img src="data:image/png;base64,{{ target_dist_plot }}" alt="Target Distribution" class="w-full">
         </div>
+        {% endif %}
 
+        <!-- Feature Types Distribution -->
+        {% if feature_types_plot %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+            <h3 class="text-lg font-medium mb-4">Feature Types Overview</h3>
+            <img src="data:image/png;base64,{{ feature_types_plot }}" alt="Feature Types Distribution" class="w-full">
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Second Row -->
+    <div class="space-y-6">
+        <!-- Data Quality Summary -->
+        {% if quality_plot %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+            <h3 class="text-lg font-medium mb-4">Data Quality Overview</h3>
+            <img src="data:image/png;base64,{{ quality_plot }}" alt="Data Quality Summary" class="w-full">
+        </div>
+        {% endif %}
+
+        <!-- Correlation Overview -->
+        {% if correlation_plot %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow duration-300">
+            <h3 class="text-lg font-medium mb-4">Feature Correlation Overview</h3>
+            <img src="data:image/png;base64,{{ correlation_plot }}" alt="Correlation Distribution" class="w-full">
+        </div>
+        {% endif %}
+    </div>
+</div>
         <!-- Bottom Section -->
 <!-- Dataset Preview -->
 <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -185,6 +223,36 @@
         </table>
     </div>
 </div>
+    </div>
+</div>
+
+<!-- Clean Data Modal -->
+<div id="clean-data-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="min-h-screen px-4 text-center">
+        <div class="inline-block align-middle bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Clean Data Required</h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                Please clean your dataset first before downloading. Click the "Clean Data" button to process your dataset.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" onclick="hideCleanDataModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Close
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -309,5 +377,12 @@
         document.getElementById('clean-data-popup').classList.add('hidden');
     });
 
+    function showCleanDataModal() {
+        document.getElementById('clean-data-modal').classList.remove('hidden');
+    }
+
+    function hideCleanDataModal() {
+        document.getElementById('clean-data-modal').classList.add('hidden');
+    }
 </script>
 {% endblock %}

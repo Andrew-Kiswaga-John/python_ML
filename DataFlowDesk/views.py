@@ -390,7 +390,7 @@ def general_dashboard(request):
     recent_activities = sorted(recent_activities, key=lambda x: x['timestamp'], reverse=True)[:5]
     
    # Get trained models data
-    trained_models = MLModel.objects.filter(dataset__user=request.user).select_related('dataset').order_by('-created_at')
+    trained_models = MLModel.objects.filter(dataset__user=request.user).select_related('dataset').order_by('-created_at')[:3]
     models_data = []
     
     for model in trained_models:
@@ -496,14 +496,30 @@ def signup(request):
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
-def dashboard(request,dataset_id):
+def download_cleaned_data(request, dataset_id):
+    # Get the dataset
+    dataset = get_object_or_404(Dataset, id=dataset_id)
+    
+    # Check if cleaned file exists
+    if not dataset.cleaned_file:
+        return HttpResponse("No cleaned data available for download", status=404)
+    
+    # Open the file and create the response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{dataset.name}_cleaned.csv"'
+    
+    # Read the cleaned file and write to response
+    with open(dataset.cleaned_file.path, 'r', encoding='utf-8') as file:
+        response.write(file.read())
+    
+    return response
 
+def dashboard(request,dataset_id):
     try:
         dataset = Dataset.objects.get(id=dataset_id)
     except Dataset.DoesNotExist:
         return JsonResponse({'error': 'Dataset not found.'}, status=404)
     
-
     try:
         if dataset.status == 'processed':
             # Load cleaned file (CSV only)
@@ -537,22 +553,15 @@ def dashboard(request,dataset_id):
     dataset_preview = data.head(10).values.tolist()  # Show the first 10 rows
     columns = data.columns.tolist()
 
-
     try:
-        # ... existing data loading code ...
-        
-        # Calculate new metrics
-        # 1. Missing Values
+        # Calculate metrics
         missing_values = data.isnull().sum()
         total_missing = missing_values.sum()
         missing_percentage = (total_missing / (data.shape[0] * data.shape[1])) * 100
         
-        # 2. Duplicate Records
         duplicate_count = data.duplicated().sum()
         duplicate_percentage = (duplicate_count / len(data)) * 100
         
-        # 3. Feature Types
-        # Get the original categorical columns that were encoded
         categorical_columns = data.attrs.get('categorical_columns', [])
         
         feature_types = {
@@ -562,27 +571,85 @@ def dashboard(request,dataset_id):
             'Boolean': len(data.select_dtypes(include=['bool']).columns)
         }
         
-        # 4. Memory Usage
         memory_usage = data.memory_usage(deep=True).sum()
-        memory_usage_mb = memory_usage / (1024 * 1024)  # Convert to MB
+        memory_usage_mb = memory_usage / (1024 * 1024)
 
+        # Set the style for all plots
+        plt.style.use('default')
         
-        # Create target class distribution plot
-        plt.style.use('fivethirtyeight')
-        fig = plt.figure(figsize=(8, 6))
-        target_column = dataset.target_class  # Get the actual target column name
+        # 1. Target Distribution Plot
+        fig_target = plt.figure(figsize=(8, 6))
+        target_column = dataset.target_class
         if target_column and target_column in data.columns:
             target_counts = data[target_column].value_counts()
-            plt.bar(range(len(target_counts)), target_counts.values, alpha=0.7)
-            plt.xticks(range(len(target_counts)), target_counts.index, rotation=45)
+            sns.barplot(x=target_counts.index, y=target_counts.values)
             plt.title(f'Distribution of {target_column}', pad=20)
+            plt.xticks(rotation=45)
             plt.xlabel(target_column)
             plt.ylabel('Count')
             plt.tight_layout()
-            target_dist_plot = fig_to_base64(fig)
-            plt.close(fig)
+            target_dist_plot = fig_to_base64(fig_target)
+            plt.close(fig_target)
         else:
             target_dist_plot = None
+
+        # 2. Feature Types Distribution
+        fig_types = plt.figure(figsize=(8, 6))
+        if sum(feature_types.values()) > 0:
+            plt.pie(feature_types.values(), labels=feature_types.keys(), autopct='%1.1f%%', 
+                   colors=['#FF9999', '#66B2FF', '#99FF99', '#FFCC99'])
+            plt.title('Distribution of Feature Types', pad=20)
+            plt.axis('equal')
+            feature_types_plot = fig_to_base64(fig_types)
+        else:
+            feature_types_plot = None
+        plt.close(fig_types)
+
+        # 3. Data Quality Summary (Missing Values and Duplicates)
+        fig_quality = plt.figure(figsize=(12, 5))
+        
+        # First subplot for data completeness
+        plt.subplot(1, 2, 1)
+        plt.pie([100 - missing_percentage, missing_percentage], 
+                labels=['Complete', 'Missing'], 
+                autopct='%1.1f%%', 
+                colors=['#2ecc71', '#e74c3c'])
+        plt.title('Data Completeness')
+
+        # Second subplot for data uniqueness
+        plt.subplot(1, 2, 2)
+        plt.pie([100 - duplicate_percentage, duplicate_percentage], 
+                labels=['Unique', 'Duplicate'], 
+                autopct='%1.1f%%', 
+                colors=['#3498db', '#e67e22'])
+        plt.title('Data Uniqueness')
+        
+        plt.tight_layout()
+        quality_plot = fig_to_base64(fig_quality)
+        plt.close(fig_quality)
+
+        # 4. Correlation Overview (Top 10 Most Correlated Features)
+        numerical_cols = data.select_dtypes(include=['int64', 'float64']).columns
+        if len(numerical_cols) > 1:
+            correlation_matrix = data[numerical_cols].corr()
+            
+            # Calculate average absolute correlation for each feature
+            avg_correlations = correlation_matrix.abs().mean().sort_values(ascending=False)
+            
+            # Take top 10 features or all if less than 10
+            n_features = min(10, len(avg_correlations))
+            
+            fig_corr = plt.figure(figsize=(10, 6))
+            sns.barplot(x=avg_correlations.values[:n_features], 
+                       y=avg_correlations.index[:n_features],
+                       palette='viridis')
+            plt.title('Top Most Correlated Features\n(Average Absolute Correlation)', pad=20)
+            plt.xlabel('Average Absolute Correlation')
+            plt.tight_layout()
+            correlation_plot = fig_to_base64(fig_corr)
+            plt.close(fig_corr)
+        else:
+            correlation_plot = None
 
         return render(request, 'dashboard.html', {
             'dataset': dataset,
@@ -596,12 +663,13 @@ def dashboard(request,dataset_id):
             'feature_types': feature_types,
             'memory_usage_mb': round(memory_usage_mb, 2),
             'target_dist_plot': target_dist_plot,
+            'feature_types_plot': feature_types_plot,
+            'quality_plot': quality_plot,
+            'correlation_plot': correlation_plot,
         })
 
     except Exception as e:
-            return JsonResponse({'error': f'Error loading dataset: {str(e)}'})
-
-
+        return JsonResponse({'error': f'Error loading dataset: {str(e)}'})
 
 def signout(request):
     logout(request)
@@ -2495,7 +2563,7 @@ def train_model(request):
     if request.method == 'POST':
         try:
             # Fetch form data
-            dataset_id = request.POST.get('datasetId')
+            dataset_id = request.POST.get('dataset_id')
             target_column = request.POST.get('targetColumn')
             model_name = request.POST.get('model')
             train_test_split_ratio = int(request.POST.get('trainTestSplit', 80)) / 100
@@ -3376,10 +3444,16 @@ def generate_visualizations(
     }
 
 
-def training_page(request):
-    datasets = Dataset.objects.all()
+def training_page(request,id):
 
-    return render(request, 'model_training.html', {'dataset': datasets})
+    try:
+        dataset = Dataset.objects.get(id=id)
+        dataset_id = id
+
+    except Dataset.DoesNotExist:
+        return JsonResponse({'error': 'Dataset not found.'}, status=404)
+
+    return render(request, 'model_training.html', {'dataset': dataset, 'dataset_id' : dataset_id})
 
 def get_columns(request):
     if request.method == 'GET':
@@ -3545,6 +3619,14 @@ def fetch_model_details(request):
         # Fetch the ML model from the database
         ml_model = MLModel.objects.get(id=model_id)
         model = joblib.load(ml_model.model_path.path)
+        accuracy_result = ModelResult.objects.filter(
+            model=ml_model,
+            metric_name='accuracy'
+        ).first()
+        
+        accuracy_value = accuracy_result.metric_value if accuracy_result else None
+        # dataset_name = ml_model.dataset.name if ml_model.dataset else 'Unknown Dataset'
+        print(accuracy_value)
 
         # Ensure the model contains feature_names_in_ and suggested_ranges
         if not hasattr(model, 'feature_names_in_') or not hasattr(model, 'suggested_ranges'):
@@ -3562,7 +3644,10 @@ def fetch_model_details(request):
         return JsonResponse({
             "algorithm": ml_model.algorithm,
             "created_at": ml_model.created_at.strftime("%Y-%m-%d"),
-            "features": features
+            "features": features,
+            "accuracy_value" : accuracy_value,
+            "dataset_name" : ml_model.dataset.name,
+            "dataset_id" : ml_model.dataset.id,
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

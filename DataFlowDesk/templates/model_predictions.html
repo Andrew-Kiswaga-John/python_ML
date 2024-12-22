@@ -157,11 +157,11 @@ document.addEventListener("DOMContentLoaded", function() {
             // Update model details
             document.getElementById("modelAlgorithm").textContent = data.algorithm;
             document.getElementById("modelDate").textContent = formatDate(data.created_at);
-            document.getElementById("modelId").textContent = data.id;
+            document.getElementById("modelId").textContent = data.dataset_id;
             document.getElementById("modelDataset").textContent = data.dataset_name;
             document.getElementById("modelAccuracy").innerHTML = `
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAccuracyBadgeColor(data.accuracy)}">
-                    ${(data.accuracy * 100).toFixed(1)}% Accuracy
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAccuracyBadgeColor(data.accuracy_value)}">
+                    ${(data.accuracy_value * 100).toFixed(1)}% Accuracy
                 </span>
             `;
 

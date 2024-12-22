@@ -139,19 +139,27 @@
 
 
    <!-- Trained Models Section -->
-   <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
+<!-- Trained Models Section -->
+<div class="bg-white p-6 rounded-lg shadow-lg mb-8">
     <div class="flex items-center justify-between mb-6">
-        <h3 class="text-xl font-semibold text-gray-900">Trained Models</h3>
-        <a href="{% url 'model_training' %}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            Train New Model
-        </a>
+        <h3 class="text-xl font-semibold text-gray-900">Recent Models</h3>
+        <div class="space-x-4">
+            <a href="{% url 'upload' %}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Train New Model
+            </a>
+        </div>
     </div>
 
     {% if dataset_results %}
     <div class="space-y-8">
         {% for dataset_id, data in dataset_results.items %}
         <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">{{ data.dataset_name }}</h3>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold text-gray-800">{{ data.dataset_name }}</h3>
+                <a href="{% url 'predictions' %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    See All Models →
+                </a>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {% for model in data.models %}
                 <div class="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -165,7 +173,7 @@
                         <p class="text-sm text-gray-600">
                             <span class="font-medium">Accuracy:</span> 
                             {% if model.accuracy %}
-                                {{ model.accuracy |floatformat:2   }}
+                                {{ model.accuracy|floatformat:2 }}%
                             {% else %}
                                 N/A
                             {% endif %}
@@ -181,7 +189,7 @@
                         </a>
                         <a href="{% url 'predictions' %}"
                            class="flex-1 px-3 py-1.5 bg-gray-600 text-white text-sm rounded text-center hover:bg-gray-700 transition-colors">
-                            Make Predictions
+                            Predict
                         </a>
                     </div>
                 </div>
@@ -199,8 +207,6 @@
     </div>
     {% endif %}
 </div>
-
-
 
 <!-- Recent Activity Timeline -->
 <div class="bg-white p-6 rounded-lg shadow mb-8">
