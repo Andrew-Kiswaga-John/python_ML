@@ -7,63 +7,82 @@
             max-height: 0;
             overflow: hidden;
             opacity: 0;
-            transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-            transform: translateY(-10px);
+            transition: all 0.2s ease-in-out;
+            transform: translateY(-5px);
         }
         
         .nav-section:hover .nav-content {
-            max-height: 300px;
+            max-height: 200px;
             opacity: 1;
             transform: translateY(0);
         }
 
         .nav-arrow {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.2s ease-in-out;
         }
 
         .nav-section:hover .nav-arrow {
             transform: rotate(180deg);
         }
 
-        /* Add spacing between nav sections */
         .nav-section {
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.5rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 1rem;
+            padding-bottom: 0.5rem;
         }
         
         .nav-section:last-child {
             border-bottom: none;
+            margin-bottom: 0;
         }
 
-        /* Add padding to nav content */
         .nav-content {
-            padding-top: 0.5rem;
+            padding-top: 0.25rem;
         }
 
-        /* Smooth hover effect for menu items */
-        .nav-content a {
+        .nav-item {
             transition: all 0.2s ease-in-out;
         }
 
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-content a {
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            padding-left: 0.75rem;
+        }
+
+        .nav-content a::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 1.5px;
+            background-color: currentColor;
+            transition: width 0.2s ease-in-out;
+        }
+
+        .nav-content a:hover::before {
+            width: 0.5rem;
+        }
+
         .nav-content a:hover {
-            transform: translateX(5px);
+            padding-left: 1rem;
+            background-color: rgba(255, 255, 255, 0.08);
         }
 
-        /* Smooth background transition for nav items */
-        .nav-item {
-            transition: background-color 0.2s ease-in-out;
-        }
-
-        /* User profile section animation */
         .user-profile {
-            animation: fadeInDown 0.5s ease-out;
+            animation: fadeInDown 0.4s ease-out;
         }
 
         @keyframes fadeInDown {
             from {
                 opacity: 0;
-                transform: translateY(-10px);
+                transform: translateY(-5px);
             }
             to {
                 opacity: 1;
@@ -73,41 +92,34 @@
     </style>
 
     <!-- Logo Section -->
-    <div class="flex items-center justify-center h-20 px-6 border-b border-white/10 mb-6">
+    <div class="flex items-center justify-center h-16 px-4 border-b border-white/10 mb-3">
         <a href="/" class="flex items-center justify-center w-full">
-            <img src="{% static 'images/logo.png' %}" alt="ML Analyzer Logo" class="h-16 w-auto object-contain">
+            <img src="{% static 'images/logo.png' %}" alt="ML Analyzer Logo" class="h-12 w-auto object-contain">
         </a>
     </div>
 
     <!-- User Profile Section -->
     {% if user.is_authenticated %}
-    <div class="px-6 py-4 border-b border-white/10 user-profile">
-        <div class="flex items-center space-x-3 mb-3">
+    <div class="px-4 py-2 border-b border-white/10 user-profile">
+        <div class="flex items-center space-x-2 mb-2">
             <!-- User Avatar -->
-            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                <span class="text-lg font-semibold text-white">{{ user.username|make_list|first|upper }}</span>
+            <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <span class="text-sm font-semibold text-white">{{ user.username|make_list|first|upper }}</span>
             </div>
             <!-- Welcome Message -->
             <div>
-                <p class="text-white font-medium">Welcome back,</p>
-                <p class="text-white/80 text-sm">{{ user.username }}</p>
+                <p class="text-white font-medium text-sm">Welcome back,</p>
+                <p class="text-white/80 text-xs">{{ user.username }}</p>
             </div>
-        </div>
-        <!-- User Status -->
-        <div class="flex items-center space-x-2 text-xs text-white/60">
-            <span class="w-2 h-2 rounded-full bg-green-400"></span>
-            <span>Online</span>
-            <span class="ml-2">•</span>
-            <span>Last login: {{ user.last_login|date:"j M, H:i" }}</span>
         </div>
     </div>
     {% endif %}
 
     <!-- Navigation Menu -->
-    <nav class="px-4 pt-2">
+    <nav class="px-2 pt-2">
         <!-- Dashboard Section -->
         <div class="nav-section" data-section="dashboard">
-            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-white/90 rounded-md">
                 <div class="flex items-center">
                     <!-- Dashboard Icon -->
                     <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,15 +131,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-2">
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Overview</a>
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Analytics</a>
+            <div class="nav-content ml-4">
+                <a href="{% url 'general_dashboard' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Overview</a>
+                <a href="#" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Analytics</a>
             </div>
         </div>
 
         <!-- Datasets Section -->
         <div class="nav-section" data-section="datasets">
-            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-white/90 rounded-md">
                 <div class="flex items-center">
                     <!-- Dataset Icon -->
                     <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -139,16 +151,16 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-2">
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Upload Dataset</a>
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">My Datasets</a>
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Create Dataset</a>
+            <div class="nav-content ml-4">
+                <a href="{% url 'upload' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Upload Dataset</a>
+                <a href="{% url 'my_datasets' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">My Datasets</a>
+                <a href="#" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Create Dataset</a>
             </div>
         </div>
 
         <!-- Analysis Section -->
         <div class="nav-section" data-section="analysis">
-            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-white/90 rounded-md">
                 <div class="flex items-center">
                     <!-- Analysis Icon -->
                     <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -160,18 +172,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-2">
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Visualizations</a>
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Model Training</a>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Dashboard</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Classifiers</a>
+            <div class="nav-content ml-4">
+                <a href="{% url 'model_visualizations' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Visualizations</a>
+                <a href="{% url 'model_training' %}" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Model Training</a>
             </div>
         </div>
 
         <!-- Assist Section -->
         <div class="mb-4 nav-section" data-section="assist">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 hover:bg-slate-800 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-gray-300 rounded-md">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -182,15 +191,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Assist Analytics</a>
-                <a href="#" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Notes</a>
+            <div class="nav-content ml-4">
+                <a href="#" class="block py-1.5 text-xs text-gray-400 hover:text-white rounded-md">Assist Analytics</a>
+                <a href="#" class="block py-1.5 text-xs text-gray-400 hover:text-white rounded-md">Notes</a>
             </div>
         </div>
 
         <!-- Analytics Section -->
         <div class="mb-4 nav-section" data-section="analytics">
-            <div class="nav-item flex items-center justify-between px-2 py-2 text-gray-300 bg-slate-800 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-gray-300 bg-slate-800 rounded-md">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -201,15 +210,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-1">
-                <a href="{%url 'predictions' %}" class="block px-2 py-1 text-sm text-gray-400 hover:text-white hover:bg-slate-800 rounded-md">Make Predictions</a>
-                <a href="#" class="block px-2 py-1 text-sm text-white bg-slate-700 rounded-md">Solve Chat Analytics</a>
+            <div class="nav-content ml-4">
+                <a href="{%url 'predictions' %}" class="block py-1.5 text-xs text-gray-400 hover:text-white rounded-md">Make Predictions</a>
             </div>
         </div>
 
         <!-- Settings Section -->
         <div class="nav-section" data-section="settings">
-            <div class="nav-item flex items-center justify-between px-3 py-2.5 text-white/90 hover:bg-white/5 rounded-md">
+            <div class="nav-item flex items-center justify-between px-2 py-1.5 text-white/90 rounded-md">
                 <div class="flex items-center">
                     <!-- Settings Icon -->
                     <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -221,9 +229,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </div>
-            <div class="nav-content ml-6 space-y-2">
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Account</a>
-                <a href="#" class="block px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-md">Sign out</a>
+            <div class="nav-content ml-4">
+                <a href="#" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Account</a>
+                <a href="#" class="block py-1.5 text-xs text-white/80 hover:text-white rounded-md">Sign out</a>
             </div>
         </div>
     </nav>

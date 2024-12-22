@@ -1,144 +1,255 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Visualizations</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-</head>
+{% block title %}Model Visualizations - ML Analyzer{% endblock %}
 
-<body class="bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 font-sans leading-normal tracking-normal">
+{% block extra_css %}
+<style>
+    .visualization-card {
+        transition: all 0.3s ease;
+        border: 1px solid rgba(209, 213, 219, 0.3);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+    }
+    .visualization-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .grid-masonry {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-gap: 1.5rem;
+        grid-auto-flow: dense;
+    }
+    .grid-masonry .visualization-card:nth-child(3n) {
+        grid-row: span 2;
+    }
+    .loading-overlay {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(5px);
+    }
+    .gradient-heading {
+        background: linear-gradient(135deg, #4F46E5, #10B981);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    .stats-card {
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+</style>
+{% endblock %}
 
-    <!-- Header -->
-    <header class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-6 shadow-lg">
-        <h1 class="text-4xl font-extrabold text-center">Model Visualizations</h1>
-        <p class="text-center mt-2 text-lg font-light">Explore the visual insights of your selected model</p>
-    </header>
+{% block content %}
+{% include 'includes/sidebar.html' %}
 
-    <!-- Main Content -->
-    <main class="container mx-auto mt-8 p-6">
-        <div id="visualizationsGrid" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <!-- Visualization cards will be dynamically loaded here -->
-        </div>
-
-        <!-- Download All Button -->
-        <div class="mt-6 text-center">
-            <button id="downloadAll"
-                class="px-6 py-3 bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 text-white font-semibold rounded shadow hover:opacity-90 transition duration-300">
-                Download All Visualizations
-            </button>
-        </div>
-
-        <!-- Back Button -->
-        <div class="mt-8 text-center">
-            <button onclick="navigateBack()"
-                class="px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white font-semibold rounded shadow hover:opacity-90 transition duration-300">
-                Back to Models
-            </button>
-        </div>
-    </main>
-
-    <!-- Image Modal -->
-    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
-        <div class="relative bg-white rounded-lg shadow-lg overflow-hidden">
-            <button id="closeModal" class="absolute top-2 right-2 text-white bg-red-500 rounded-full px-2 py-1">
-                &times;
-            </button>
-            <img id="modalImage" src="" alt="Visualization" class="max-w-full max-h-screen object-contain">
+<div class="content-with-sidebar">
+    <!-- Header Section -->
+    <div class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold gradient-heading">Model Visualizations</h1>
+                    <p class="mt-1 text-sm text-gray-500">Explore your model's performance through interactive visualizations</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="downloadVisualizations()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download All
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-white text-center py-6 mt-16 relative">
-        <p class="text-sm">&copy; 2024 Your AI Project. Crafted with 💖.</p>
+    <!-- Model Stats Section -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="stats-grid mb-8">
+            <div class="stats-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Accuracy</h3>
+                <p class="text-2xl font-bold text-indigo-600" id="modelAccuracy">--</p>
+            </div>
+            <div class="stats-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-1">F1 Score</h3>
+                <p class="text-2xl font-bold text-emerald-600" id="modelF1Score">--</p>
+            </div>
+            <div class="stats-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Precision</h3>
+                <p class="text-2xl font-bold text-blue-600" id="modelPrecision">--</p>
+            </div>
+            <div class="stats-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Recall</h3>
+                <p class="text-2xl font-bold text-purple-600" id="modelRecall">--</p>
+            </div>
+        </div>
 
-    </footer>
+        <!-- Visualizations Grid -->
+        <div class="grid-masonry" id="visualizationsGrid">
+            <!-- Loading State -->
+            <div id="loadingState" class="col-span-full flex items-center justify-center p-12">
+                <div class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                    <p class="text-gray-500">Loading visualizations...</p>
+                </div>
+            </div>
+        </div>
 
-    <script>
-        // Fetch visualizations for the selected model
-        document.addEventListener("DOMContentLoaded", function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            const modelId = urlParams.get("id");
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden col-span-full flex flex-col items-center justify-center p-12 bg-white rounded-lg shadow-sm">
+            <img src="{% static 'images/empty-state.svg' %}" alt="No visualizations" class="w-48 h-48 mb-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">No Visualizations Available</h3>
+            <p class="text-gray-500 text-center mb-6">Train your model first to generate visualizations</p>
+            <button onclick="location.href='/models/train'" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Train Model
+            </button>
+        </div>
+    </div>
+</div>
 
-            if (!modelId) {
-                alert("Invalid model ID.");
-                return;
-            }
+<!-- Lightbox Modal -->
+<div id="lightboxModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black bg-opacity-75 transition-opacity"></div>
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-3xl w-full">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900" id="lightboxTitle"></h3>
+                <button onclick="closeLightbox()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4">
+                <img id="lightboxImage" src="" alt="" class="w-full">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-            fetch(`/fetch-visualizations/?id=${modelId}`)
-                .then(response => response.json())
-                .then(data => {
-                    const visualizationsGrid = document.getElementById("visualizationsGrid");
-                    visualizationsGrid.innerHTML = "";
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const modelId = urlParams.get('id');
+    
+    if (!modelId) {
+        showEmptyState('No model ID provided');
+        return;
+    }
 
-                    if (data.visualizations.length === 0) {
-                        visualizationsGrid.innerHTML = `
-                            <div class="col-span-full text-center text-gray-700 text-lg">
-                                <p>No visualizations found for this model.</p>
-                            </div>`;
-                        return;
-                    }
+    // Fetch model details and visualizations
+    Promise.all([
+        fetch(`/fetch-model-details/?id=${modelId}`).then(res => res.json()),
+        fetch(`/fetch-visualizations/?id=${modelId}`).then(res => res.json())
+    ])
+    .then(([modelDetails, visualizationsData]) => {
+        updateModelStats(modelDetails);
+        displayVisualizations(visualizationsData.visualizations);
+    })
+    .catch(error => {
+        console.error('Error fetching data:', error);
+        showEmptyState('Failed to load visualizations');
+    });
+});
 
-                    data.visualizations.forEach((imagePath, index) => {
-                        const card = document.createElement("div");
-                        card.className = "relative bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 ease-in-out";
+function updateModelStats(modelDetails) {
+    if (modelDetails.metrics) {
+        document.getElementById('modelAccuracy').textContent = 
+            formatMetric(modelDetails.metrics.accuracy, '%');
+        document.getElementById('modelF1Score').textContent = 
+            formatMetric(modelDetails.metrics.f1_score);
+        document.getElementById('modelPrecision').textContent = 
+            formatMetric(modelDetails.metrics.precision);
+        document.getElementById('modelRecall').textContent = 
+            formatMetric(modelDetails.metrics.recall);
+    }
+}
 
-                        card.innerHTML = `
-                            <img src="${imagePath}" alt="Visualization" class="w-full object-cover cursor-pointer" onclick="openModal('${imagePath}')">
-                        `;
+function formatMetric(value, suffix = '') {
+    if (value === null || value === undefined) return '--';
+    return `${(value * 100).toFixed(1)}${suffix}`;
+}
 
-                        visualizationsGrid.appendChild(card);
+function displayVisualizations(visualizations) {
+    const grid = document.getElementById('visualizationsGrid');
+    document.getElementById('loadingState').style.display = 'none';
+    
+    if (!visualizations || visualizations.length === 0) {
+        showEmptyState();
+        return;
+    }
 
-                        gsap.fromTo(card, { opacity: 0, y: 30 }, {
-                            opacity: 1,
-                            y: 0,
-                            delay: index * 0.1,
-                            duration: 0.6,
-                            ease: "power3.out"
-                        });
-                    });
-                })
-                .catch(error => {
-                    console.error("Error fetching visualizations:", error);
-                    const visualizationsGrid = document.getElementById("visualizationsGrid");
-                    visualizationsGrid.innerHTML = `
-                        <div class="col-span-full text-center text-red-700">
-                            <p>Failed to load visualizations. Please try again later.</p>
-                        </div>`;
-                });
+    grid.innerHTML = visualizations.map((viz, index) => `
+        <div class="visualization-card rounded-xl overflow-hidden cursor-pointer"
+             onclick="openLightbox('${viz.title}', '${viz.url}')">
+            <div class="aspect-w-16 aspect-h-9">
+                <img src="${viz.url}" 
+                     alt="${viz.title}" 
+                     class="object-cover w-full h-full">
+            </div>
+            <div class="p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-1">${viz.title}</h3>
+                <p class="text-sm text-gray-500">${viz.description || 'Click to view details'}</p>
+            </div>
+        </div>
+    `).join('');
+}
 
-            // Set up the download button
-            const downloadAllBtn = document.getElementById("downloadAll");
-            downloadAllBtn.addEventListener("click", function () {
-                window.location.href = `/download-visualizations/?id=${modelId}`;
-            });
+function showEmptyState(message = 'No visualizations available') {
+    document.getElementById('loadingState').style.display = 'none';
+    const emptyState = document.getElementById('emptyState');
+    emptyState.classList.remove('hidden');
+    emptyState.querySelector('p').textContent = message;
+}
 
-        });
+function openLightbox(title, imageUrl) {
+    const modal = document.getElementById('lightboxModal');
+    const titleEl = document.getElementById('lightboxTitle');
+    const imageEl = document.getElementById('lightboxImage');
+    
+    titleEl.textContent = title;
+    imageEl.src = imageUrl;
+    modal.classList.remove('hidden');
+}
 
+function closeLightbox() {
+    const modal = document.getElementById('lightboxModal');
+    modal.classList.add('hidden');
+}
 
-        
-        // Open Modal
-        function openModal(imagePath) {
-            const modal = document.getElementById("imageModal");
-            const modalImage = document.getElementById("modalImage");
-            modalImage.src = imagePath;
-            modal.classList.remove("hidden");
-        }
+function downloadVisualizations() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const modelId = urlParams.get('id');
+    
+    if (!modelId) return;
+    
+    window.location.href = `/download-visualizations/?id=${modelId}`;
+}
 
-        // Close Modal
-        document.getElementById("closeModal").addEventListener("click", function () {
-            const modal = document.getElementById("imageModal");
-            modal.classList.add("hidden");
-        });
+// Close lightbox when clicking outside the image
+document.getElementById('lightboxModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeLightbox();
+    }
+});
 
-        // Navigate back to models page
-        function navigateBack() {
-            window.location.href = "/predictions/";
-        }
-    </script>
-</body>
-
-</html>
+// Handle escape key to close lightbox
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeLightbox();
+    }
+});
+</script>
+{% endblock %}

@@ -1,132 +1,493 @@
-{% extends 'base.html' %}
-
-{% block title %}Upload Dataset{% endblock %}
-
-{% block header_title %}Upload Dataset{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-        <div class="p-6 bg-white border-b border-gray-200">
-            <h2 class="text-2xl font-bold mb-4">Upload Dataset</h2>
-            <form method="post" enctype="multipart/form-data" id="uploadForm" class="space-y-6">
-                {% csrf_token %}
-                
-                <!-- File Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Choose Dataset File</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                        <div class="space-y-1 text-center">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            <div class="flex text-sm text-gray-600">
-                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                                    <span>Upload a file</span>
-                                    <input id="file-upload" name="file" type="file" class="sr-only" required>
-                                </label>
-                                <p class="pl-1">or drag and drop</p>
-                            </div>
-                            <p class="text-xs text-gray-500">CSV, Excel up to 10MB</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Dataset Name -->
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name</label>
-                    <input type="text" name="name" id="name" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
-                </div>
-                <!-- Target Class Selection (initially hidden) -->
-                <div id="targetClassSection" style="display: block;">
-                    <label for="target_class" class="block text-sm font-medium text-gray-700">Select Target Class</label>
-                    <select name="target_class" id="target_class" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        <option value="">Select a column</option>
-                    </select>
-                    <p class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
-                </div>
-
-
-                <!-- Dataset Description -->
-                <div>
-                    <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-                    <textarea id="description" name="description" rows="3" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
-                </div>
-
-
-                <!-- Submit Button -->
-                <div class="flex justify-end">
-                    <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Upload Dataset
-                    </button>
-                </div>
-            </form>
+<div class="relative group slide-in-left">
+    <div class="rounded-2xl bg-white/70 backdrop-blur-lg p-8 
+                shadow-[0_8px_30px_rgb(0,0,0,0.12)] 
+                hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] 
+                transition-all duration-300 ease-in-out 
+                transform hover:-translate-y-1 cursor-pointer 
+                border border-gray-100"
+         onclick="openDatasetModal('uploadModal')">
+        <div class="flex flex-col items-center">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-3">
+                <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+            </div>
+            <h3 class="text-2xl font-semibold leading-7 text-gray-900 mb-3">Upload Dataset</h3>
+            <p class="text-gray-600 text-center">
+                Import your existing dataset files for immediate analysis
+            </p>
+            <span class="mt-4 inline-flex items-center text-blue-600 group-hover:text-blue-700">
+                Get Started
+                <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </span>
         </div>
     </div>
 </div>
+<div id="uploadModal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden overflow-y-auto h-full w-full transition-opacity duration-300 ease-out opacity-0 z-50">
+    <div class="relative top-5 mx-auto p-8 border w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-xl transform transition-all duration-300 ease-out scale-90 -translate-y-20">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center pb-6 border-b border-gray-200">
+            <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-700">Upload Dataset</h3>
+            <button onclick="closeModal('uploadModal')" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 rounded-full p-2 hover:bg-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
 
-<!-- JavaScript for handling file upload and column detection -->
-<script>
-    document.getElementById('file-upload').addEventListener('change', async function(e) {
-        console.log('File selected:', e.target.files[0]); // Debug log
-        const file = e.target.files[0];
-        if (file) {
-            const formData = new FormData();
-            formData.append('file', file);
+        <form id="upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_file' %}" class="space-y-6 mt-6">
+            {% csrf_token %}
             
-            try {
-                console.log('Sending request to /get_columns_target/'); // Debug log
-                const response = await fetch('/get_columns_target/', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
+            <!-- Data Source Selection -->
+            <div class="bg-gray-50/50 rounded-xl p-6 backdrop-blur-sm">
+                <label class="block text-sm font-medium text-gray-700 mb-4">Choose Data Source:</label>
+                <div class="flex space-x-6">
+                    <label class="relative flex items-center group cursor-pointer">
+                        <input type="radio" name="source" value="local" class="peer sr-only" required checked>
+                        <div class="w-10 h-10 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition-all duration-200">
+                            <svg class="w-6 h-6 text-gray-400 peer-checked:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                        </div>
+                        <span class="ml-3 text-gray-700">From Computer</span>
+                    </label>
+                    
+                    <label class="relative flex items-center group cursor-pointer">
+                        <input type="radio" name="source" value="kaggle" class="peer sr-only">
+                        <div class="w-10 h-10 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition-all duration-200">
+                            <svg class="w-6 h-6 text-gray-400 peer-checked:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>
+                        </div>
+                        <span class="ml-3 text-gray-700">From Kaggle</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Kaggle URL Input -->
+            <div id="kaggle-input" class="hidden space-y-4">
+                <label for="kaggle-link" class="block text-sm font-medium text-gray-700">Kaggle Dataset URL</label>
+                <div class="flex space-x-3">
+                    <div class="relative flex-1">
+                        <input type="url" id="kaggle-link" name="kaggle_link"
+                            class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="https://www.kaggle.com/datasets/...">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                        </div>
+                    </div>
+                    <button type="button" id="analyze-kaggle" 
+                        class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center space-x-2">
+                        <span>Analyze</span>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Upload -->
+            <div class="space-y-4">
+                <label for="dataset" id="file-label" class="block text-sm font-medium text-gray-700">Dataset File</label>
+                <div class="relative">
+                    <input type="file" id="dataset" name="file" accept=".csv, .xls, .xlsx"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Dataset Name -->
+            <div class="space-y-4">
+                <label for="name" class="block text-sm font-medium text-gray-700">Dataset Name</label>
+                <input type="text" id="name" name="name" required
+                    class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Enter a name for your dataset">
+            </div>
+
+            <!-- Target Class Selection -->
+            <div id="targetClassSection" class="hidden space-y-4">
+                <label for="target_class" class="block text-sm font-medium text-gray-700">Target Class</label>
+                <select name="target_class" id="target_class" 
+                    class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                    <option value="">Select a column</option>
+                </select>
+                <p id="target-class-help" class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
+            </div>
+
+            <!-- Description -->
+            <div class="space-y-4">
+                <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                <textarea id="description" name="description" rows="3" required
+                    class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Describe your dataset"></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit"
+                class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-[1.02]">
+                Upload Dataset
+            </button>
+        </form>
+
+        <!-- Response Messages -->
+        <div id="upload-response" class="mt-6"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+    // Modal functions with animations
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('hidden');
+        
+        // Trigger a reflow to ensure the transitions work
+        void modal.offsetWidth;
+        
+        // Add the visible classes
+        modal.classList.remove('opacity-0');
+        modal.classList.add('opacity-100');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-95', 'translate-y-4');
+            modalContent.classList.add('scale-100', 'translate-y-0');
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        
+        // Start the closing animation
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('scale-100', 'translate-y-0');
+            modalContent.classList.add('scale-95', 'translate-y-4');
+        }
+        
+        // Hide the modal after the animation completes
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    // Authentication check function
+    function checkAuthentication(action) {
+        // Get authentication status from a data attribute we'll add to the body
+        const isAuthenticated = document.body.dataset.authenticated === 'true';
+        
+        if (!isAuthenticated) {
+            window.intendedAction = action;
+            openModal('authModal');
+            return false;
+        }
+        return true;
+    }
+
+    // Dataset modal open function with auth check
+    function openDatasetModal(modalId) {
+        const isAuthenticated = document.body.dataset.authenticated === 'true';
+        console.log('Authentication status:', isAuthenticated); // Debug line
+        
+        if (isAuthenticated) {
+            openModal(modalId);
+        } else {
+            window.intendedAction = modalId;
+            openModal('authModal');
+        }
+    }
+
+
+
+// Add Kaggle analyze button handler
+document.getElementById('analyze-kaggle').addEventListener('click', async function() {
+    const kaggleUrl = document.getElementById('kaggle-link').value;
+    if (!kaggleUrl) {
+        alert('Please enter a Kaggle dataset URL');
+        return;
+    }
+
+    const targetSection = document.getElementById('targetClassSection');
+    const targetSelect = document.getElementById('target_class');
+    const helpText = document.getElementById('target-class-help');
+
+    try {
+        // Show loading state
+        targetSection.style.display = 'block';
+        targetSelect.disabled = true;
+        targetSelect.required = false;
+        helpText.textContent = 'Analyzing Kaggle dataset...';
+        this.disabled = true;
+        this.innerHTML = '<span class="animate-spin inline-block h-4 w-4 border-t-2 border-white rounded-full mr-2"></span>Analyzing...';
+
+        const response = await fetch('/get_columns_target/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify({
+                kaggle_url: kaggleUrl
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Clear existing options
+            targetSelect.innerHTML = '<option value="">Select a column</option>';
+            
+            if (data.columns && Array.isArray(data.columns)) {
+                data.columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column;
+                    option.textContent = column;
+                    targetSelect.appendChild(option);
                 });
                 
-                console.log('Response status:', response.status); // Debug log
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Received data:', data); // Debug log
-                    
-                    const targetSelect = document.getElementById('target_class');
-                    if (!targetSelect) {
-                        console.error('Target select element not found!');
-                        return;
-                    }
-                    
-                    // Clear previous options
-                    targetSelect.innerHTML = '<option value="">Select a column</option>';
-                    
-                    // Add new options
-                    if (data.columns && Array.isArray(data.columns)) {
-                        data.columns.forEach(column => {
-                            const option = document.createElement('option');
-                            option.value = column;
-                            option.textContent = column;
-                            targetSelect.appendChild(option);
-                        });
-                        
-                        // Show the target class selection
-                        const targetSection = document.getElementById('targetClassSection');
-                        if (targetSection) {
-                            targetSection.style.display = 'block';
-                            console.log('Target section displayed'); // Debug log
-                        } else {
-                            console.error('Target section element not found!');
-                        }
-                    } else {
-                        console.error('Invalid columns data received:', data);
-                    }
-                } else {
-                    const errorData = await response.json();
-                    console.error('Server error:', errorData.error);
-                }
-            } catch (error) {
-                console.error('Request error:', error);
+                targetSelect.disabled = false;
+                targetSelect.required = true;
+                helpText.textContent = 'Please select a target class for your analysis';
+                helpText.className = 'mt-2 text-sm text-indigo-600 font-medium';
+            } else {
+                throw new Error('No columns found in the dataset');
             }
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to analyze Kaggle dataset');
+        }
+    } catch (error) {
+        console.error('Kaggle analysis error:', error);
+        targetSelect.innerHTML = '<option value="">Error analyzing dataset</option>';
+        targetSelect.disabled = true;
+        targetSelect.required = false;
+        helpText.textContent = error.message || 'Failed to analyze Kaggle dataset. Please check the URL and try again.';
+        helpText.className = 'mt-2 text-sm text-red-600 font-medium';
+    } finally {
+        this.disabled = false;
+        this.textContent = 'Analyze Columns';
+    }
+});
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target.classList.contains('fixed')) {
+            closeModal(event.target.id);
+        }
+    }
+
+    // Initialize all event listeners when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Authentication form toggle
+        const toggleButton = document.getElementById('toggleAuthForm');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', function() {
+                const signInForm = document.getElementById('signInForm');
+                const signUpForm = document.getElementById('signUpForm');
+                const modalTitle = document.getElementById('authModalTitle');
+                
+                if (signInForm.classList.contains('hidden')) {
+                    signInForm.classList.remove('hidden');
+                    signUpForm.classList.add('hidden');
+                    modalTitle.textContent = 'Sign In';
+                    this.textContent = "Don't have an account? Sign Up";
+                } else {
+                    signInForm.classList.add('hidden');
+                    signUpForm.classList.remove('hidden');
+                    modalTitle.textContent = 'Sign Up';
+                    this.textContent = 'Already have an account? Sign In';
+                }
+            });
+        }
+
+        // Handle authentication form submissions
+        const signInForm = document.getElementById('signInForm');
+        if (signInForm) {
+            signInForm.addEventListener('submit', handleAuthSubmit);
+        }
+
+        const signUpForm = document.getElementById('signUpForm');
+        if (signUpForm) {
+            signUpForm.addEventListener('submit', handleAuthSubmit);
+        }
+
+        // Update dataset modal triggers
+        const uploadCard = document.querySelector('[onclick*="uploadModal"]');
+        if (uploadCard) {
+            uploadCard.setAttribute('onclick', 'openDatasetModal("uploadModal")');
+        }
+
+        const createCard = document.querySelector('[onclick*="createModal"]');
+        if (createCard) {
+            createCard.setAttribute('onclick', 'openDatasetModal("createModal")');
         }
     });
+
+ 
+    // Upload form handling
+    document.querySelectorAll('input[name="source"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const kaggleInput = document.getElementById('kaggle-input');
+            const fileInput = document.getElementById('dataset');
+            const fileLabel = document.getElementById('file-label');
+            
+            if (e.target.value === 'kaggle') {
+                kaggleInput.classList.remove('hidden');
+                fileInput.classList.add('hidden');
+                fileLabel.classList.add('hidden');
+                fileInput.required = false;
+            } else {
+                kaggleInput.classList.add('hidden');
+                fileInput.classList.remove('hidden');
+                fileLabel.classList.remove('hidden');
+                fileInput.required = true;
+            }
+        });
+    });
+
+    document.getElementById('dataset').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Validate file type
+        const validTypes = ['.csv', '.xls', '.xlsx'];
+        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!validTypes.includes(fileExtension)) {
+            alert('Please upload a valid CSV or Excel file (.csv, .xls, .xlsx)');
+            this.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            // Show loading state
+            const targetSection = document.getElementById('targetClassSection');
+            targetSection.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div><p class="mt-2 text-sm text-gray-500">Loading columns...</p></div>';
+            targetSection.style.display = 'block';
+
+            const response = await fetch('/get_columns_target/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Restore target section HTML with improved layout
+                targetSection.innerHTML = `
+                    <label for="target_class" class="block text-sm font-medium text-gray-700">Select Target Class</label>
+                    <select name="target_class" id="target_class" required class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select a column</option>
+                    </select>
+                `;
+
+                const targetSelect = document.getElementById('target_class');
+                const columnDetails = document.getElementById('column-details');
+                
+                // Add options and show data types
+                if (data.columns && Array.isArray(data.columns)) {
+                    data.columns.forEach(column => {
+                        const option = document.createElement('option');
+                        option.value = column;
+                        option.textContent = column;
+                        targetSelect.appendChild(option);
+                        
+                        // Add column type information
+                        const dtype = data.dtypes[column] || 'unknown';
+                        const columnInfo = document.createElement('div');
+
+                    });
+                }
+            } else {
+                const errorData = await response.json();
+                targetSection.innerHTML = `
+                    <div class="text-red-500 p-4 rounded-md bg-red-50">
+                        <p class="font-medium">Error loading columns:</p>
+                        <p class="text-sm">${errorData.error || 'Unknown error occurred'}</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Request error:', error);
+            document.getElementById('targetClassSection').innerHTML = `
+                <div class="text-red-500 p-4 rounded-md bg-red-50">
+                    <p class="font-medium">Error:</p>
+                    <p class="text-sm">Failed to load columns. Please try again or contact support.</p>
+                </div>
+            `;
+        }
+    }
+});
+
+    // Handle upload form submission
+    const uploadForm = document.getElementById('upload-form');
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(uploadForm);
+
+        const response = await fetch(uploadForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            }
+        });
+
+        const result = await response.json();
+        const responseDiv = document.getElementById('upload-response');
+        
+        if (result.error) {
+            responseDiv.innerHTML = `<p class="text-red-500">Error: ${result.error}</p>`;
+        } else {
+            responseDiv.innerHTML = `
+                <p class="text-green-500">${result.message}</p>
+                <h3 class="font-semibold mt-4">Preview of Uploaded Dataset:</h3>
+                <div class="overflow-x-auto">${result.preview}</div>
+            `;
+        }
+    });
+
+
+
+// Intersection Observer for scroll animations
+const observerOptions = {
+    root: null,
+    rootMargin: '0px',
+    threshold: 0.1
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            // Unobserve after animation
+            observer.unobserve(entry.target);
+        }
+    });
+}, observerOptions);
+
+// Observe all animated elements
+document.addEventListener('DOMContentLoaded', () => {
+    const animatedElements = document.querySelectorAll('.fade-up, .stagger-fade, .scale-in, .slide-in-left, .slide-in-right');
+    animatedElements.forEach(el => observer.observe(el));
+});
 </script>
 {% endblock %}

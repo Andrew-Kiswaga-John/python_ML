@@ -1045,6 +1045,9 @@ document.getElementById('analyze-kaggle').addEventListener('click', async functi
                 <h3 class="font-semibold mt-4">Preview of Uploaded Dataset:</h3>
                 <div class="overflow-x-auto">${result.preview}</div>
             `;
+            if (result.dataset_id) {
+                window.location.href = `${result.dataset_id}/dashboard/`;
+            }
         }
     });
 
@@ -1213,7 +1216,7 @@ document.getElementById('step2-form').addEventListener('submit', async function(
             alert('Dataset created successfully!');
             // Redirect to the dataset view page
             if (result.dataset_id) {
-                window.location.href = `/dataset/${result.dataset_id}/`;
+                window.location.href = `${result.dataset_id}/dashboard/`;
             }
         }
     } catch (error) {

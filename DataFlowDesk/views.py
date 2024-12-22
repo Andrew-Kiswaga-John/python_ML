@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 from datetime import datetime
-from .models import Dataset, MLModel, DataPreprocessingLog, Profile
+from .models import Dataset, MLModel, DataPreprocessingLog, Profile, ModelResult
 from django.db.models.functions import TruncMonth
 from django.db.models import Avg
 from django.db import models
@@ -72,8 +72,53 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def index(request) :
-    return render( request, "index.html")
+
+
+
+def my_datasets(request):
+    datasets = Dataset.objects.all().order_by('-uploaded_at')
+    
+    datasets_list = []
+    for dataset in datasets:
+        # Get the file size in a readable format
+        if dataset.file_path:
+            size = dataset.file_path.size
+            if size < 1024:
+                size_str = f"{size} B"
+            elif size < 1024*1024:
+                size_str = f"{size/1024:.1f} KB"
+            else:
+                size_str = f"{size/(1024*1024):.1f} MB"
+        else:
+            size_str = "N/A"
+            
+        # Get the number of rows and columns
+        try:
+            file_path = dataset.cleaned_file.path if dataset.cleaned_file else dataset.file_path.path
+            df = pd.read_csv(file_path, encoding='utf-8', on_bad_lines='skip')
+            rows = format(len(df), ',d')  # Format with commas for thousands
+            columns = format(len(df.columns), ',d')
+        except Exception as e:
+            print(f"Error reading file: {str(e)}")
+            rows = "N/A"
+            columns = "N/A"
+            
+        datasets_list.append({
+            'id': dataset.id,
+            'name': dataset.name,
+            'description': dataset.description,
+            'created_at': dataset.uploaded_at,
+            'size': size_str,
+            'rows': rows,
+            'columns': columns,
+            'status': dataset.status
+        })
+    
+    context = {
+        'datasets': datasets_list,
+        'page_title': 'My Datasets'
+    }
+    return render(request, 'datasets/show_datasets.html', context)
 
 
 @ensure_csrf_cookie
@@ -1648,7 +1693,8 @@ def upload_file(request):
                 'success': True,
                 'message': 'Dataset uploaded successfully',
                 'dataset_id': dataset.id,
-                'preview': preview_html
+                'preview': preview_html,
+                'redirect_url': f'/dashboard/{dataset.id}'
             })
 
         except Exception as e:
@@ -2827,16 +2873,11 @@ def train_model(request):
                 print("Initializing and training LinearRegression model...")
                 model = LinearRegression()
                 model.fit(X_train_poly, y_train)
-
                 model.feature_names_in_ = feature_columns  # Add feature names
                 model.suggested_ranges = {  # Add suggested input ranges
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
-
-                print("Model training complete.")
-
-                # Make predictions and log predictions shape
-                print("Making predictions on X_test_poly...")
+                # Predict on transformed test data
                 y_pred = model.predict(X_test_poly)
                 print(f"Shape of y_pred: {y_pred.shape}")
                 print(f"First 5 predictions: {y_pred[:5]}")
@@ -3369,38 +3410,96 @@ def render_predictions_view(request):
         'metrics': None,         # No metrics yet
     })
 
-def fetch_models(request):
-    models = MLModel.objects.all().values('id', 'algorithm', 'created_at')
-    return JsonResponse({'models': list(models)})
+# def fetch_models(request):
+#     models = MLModel.objects.all().values('id', 'algorithm', 'created_at')
+#     return JsonResponse({'models': list(models)})
 
-# API endpoint to fetch visualizations for a specific model
+def fetch_models(request):
+    # Fetch all models with their related dataset and results
+    models = MLModel.objects.select_related('dataset').prefetch_related('results').all()
+    model_list = []
+    
+    for model in models:
+        # Get accuracy from ModelResult if it exists
+        accuracy_result = ModelResult.objects.filter(
+            model=model,
+            metric_name='accuracy'
+        ).first()
+        
+        accuracy_value = accuracy_result.metric_value if accuracy_result else None
+        dataset_name = model.dataset.name if model.dataset else 'Unknown Dataset'
+        
+        model_data = {
+            'id': model.id,
+            'algorithm': model.algorithm,
+            'created_at': model.created_at,
+            'dataset_id': model.dataset.id if model.dataset else None,
+            'dataset_name': dataset_name,
+            'accuracy': accuracy_value
+        }
+        model_list.append(model_data)
+    
+    return JsonResponse({'models': model_list})
+
 def fetch_visualizations(request):
-    model_id = request.GET.get("id")
+    model_id = request.GET.get('id')
+    if not model_id:
+        return JsonResponse({'error': 'No model ID provided'}, status=400)
+    
     try:
         model = MLModel.objects.get(id=model_id)
         model_path = os.path.splitext(os.path.basename(model.model_path.path))[0]
-        print(f"visualizations folder name is {model_path}")
         visualizations_dir = os.path.join(settings.MEDIA_ROOT, "visualizations", model_path)
-        print(f"visualizations folder directory is {visualizations_dir}")
         
-        # Ensure directory exists
         if not os.path.exists(visualizations_dir):
-            return JsonResponse({"visualizations": []})  # No visualizations found
+            return JsonResponse({"visualizations": []})
         
-        # List all PNG files in the directory
-        visualizations = [
-            f"/media/visualizations/{model_path}/{file}"
-            for file in os.listdir(visualizations_dir) if file.endswith(".png")
-        ]
+        visualizations = []
+        for file in os.listdir(visualizations_dir):
+            if file.endswith('.png'):
+                # Create a title from the filename
+                title = ' '.join(file.split('.')[0].split('_')).title()
+                
+                # Get description based on the type of visualization
+                description = None
+                if 'confusion_matrix' in file.lower():
+                    description = 'Shows the model\'s prediction accuracy across different classes'
+                elif 'roc_curve' in file.lower():
+                    description = 'Receiver Operating Characteristic curve showing true vs false positive rates'
+                elif 'learning_curve' in file.lower():
+                    description = 'Model\'s learning progress during training'
+                elif 'feature_importance' in file.lower():
+                    description = 'Relative importance of different features in making predictions'
+                elif 'precision_recall' in file.lower():
+                    description = 'Trade-off between precision and recall at different thresholds'
+                
+                visualizations.append({
+                    'title': title,
+                    'url': f'/media/visualizations/{model_path}/{file}',
+                    'description': description
+                })
+        
         return JsonResponse({"visualizations": visualizations})
     except MLModel.DoesNotExist:
         return JsonResponse({"error": "Model not found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-# View to render the model_visualizations.html page
 def model_visualizations(request):
-    return render(request, 'model_visualizations.html')
+    model_id = request.GET.get('id')
+    if not model_id:
+        return redirect('predictions')
+        
+    try:
+        model = MLModel.objects.get(id=model_id)
+        context = {
+            'model': model,
+            'page_title': f'Visualizations for {model.algorithm} Model'
+        }
+        return render(request, 'model_visualizations.html', context)
+    except MLModel.DoesNotExist:
+        messages.error(request, 'Model not found')
+        return redirect('predictions')
 
 def model_predictions(request):
     return render(request, 'model_predictions.html')
