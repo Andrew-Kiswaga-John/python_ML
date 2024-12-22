@@ -75,6 +75,8 @@ logger = logging.getLogger(__name__)
 
 
 
+
+
 def my_datasets(request):
     datasets = Dataset.objects.all().order_by('-uploaded_at')
     
@@ -270,13 +272,11 @@ def general_dashboard(request):
         'Text Files': datasets.filter(file_path__endswith='.txt').count(),
     }
     
-    plt.pie(data_types.values(), 
-           labels=data_types.keys(),
-           autopct='%1.1f%%',
+    plt.pie(data_types.values(), labels=data_types.keys(), autopct='%1.1f%%', 
            colors=['#4F46E5', '#10B981', '#F59E0B'],
            explode=[0.05] * len(data_types))
     plt.title('Dataset Types Distribution', pad=20)
-    plt.tight_layout()
+    plt.axis('equal')
     quality_trend_plot = fig_to_base64(fig_types)
     plt.close(fig_types)
     
@@ -3041,7 +3041,6 @@ def train_model(request):
                     # visualization_path=f'data:image/png;base64,{image_base64}',
                 )
 
-
             elif model_name == 'naive_bayes':
                 var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
                 model = GaussianNB(var_smoothing=var_smoothing)
@@ -3904,3 +3903,259 @@ def download_model(request):
     
     logger.error("Invalid request method")
     return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+def tutorials(request):
+    tutorial_videos = [
+        {
+            'id': 1,
+            'title': 'How to Create a Dataset',
+            'video_url': 'tutorials/how to create a dataset.mp4',
+            'level': 'Beginner',
+            'duration': '5 min',
+            'description': 'Master the fundamentals of dataset creation in DataFlowDesk.',
+            'key_points': [
+                'Dataset creation interface walkthrough',
+                'Understanding data formats',
+                'Best practices and organization'
+            ]
+        },
+        {
+            'id': 2,
+            'title': 'How to Upload Dataset',
+            'video_url': 'tutorials/how to ulpoad dataset.mp4',
+            'level': 'Beginner',
+            'duration': '3 min',
+            'description': 'Learn the seamless process of uploading your datasets.',
+            'key_points': [
+                'Supported file formats',
+                'Upload process walkthrough',
+                'Troubleshooting tips'
+            ]
+        },
+        {
+            'id': 3,
+            'title': 'How to Import Dataset from Kaggle',
+            'video_url': 'tutorials/how to import dataset from kaggle.mp4',
+            'level': 'Intermediate',
+            'duration': '7 min',
+            'description': 'Explore how to leverage Kaggle\'s vast dataset repository.',
+            'key_points': [
+                'Kaggle API setup',
+                'Dataset browsing and selection',
+                'Import optimization techniques'
+            ]
+        },
+        {
+            'id': 4,
+            'title': 'How to Clean Dataset and Create Visualizations',
+            'video_url': 'tutorials/how to clean dataset and create visualizations.mp4',
+            'level': 'Advanced',
+            'duration': '10 min',
+            'description': 'Master advanced data cleaning and visualization techniques.',
+            'key_points': [
+                'Data cleaning strategies',
+                'Visualization techniques',
+                'Pattern interpretation'
+            ]
+        },
+        {
+            'id': 5,
+            'title': 'How to Train Model and Make Predictions',
+            'video_url': 'tutorials/how to train model and make predictions.mp4',
+            'level': 'Expert',
+            'duration': '12 min',
+            'description': 'Learn advanced model training and prediction techniques.',
+            'key_points': [
+                'Model selection strategies',
+                'Training optimization',
+                'Prediction accuracy tips'
+            ]
+        }
+    ]
+    
+    return render(request, 'tutorials.html', {'tutorials': tutorial_videos})
+
+def documentation(request):
+    # Quick start guide sections
+    quick_start = [
+        {
+            'title': 'Dataset Management',
+            'description': 'Upload your dataset or create a new one from scratch. Supported formats include CSV, Excel, and JSON files. You can also connect to databases or use sample datasets.',
+            'code': '''# Supported file formats
+- CSV (.csv)
+- Excel (.xlsx, .xls)
+- JSON (.json)
+- SQL databases
+- Sample datasets'''
+        },
+        {
+            'title': 'Data Cleaning & Preprocessing',
+            'description': 'Clean and prepare your data for analysis. Handle missing values, remove duplicates, normalize data, and encode categorical variables.',
+            'code': '''# Available preprocessing options
+1. Handle missing values
+   - Remove rows
+   - Fill with mean/median/mode
+   - Forward/backward fill
+2. Remove duplicates
+3. Scale/normalize data
+   - Min-Max scaling
+   - Standard scaling
+   - Robust scaling
+4. Encode categorical variables
+   - One-hot encoding
+   - Label encoding
+   - Ordinal encoding'''
+        },
+        {
+            'title': 'Data Visualization',
+            'description': 'Create interactive visualizations to understand your data better. Customize X and Y axes, plot types, and styling options.',
+            'code': '''# Available plot types
+1. Statistical plots
+   - Histograms
+   - Box plots
+   - Violin plots
+   - KDE plots
+2. Relationship plots
+   - Scatter plots
+   - Line plots
+   - Bar plots
+   - Heat maps
+3. Distribution plots
+   - Pair plots
+   - Joint plots
+4. Time series plots
+   - Line plots
+   - Area plots
+   - Seasonal decomposition'''
+        },
+        {
+            'title': 'Model Training',
+            'description': 'Train your machine learning models using various algorithms and techniques. Customize hyperparameters and validation strategies.',
+            'code': '''# Available algorithms
+1. Classification
+   - Logistic Regression
+   - Random Forest
+   - Support Vector Machines
+   - Gradient Boosting
+   - Neural Networks
+2. Regression
+   - Linear Regression
+   - Ridge/Lasso
+   - Decision Trees
+   - XGBoost
+   - LightGBM
+3. Clustering
+   - K-Means
+   - DBSCAN
+   - Hierarchical Clustering
+4. Dimensionality Reduction
+   - PCA
+   - t-SNE
+   - UMAP'''
+        },
+        {
+            'title': 'Model Evaluation & Predictions',
+            'description': 'Evaluate model performance, make predictions on new data, and export results. Download trained models and visualization graphs.',
+            'code': '''# Available features
+1. Model evaluation metrics
+   - Accuracy, Precision, Recall
+   - ROC curves, AUC
+   - Confusion matrix
+   - R², MSE, MAE
+2. Cross-validation
+   - K-fold
+   - Stratified K-fold
+   - Time series split
+3. Export options
+   - Download trained model (.pkl)
+   - Export predictions (.csv)
+   - Save visualizations (.png, .pdf)
+   - Generate reports (.html, .pdf)'''
+        }
+    ]
+
+    # API Reference sections
+    api_reference = [
+        {
+            'id': 'data-management',
+            'name': 'Data Management API',
+            'description': 'Upload, create, and manage datasets'
+        },
+        {
+            'id': 'preprocessing',
+            'name': 'Data Preprocessing API',
+            'description': 'Clean and prepare your data'
+        },
+        {
+            'id': 'visualization',
+            'name': 'Visualization API',
+            'description': 'Create and customize visualizations'
+        },
+        {
+            'id': 'model-training',
+            'name': 'Model Training API',
+            'description': 'Train and tune machine learning models'
+        },
+        {
+            'id': 'predictions',
+            'name': 'Predictions API',
+            'description': 'Make predictions and export results'
+        }
+    ]
+
+    # Example sections
+    examples = [
+        {
+            'id': 'classification',
+            'title': 'Classification Example',
+            'description': 'Build a classification model for customer churn prediction'
+        },
+        {
+            'id': 'regression',
+            'title': 'Regression Example',
+            'description': 'Create a house price prediction model'
+        },
+        {
+            'id': 'clustering',
+            'title': 'Clustering Example',
+            'description': 'Customer segmentation using K-means'
+        },
+        {
+            'id': 'time-series',
+            'title': 'Time Series Analysis',
+            'description': 'Sales forecasting with ARIMA and Prophet'
+        }
+    ]
+
+    # Resource sections
+    resources = [
+        {
+            'title': 'Video Tutorials',
+            'description': 'Step-by-step video guides for DataFlowDesk',
+            'url': '/tutorials/'
+        },
+        {
+            'title': 'API Documentation',
+            'description': 'Detailed API reference and examples',
+            'url': '#'
+        },
+        {
+            'title': 'Best Practices',
+            'description': 'ML workflow best practices and tips',
+            'url': '#'
+        },
+        {
+            'title': 'Sample Projects',
+            'description': 'Example projects and use cases',
+            'url': '#'
+        }
+    ]
+
+    context = {
+        'quick_start': quick_start,
+        'api_reference': api_reference,
+        'examples': examples,
+        'resources': resources
+    }
+
+    return render(request, 'documentation.html', context)

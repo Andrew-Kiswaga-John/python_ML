@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Include Sidebar -->
+{% include 'includes/sidebar.html' %}
+
+<!-- Main Content Area -->
+<div class="ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white/70 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Tutorials</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-700 font-medium">{{ user.username }}</span>
+                    <div class="h-9 w-9 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 p-0.5">
+                        <div class="rounded-full bg-white h-full w-full flex items-center justify-center text-indigo-500 font-semibold">
+                            {{ user.username|make_list|first|upper }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="bg-white/80 backdrop-blur-xl shadow-lg rounded-2xl p-8 border border-white/20 transition-all duration-300 hover:shadow-xl">
+            <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600 text-center mb-8">Learn ru2ya.AI</h2>
+            
+            <!-- Tutorial Grid -->
+            <div class="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
+                {% for tutorial in tutorials %}
+                <div class="bg-white/90 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 border border-white/20">
+                    <div class="p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="px-3 py-1 text-sm font-semibold text-indigo-800 bg-indigo-100 rounded-full">
+                                {{ tutorial.level }}
+                            </span>
+                            <span class="text-sm text-gray-500">{{ tutorial.duration }}</span>
+                        </div>
+                        
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-4">{{ tutorial.title }}</h2>
+                        
+                        <!-- Video Container -->
+                        <div class="relative mb-4 cursor-pointer video-container group" 
+                             data-video-url="{% static tutorial.video_url %}"
+                             onclick="playVideo(this)">
+                            <!-- Video Thumbnail -->
+                            <div class="aspect-w-16 aspect-h-9 bg-gray-200 rounded-xl overflow-hidden">
+                                <video class="w-full h-full object-cover" muted>
+                                    <source src="{% static tutorial.video_url %}" type="video/mp4">
+                                </video>
+                            </div>
+                            
+                            <!-- Play Button Overlay -->
+                            <div class="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-all duration-300">
+                                <div class="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
+                                    <svg class="w-8 h-8 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">{{ tutorial.description }}</p>
+                        
+                        <div class="space-y-2">
+                            {% for point in tutorial.key_points %}
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-gray-700">{{ point }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video Modal -->
+<div id="videoModal" class="fixed inset-0 bg-black/95 hidden z-50">
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl">
+            <!-- Close Button -->
+            <button onclick="closeVideoModal()" class="absolute -top-12 right-0 text-white/90 hover:text-white text-3xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-all duration-300">&times;</button>
+            
+            <!-- Video Player -->
+            <div class="aspect-w-16 aspect-h-9 rounded-xl overflow-hidden">
+                <video id="modalVideo" class="w-full h-full" controls muted>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('videoModal');
+    const modalVideo = document.getElementById('modalVideo');
+
+    function playVideo(container) {
+        const videoUrl = container.dataset.videoUrl;
+        modalVideo.src = videoUrl;
+        modal.classList.remove('hidden');
+        modalVideo.play();
+    }
+
+    function closeVideoModal() {
+        modal.classList.add('hidden');
+        modalVideo.pause();
+        modalVideo.currentTime = 0;
+    }
+
+    // Close modal when clicking outside the video
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeVideoModal();
+        }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeVideoModal();
+        }
+    });
+
+    // Ensure videos stay muted
+    document.querySelectorAll('video').forEach(video => {
+        video.addEventListener('volumechange', () => {
+            if (!video.muted) video.muted = true;
+        });
+    });
+
+    // Prevent right-click on videos
+    document.querySelectorAll('video').forEach(video => {
+        video.addEventListener('contextmenu', e => e.preventDefault());
+    });
+</script>
+{% endblock %}

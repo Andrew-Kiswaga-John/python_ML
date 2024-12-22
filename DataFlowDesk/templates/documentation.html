@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Include Sidebar -->
+{% include 'includes/sidebar.html' %}
+
+<!-- Main Content Area -->
+<div class="ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white/70 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Documentation</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-700 font-medium">{{ user.username }}</span>
+                    <div class="h-9 w-9 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 p-0.5">
+                        <div class="rounded-full bg-white h-full w-full flex items-center justify-center text-indigo-500 font-semibold">
+                            {{ user.username|make_list|first|upper }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Documentation Search -->
+        <div class="mb-8">
+            <div class="relative">
+                <input type="text" 
+                       id="docSearch" 
+                       class="w-full px-4 py-3 pl-12 bg-white/80 backdrop-blur-xl rounded-xl border border-white/20 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300"
+                       placeholder="Search documentation...">
+                <svg class="w-6 h-6 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Documentation Grid -->
+        <div class="grid gap-6 lg:grid-cols-3">
+            <!-- Quick Start Guide -->
+            <div class="col-span-2">
+                <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-white/20 transition-all duration-300 hover:shadow-xl">
+                    <h2 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600 mb-6">Quick Start Guide</h2>
+                    
+                    <div class="prose prose-indigo max-w-none">
+                        <div class="space-y-6">
+                            {% for section in quick_start %}
+                            <div class="bg-white/90 rounded-xl p-6 border border-white/20">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4">{{ section.title }}</h3>
+                                <p class="text-gray-600 mb-4">{{ section.description }}</p>
+                                {% if section.code %}
+                                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                    <pre class="text-gray-200"><code>{{ section.code }}</code></pre>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documentation Sections -->
+            <div class="space-y-6">
+                <!-- API Reference -->
+                <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/20 transition-all duration-300 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">API Reference</h3>
+                    <ul class="space-y-3">
+                        {% for api in api_reference %}
+                        <li>
+                            <a href="#{{ api.id }}" class="flex items-center p-3 rounded-xl hover:bg-indigo-50 transition-all duration-300">
+                                <span class="text-indigo-600 mr-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                    </svg>
+                                </span>
+                                <div>
+                                    <span class="block font-medium text-gray-800">{{ api.name }}</span>
+                                    <span class="text-sm text-gray-500">{{ api.description }}</span>
+                                </div>
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- Examples -->
+                <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/20 transition-all duration-300 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Examples</h3>
+                    <div class="space-y-4">
+                        {% for example in examples %}
+                        <a href="#{{ example.id }}" class="block p-4 rounded-xl hover:bg-indigo-50 transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-800">{{ example.title }}</span>
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-1">{{ example.description }}</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Resources -->
+                <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/20 transition-all duration-300 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Resources</h3>
+                    <div class="space-y-3">
+                        {% for resource in resources %}
+                        <a href="{{ resource.url }}" class="flex items-center p-3 rounded-xl hover:bg-indigo-50 transition-all duration-300">
+                            <span class="text-indigo-600 mr-3">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                            </span>
+                            <div>
+                                <span class="block font-medium text-gray-800">{{ resource.title }}</span>
+                                <span class="text-sm text-gray-500">{{ resource.description }}</span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Documentation Search Functionality
+    const searchInput = document.getElementById('docSearch');
+    searchInput.addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        // Add your search logic here
+    });
+</script>
+{% endblock %}

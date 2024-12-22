@@ -49,6 +49,8 @@ urlpatterns = [
     path('make-prediction/', views.make_prediction, name='make_prediction'),
     path('model-predictions/', views.model_predictions, name='model_predictions'),
 
+    path('tutorials/', views.tutorials, name='tutorials'),
+    path('documentation/', views.documentation, name='documentation'),
 
     # Add these URL patterns to your urls.py
     path('auth/signin/', views.signin, name='login'),
