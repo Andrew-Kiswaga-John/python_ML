@@ -337,18 +337,18 @@ def general_dashboard(request):
     data_types = {
         'CSV Files': datasets.filter(file_path__endswith='.csv').count(),
         'Excel Files': datasets.filter(file_path__endswith='.xlsx').count() + 
-                      datasets.filter(file_path__endswith='.xls').count(),
+                    datasets.filter(file_path__endswith='.xls').count(),
         'Text Files': datasets.filter(file_path__endswith='.txt').count(),
     }
     
     plt.pie(data_types.values(), labels=data_types.keys(), autopct='%1.1f%%', 
-           colors=['#4F46E5', '#10B981', '#F59E0B'],
-           explode=[0.05] * len(data_types))
+        colors=['#4F46E5', '#10B981', '#F59E0B'],
+        explode=[0.05] * len(data_types))
     plt.title('Dataset Types Distribution', pad=20)
     plt.axis('equal')
     quality_trend_plot = fig_to_base64(fig_types)
     plt.close(fig_types)
-    
+
     # Dataset Usage Statistics
     datasets_usage = []
     for dataset in datasets:

@@ -182,19 +182,32 @@
                             <span class="font-medium">Created:</span> {{ model.created_at|date:"M d, Y" }}
                         </p>
                     </div>
-                    <div class="mt-4 flex space-x-3">
+                    <div class="mt-4 flex flex-wrap gap-3">
                         <button onclick="downloadModel('{{ model.id }}')"
-                            class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl
-                            hover:shadow-lg hover:shadow-emerald-500/20 transform hover:-translate-y-0.5 
-                            transition-all duration-300 flex items-center space-x-2 font-medium">
-                            <span>Download Model</span>
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            class="flex-1 min-w-[120px] inline-flex justify-center items-center px-4 py-2.5
+                            bg-gradient-to-r from-emerald-500 to-teal-400 text-white rounded-xl
+                            hover:from-emerald-600 hover:to-teal-500
+                            transform hover:-translate-y-0.5 transition-all duration-300
+                            shadow-md hover:shadow-xl hover:shadow-emerald-500/20
+                            text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
+                            <span>Download</span>
                         </button>
                         <a href="{% url 'predictions' %}"
-                           class="flex-1 px-3 py-1.5 bg-gray-600 text-white text-sm rounded text-center hover:bg-gray-700 transition-colors">
-                            Predict
+                            class="flex-1 min-w-[120px] inline-flex justify-center items-center px-4 py-2.5
+                            bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl
+                            hover:from-indigo-700 hover:to-blue-600
+                            transform hover:-translate-y-0.5 transition-all duration-300
+                            shadow-md hover:shadow-xl hover:shadow-indigo-500/20
+                            text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            <span>Predict</span>
                         </a>
                     </div>
                 </div>
@@ -456,7 +469,7 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `model_${modelId}.joblib`;
+            a.download = `model_${modelId}.pkl`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);

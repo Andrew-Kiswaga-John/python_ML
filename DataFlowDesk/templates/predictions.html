@@ -95,7 +95,7 @@ function downloadModel(modelId) {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `model_${modelId}.joblib`;
+            a.download = `model_${modelId}.pkl`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -175,30 +175,43 @@ document.addEventListener("DOMContentLoaded", function() {
                             </p>
                         </div>
 
-                        <div class="mt-6 flex space-x-3">
+                        <div class="mt-6 flex flex-wrap gap-3">
                             <button onclick="navigateTo('/model-predictions/?id=${model.id}')" 
-                                class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="flex-1 min-w-[120px] inline-flex justify-center items-center px-4 py-2.5 
+                                bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl
+                                hover:from-indigo-700 hover:to-blue-600 
+                                transform hover:-translate-y-0.5 transition-all duration-300
+                                shadow-md hover:shadow-xl hover:shadow-indigo-500/20
+                                text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                                 </svg>
                                 Predict
                             </button>
                             <button onclick="navigateTo('/visualizations/?id=${model.id}')" 
-                                class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="flex-1 min-w-[120px] inline-flex justify-center items-center px-4 py-2.5
+                                bg-gradient-to-r from-violet-600 to-purple-500 text-white rounded-xl
+                                hover:from-violet-700 hover:to-purple-600
+                                transform hover:-translate-y-0.5 transition-all duration-300
+                                shadow-md hover:shadow-xl hover:shadow-violet-500/20
+                                text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
                                 Visualize
                             </button>
-                            <button onclick="downloadModel('{{ model.id }}')"
-                            class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl
-                            hover:shadow-lg hover:shadow-emerald-500/20 transform hover:-translate-y-0.5 
-                            transition-all duration-300 flex items-center space-x-2 font-medium">
-                            <span>Download Model</span>
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                            </svg>
-                        </button>
+                            <button onclick="downloadModel('${model.id}')"
+                                class="flex-1 min-w-[120px] inline-flex justify-center items-center px-4 py-2.5
+                                bg-gradient-to-r from-emerald-500 to-teal-400 text-white rounded-xl
+                                hover:from-emerald-600 hover:to-teal-500
+                                transform hover:-translate-y-0.5 transition-all duration-300
+                                shadow-md hover:shadow-xl hover:shadow-emerald-500/20
+                                text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Download
+                            </button>
                         </div>
                     </div>
                 `;
