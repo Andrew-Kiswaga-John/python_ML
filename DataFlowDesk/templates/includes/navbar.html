@@ -23,8 +23,12 @@
                         <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </a>
                     
-                    <a href="#" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                    <a href="{% url 'documentation' %}" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
                         <span class="relative z-10">Documentation</span>
+                        <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </a>
+                    <a href="{% url 'tutorials' %}" class="relative px-4 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white group">
+                        <span class="relative z-10">Tutorials</span>
                         <div class="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </a>
                     
@@ -75,7 +79,7 @@
         </div>
     </nav>
     
-    
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const mobileMenuButton = document.querySelector('#main-nav button');

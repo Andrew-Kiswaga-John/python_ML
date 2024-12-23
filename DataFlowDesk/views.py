@@ -11,22 +11,10 @@ from django.db.models.functions import TruncMonth
 from django.db.models import Avg
 from django.db import models
 import json
-
 import matplotlib.pyplot as plt
-import seaborn as sns
 import io
 import base64
 from matplotlib.backends.backend_agg import FigureCanvas
-
-from django.conf import settings
-
-def fig_to_base64(fig):
-    """Convert matplotlib figure to base64 string"""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
-    buf.seek(0)
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
-
 from django.shortcuts import render
 from django.shortcuts import render, redirect
 from .forms import DatasetMetaForm
@@ -50,19 +38,112 @@ from sklearn.metrics import roc_curve, auc, precision_recall_curve
 from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
-import matplotlib.pyplot as plt
 import seaborn as sns
-import io
-import base64
-
 import pandas as pd
 import numpy as np
-import json
 import logging
-
 import logging
 import zipfile
 from django.http import HttpResponse
+from .models import Dataset, MLModel, DataPreprocessingLog, ModelResult
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from django.forms import modelform_factory
+from .models import Dataset
+import csv
+import os
+import uuid
+import os
+import csv
+from django.shortcuts import render, redirect
+from .models import Dataset
+from django.shortcuts import render, redirect
+from django.urls import reverse  # For generating URLs
+import pandas as pd
+from django.shortcuts import render, redirect
+from .models import Dataset
+import pandas as pd
+from django.shortcuts import render, redirect
+import plotly.express as px
+
+import pandas as pd
+from .models import Dataset
+
+import pandas as pd
+from .models import Dataset
+
+from django.shortcuts import render, redirect
+from .models import Dataset
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.decomposition import PCA
+from django.utils.timezone import now
+from django.utils.timezone import now
+from imblearn.over_sampling import SMOTE
+
+from sklearn.preprocessing import MinMaxScaler
+from django.utils.timezone import now
+
+
+
+import pandas as pd
+from .models import Dataset
+
+import pandas as pd
+from .models import Dataset
+from django.contrib import messages
+from django.shortcuts import render, get_object_or_404
+import os
+import logging
+import pandas as pd
+from django.shortcuts import render, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from .models import Dataset
+
+
+from io import StringIO
+from django.core.files.base import ContentFile
+import uuid
+import os
+import pylightxl
+import pandas as pd
+from django.shortcuts import render, redirect
+from django.views.decorators.csrf import csrf_exempt
+
+
+import pandas as pd
+from django.shortcuts import get_object_or_404
+import matplotlib
+matplotlib.use('Agg')  # Use the non-GUI backend
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LinearRegression, LogisticRegression, Lasso, Ridge
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score, silhouette_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.cluster import KMeans
+import joblib
+import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import logging
+from typing import List, Tuple, Optional, Dict
+
+
+def fig_to_base64(fig):
+    """Convert matplotlib figure to base64 string"""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=300)
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -139,17 +220,7 @@ def signin(request):
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
-from django.shortcuts import render
-from django.db.models import Count
-from django.utils import timezone
-from datetime import timedelta
-from .models import Dataset, MLModel, DataPreprocessingLog, ModelResult
-from django.db.models.functions import TruncMonth
 
-import matplotlib.pyplot as plt
-import io
-import base64
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 
 def general_dashboard(request):
@@ -698,22 +769,7 @@ def create_dataset_step1(request):
         form = DatasetMetaForm()
     return render(request, 'home.html', {'form': form})
 
-from django.forms import modelform_factory
-from .models import Dataset
-import csv
-import os
-import uuid
-from django.conf import settings
 
-
-import os
-import csv
-from datetime import datetime
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from .models import Dataset
-from django.shortcuts import render, redirect
-from django.urls import reverse  # For generating URLs
 
 
 def create_dataset_step2(request):
@@ -813,49 +869,6 @@ def create_dataset_step2(request):
     # If not POST, redirect to step 1
     return redirect('create_dataset_step1')
 
-import pandas as pd
-from django.shortcuts import render, redirect
-from .models import Dataset
-import pandas as pd
-import json
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-import plotly.express as px
-
-from django.http import JsonResponse
-import pandas as pd
-from .models import Dataset
-
-from django.http import JsonResponse
-import pandas as pd
-from .models import Dataset
-
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from .models import Dataset
-import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
-from django.utils.timezone import now
-from django.utils.timezone import now
-from imblearn.over_sampling import SMOTE
-
-from sklearn.preprocessing import MinMaxScaler
-from django.utils.timezone import now
-
-
-
-from django.http import JsonResponse
-import pandas as pd
-from .models import Dataset
-import json
-
-from django.http import JsonResponse
-from django.shortcuts import render
-import pandas as pd
-import json
-from .models import Dataset
-from django.contrib import messages
 
 def display_dataset(request, id):
     try:
@@ -947,15 +960,6 @@ def perform_data_normalization(request, dataset_id):
             # Update the dataset object to reflect the cleaned dataset
             dataset.cleaned_file = os.path.relpath(cleaned_file_path, settings.MEDIA_ROOT)
 
-            # Update the Dataset table
-            # dataset.cleaned_file.name = new_file_path  # Update file path
-            # dataset.status = 'processed'  # Update status
-            # dataset.columns_info = {  # Log normalization statistics
-            #     col: {
-            #         "mean": round(df[col].mean(), 2),
-            #         "std_dev": round(df[col].std(), 2)
-            #     } for col in numeric_columns
-            # }
             dataset.save()
 
             # Log the preprocessing action in DataPreprocessingLog
@@ -979,24 +983,6 @@ def perform_data_normalization(request, dataset_id):
     else:
         return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
-from django.shortcuts import render, get_object_or_404
-
-
-
-import os
-import io
-import json
-import base64
-import logging
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from datetime import datetime
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-from .models import Dataset
 
 
 @csrf_exempt
@@ -1119,20 +1105,7 @@ def get_columns_graphs(request):
         })
 
 
-import os
-import io
-import json
-import base64
-import logging
-from datetime import datetime
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-from .models import Dataset
+
 
 @csrf_exempt
 def display_graphs(request, dataset_id=None):
@@ -1573,18 +1546,7 @@ def save_graph(request):
         })
 
 
-from io import StringIO
-from django.core.files.base import ContentFile
-import uuid
-import os
-import pylightxl
-import pandas as pd
-from django.shortcuts import render, redirect
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.conf import settings
-from datetime import datetime
-import json
+
 # from autoclean import autoclean
 
 
@@ -1851,6 +1813,7 @@ def clean_dataset(df, delete_header=False):
                 print(f"Filling {num_missing} missing values in numerical column '{col}' with median.")
                 df[col].fillna(df[col].median(), inplace=True)
 
+
             # Handle outliers
             q1 = df[col].quantile(0.25)
             q3 = df[col].quantile(0.75)
@@ -1868,6 +1831,7 @@ def clean_dataset(df, delete_header=False):
 
         # Handle categorical columns
         elif pd.api.types.is_object_dtype(df[col]):
+
             categorical_columns.append(col)  # Track this as a categorical column
             num_missing = df[col].isnull().sum()
             if num_missing > 0:
@@ -1878,6 +1842,7 @@ def clean_dataset(df, delete_header=False):
             df[col] = df[col].astype(str).str.strip()
 
             # Encode categorical data (skip for target column)
+            
             if col != target_column:
                 print(f"Encoding categorical column '{col}' using Label Encoding.")
                 le = LabelEncoder()
@@ -2025,24 +1990,20 @@ def data_cleaning_preview(request, dataset_id):
 from django.shortcuts import render, get_object_or_404
 
 
-import json
 import pandas as pd
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset
 import pandas as pd
-import json
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset  # Adjust based on your actual model import
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
-import json
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
-import json
 import numpy as np
 from collections import Counter
 
@@ -2199,33 +2160,7 @@ def get_columns_target(request):
 
 ### MODEL TRAINING PART ###
 
-import json
-import pandas as pd
-from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
-import matplotlib
-matplotlib.use('Agg')  # Use the non-GUI backend
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LinearRegression, LogisticRegression, Lasso, Ridge
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score, silhouette_score
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.cluster import KMeans
-import joblib
-import os
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-import logging
-from typing import List, Tuple, Optional, Dict
-import json
+
 
 class NeuralNetwork(nn.Module):
     def __init__(self, 
@@ -4131,7 +4066,7 @@ def documentation(request):
     resources = [
         {
             'title': 'Video Tutorials',
-            'description': 'Step-by-step video guides for DataFlowDesk',
+            'description': 'Step-by-step video guides for ru2yaAI',
             'url': '/tutorials/'
         },
         {

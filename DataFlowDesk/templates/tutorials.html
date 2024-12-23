@@ -3,35 +3,17 @@
 
 {% block content %}
 <!-- Include Sidebar -->
-{% include 'includes/sidebar.html' %}
+{% include 'includes/navbar.html' %}
 
 <!-- Main Content Area -->
-<div class="ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50">
-    <!-- Top Navigation Bar -->
-    <nav class="bg-white/70 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-2xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Tutorials</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-gray-700 font-medium">{{ user.username }}</span>
-                    <div class="h-9 w-9 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 p-0.5">
-                        <div class="rounded-full bg-white h-full w-full flex items-center justify-center text-indigo-500 font-semibold">
-                            {{ user.username|make_list|first|upper }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50">
 
-    <div class="max-w-7xl mx-auto p-6">
-        <div class="bg-white/80 backdrop-blur-xl shadow-lg rounded-2xl p-8 border border-white/20 transition-all duration-300 hover:shadow-xl">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white/90 backdrop-blur-xl shadow-lg rounded-2xl p-8 border border-white/20 transition-all duration-300 hover:shadow-xl">
             <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600 text-center mb-8">Learn ru2ya.AI</h2>
             
             <!-- Tutorial Grid -->
-            <div class="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
+            <div class="grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                 {% for tutorial in tutorials %}
                 <div class="bg-white/90 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 border border-white/20">
                     <div class="p-6">
