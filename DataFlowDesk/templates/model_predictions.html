@@ -130,12 +130,11 @@
 </div>
 
 <!-- Loading Overlay -->
-<div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
-        <div class="flex items-center justify-center space-x-4">
-            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-            <p class="text-gray-700">Processing your prediction...</p>
-        </div>
+<div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-white/20 text-center">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-violet-500 border-t-transparent mb-4"></div>
+        <p class="text-lg font-medium text-gray-700">Making Predictions...</p>
+        <p class="text-sm text-gray-500">Please wait while we process your data</p>
     </div>
 </div>
 

@@ -219,7 +219,6 @@ def signin(request):
 
 
 
-
 def general_dashboard(request):
     if not request.user.is_authenticated:
         return redirect('signin')
@@ -227,63 +226,64 @@ def general_dashboard(request):
     # Get all datasets for the current user
     datasets = Dataset.objects.filter(user=request.user)
     
-    # Basic Statistics
-    total_datasets = datasets.count()
-    clean_datasets = datasets.filter(status='processed').count()
-    unclean_datasets = total_datasets - clean_datasets
-    total_models = MLModel.objects.count()
+    # Basic Statistics with safety checks
+    total_datasets = datasets.count() or 0
+    clean_datasets = datasets.filter(status='processed').count() or 0
+    unclean_datasets = max(0, total_datasets - clean_datasets)
+    total_models = MLModel.objects.count() or 0
     
-    # Calculate percentages
+    # Calculate percentages with safety checks
     clean_datasets_percentage = (clean_datasets / total_datasets * 100) if total_datasets > 0 else 0
     unclean_datasets_percentage = (unclean_datasets / total_datasets * 100) if total_datasets > 0 else 0
     
-    # Calculate usage percentage for each dataset
-    for dataset in datasets:
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        max_usage = MLModel.objects.count() or 1  # Avoid division by zero
-        dataset.usage_percentage = (usage_count / max_usage) * 100
+    # Calculate usage percentage for each dataset with safety check
+    if datasets.exists():
+        for dataset in datasets:
+            usage_count = MLModel.objects.filter(dataset=dataset).count()
+            max_usage = MLModel.objects.count() or 1  # Avoid division by zero
+            dataset.usage_percentage = (usage_count / max_usage) * 100
     
     # Get current and previous month for comparison
     current_date = timezone.now()
     current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
     
-    # Dataset categories analysis (current month)
+    # Dataset categories analysis (current month) with safety checks
     current_month_stats = {
         'Diagnostic Imaging': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='diagnostic imaging'
-        ).count(),
+        ).count() or 0,
         'Data.Gov': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='data.gov'
-        ).count(),
+        ).count() or 0,
         'Image Net': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='image net'
-        ).count(),
+        ).count() or 0,
         'MNIST': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='mnist'
-        ).count(),
+        ).count() or 0,
         'MHLDDS': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='mhldds'
-        ).count(),
+        ).count() or 0,
         'HES': datasets.filter(
             uploaded_at__gte=current_month_start,
             description__icontains='hes'
-        ).count(),
+        ).count() or 0,
     }
 
-    # Previous month statistics using the same categories
+    # Previous month statistics with safety checks
     previous_month_stats = {}
     for category, _ in current_month_stats.items():
         previous_month_stats[category] = datasets.filter(
             uploaded_at__gte=previous_month_start,
             uploaded_at__lt=current_month_start,
             description__icontains=category.lower()
-        ).count()
+        ).count() or 0
     
     # Quality and Completeness Analysis
     last_6_months = current_date - timedelta(days=180)
@@ -302,22 +302,28 @@ def general_dashboard(request):
     
     for stat in monthly_stats:
         quality_labels.append(stat['month'].strftime('%b %Y'))
-        total = stat['total']
+        total = stat['total'] or 1  # Avoid division by zero
         clean = stat['clean']
         completeness = (clean / total * 100) if total > 0 else 0
         quality = completeness * 0.8  # Simplified quality metric
         completeness_data.append(completeness)
         quality_data.append(quality)
     
-    # Generate matplotlib visualizations
-    plt.style.use('fivethirtyeight')  # Using a built-in style
+    # If no monthly stats, provide default empty month data
+    if not quality_labels:
+        for i in range(6):
+            month_date = current_date - timedelta(days=30 * i)
+            quality_labels.append(month_date.strftime('%b %Y'))
+            completeness_data.append(0)
+            quality_data.append(0)
     
-    # Set global font size
+    # Generate matplotlib visualizations with safety checks
+    plt.style.use('fivethirtyeight')
     plt.rcParams.update({'font.size': 10})
     
     # 1. Missing Values Bar Chart
-    missing_data = datasets.filter(status='processed').count()
-    total_data = datasets.count()
+    missing_data = datasets.filter(status='processed').count() or 0
+    total_data = datasets.count() or 0
     
     fig_missing = plt.figure(figsize=(10, 6))
     plt.bar(['Complete Data', 'Missing Data'], 
@@ -334,11 +340,15 @@ def general_dashboard(request):
     # 2. Data Types Distribution Pie Chart
     fig_types = plt.figure(figsize=(10, 6))
     data_types = {
-        'CSV Files': datasets.filter(file_path__endswith='.csv').count(),
-        'Excel Files': datasets.filter(file_path__endswith='.xlsx').count() + 
-                    datasets.filter(file_path__endswith='.xls').count(),
-        'Text Files': datasets.filter(file_path__endswith='.txt').count(),
+        'CSV Files': datasets.filter(file_path__endswith='.csv').count() or 0,
+        'Excel Files': (datasets.filter(file_path__endswith='.xlsx').count() + 
+                       datasets.filter(file_path__endswith='.xls').count()) or 0,
+        'Text Files': datasets.filter(file_path__endswith='.txt').count() or 0,
     }
+    
+    # Add default value if no data
+    if sum(data_types.values()) == 0:
+        data_types = {'No Data': 1}
     
     plt.pie(data_types.values(), labels=data_types.keys(), autopct='%1.1f%%', 
         colors=['#4F46E5', '#10B981', '#F59E0B'],
@@ -348,16 +358,17 @@ def general_dashboard(request):
     quality_trend_plot = fig_to_base64(fig_types)
     plt.close(fig_types)
 
-    # Dataset Usage Statistics
+    # Dataset Usage Statistics with safety checks
     datasets_usage = []
-    for dataset in datasets:
-        usage_count = MLModel.objects.filter(dataset=dataset).count()
-        if usage_count > 0:
-            datasets_usage.append({
-                'title': dataset.name,
-                'usage_percentage': min((usage_count / total_datasets * 100), 100),
-                'count': usage_count
-            })
+    if datasets.exists():
+        for dataset in datasets:
+            usage_count = MLModel.objects.filter(dataset=dataset).count()
+            if usage_count > 0:
+                datasets_usage.append({
+                    'title': dataset.name,
+                    'usage_percentage': min((usage_count / (total_datasets or 1) * 100), 100),
+                    'count': usage_count
+                })
     
     # Sort datasets_usage by count in descending order
     datasets_usage = sorted(datasets_usage, key=lambda x: x['count'], reverse=True)[:10]
@@ -371,7 +382,7 @@ def general_dashboard(request):
         plt.imshow([usage_data[0]], cmap='YlOrRd', aspect='auto')
         plt.colorbar(label='Usage %')
         plt.yticks(range(len(labels)), labels)
-        plt.xticks([])  # Hide x-axis ticks
+        plt.xticks([])
         plt.title('Dataset Usage Intensity', pad=20)
         plt.tight_layout()
         usage_heatmap = fig_to_base64(fig_heatmap)
@@ -380,62 +391,65 @@ def general_dashboard(request):
         usage_heatmap = None
     
     # 4. Processing Status Donut Chart
+# 4. Processing Status Donut Chart
     fig_status = plt.figure(figsize=(8, 8))
-    colors = ['#10B981', '#EF4444']
-    plt.pie([clean_datasets, unclean_datasets], 
-           labels=['Clean', 'Unclean'], 
-           autopct='%1.1f%%',
-           colors=colors,
-           wedgeprops=dict(width=0.5, edgecolor='white'),
-           textprops={'color': '#374151', 'fontsize': 12})
+    if total_datasets > 0:
+        plt.pie([clean_datasets, unclean_datasets], 
+            labels=['Clean', 'Unclean'], 
+            autopct='%1.1f%%',
+            colors=['#10B981', '#EF4444'],
+            wedgeprops=dict(width=0.5, edgecolor='white'),
+            textprops={'color': '#374151', 'fontsize': 12})
+    else:
+        # Fix: Changed autopct format to be a proper string format
+        plt.pie([1], 
+            labels=['No Data'], 
+            autopct='%1.1f%%',  # This is the fixed format
+            colors=['#CBD5E0'],
+            wedgeprops=dict(width=0.5, edgecolor='white'),
+            textprops={'color': '#374151', 'fontsize': 12})
     plt.title('Dataset Processing Status', pad=20)
     processing_status_plot = fig_to_base64(fig_status)
     plt.close(fig_status)
     
-    # Calculate average completeness and quality
+    # Calculate average completeness and quality with safety checks
     avg_completeness = sum(completeness_data) / len(completeness_data) if completeness_data else 0
     avg_quality = sum(quality_data) / len(quality_data) if quality_data else 0
     
-    # Model Performance Metrics (average across all models)
+    # Model Performance Metrics with safety checks
     model_metrics = MLModel.objects.all()
     model_performance = [0, 0, 0, 0, 0]  # Default values
     
     if model_metrics.exists():
         total_models = 0
-        accuracy_sum = 0
-        precision_sum = 0
-        recall_sum = 0
-        f1_sum = 0
-        roc_auc_sum = 0
+        metrics_sum = {'accuracy': 0, 'precision': 0, 'recall': 0, 'f1_score': 0, 'roc_auc': 0}
         
         for model in model_metrics:
-            if model.results:  # Check if results exist
+            if model.results:
                 try:
                     results = model.results
                     if isinstance(results, str):
                         results = json.loads(results)
                     
-                    # Extract metrics from results
-                    accuracy_sum += float(results.get('accuracy', 0))
-                    precision_sum += float(results.get('precision', 0))
-                    recall_sum += float(results.get('recall', 0))
-                    f1_sum += float(results.get('f1_score', 0))
-                    roc_auc_sum += float(results.get('roc_auc', 0))
+                    metrics_sum['accuracy'] += float(results.get('accuracy', 0))
+                    metrics_sum['precision'] += float(results.get('precision', 0))
+                    metrics_sum['recall'] += float(results.get('recall', 0))
+                    metrics_sum['f1_score'] += float(results.get('f1_score', 0))
+                    metrics_sum['roc_auc'] += float(results.get('roc_auc', 0))
                     total_models += 1
                 except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
                     continue
         
-        # Calculate averages if we have valid models
         if total_models > 0:
             model_performance = [
-                (accuracy_sum / total_models) * 100,
-                (precision_sum / total_models) * 100,
-                (recall_sum / total_models) * 100,
-                (f1_sum / total_models) * 100,
-                (roc_auc_sum / total_models) * 100
+                (metrics_sum['accuracy'] / total_models) * 100,
+                (metrics_sum['precision'] / total_models) * 100,
+                (metrics_sum['recall'] / total_models) * 100,
+                (metrics_sum['f1_score'] / total_models) * 100,
+                (metrics_sum['roc_auc'] / total_models) * 100
             ]
     
-    # Recent Activities
+    # Recent Activities with safety checks
     recent_activities = []
     
     # Dataset activities
@@ -451,24 +465,26 @@ def general_dashboard(request):
     for model in model_activities:
         recent_activities.append({
             'timestamp': model.created_at,
-            'description': f'this model was trained on dataset "{model.dataset.name}"'
+            'description': f'Model was trained on dataset "{model.dataset.name}"'
         })
     
     # Sort activities by timestamp
     recent_activities = sorted(recent_activities, key=lambda x: x['timestamp'], reverse=True)[:5]
     
-   # Get trained models data
+    # Get trained models data with safety checks
     trained_models = MLModel.objects.filter(dataset__user=request.user).select_related('dataset').order_by('-created_at')[:3]
     models_data = []
     
     for model in trained_models:
-        # Get all results for this model
-        model_results = ModelResult.objects.filter(
-            model=model
-        ).order_by('-generated_at')
-
-        # Create a dictionary to store all metrics
-        metrics = {}
+        model_results = ModelResult.objects.filter(model=model).order_by('-generated_at')
+        
+        metrics = {
+            'accuracy': None,
+            'precision': None,
+            'recall': None,
+            'f1_score': None
+        }
+        
         for result in model_results:
             metrics[result.metric_name.lower()] = result.metric_value
 
@@ -479,14 +495,11 @@ def general_dashboard(request):
             'dataset_id': model.dataset.id,
             'type': 'classification' if 'class' in model.algorithm.lower() else 'regression',
             'created_at': model.created_at,
-            'accuracy': metrics.get('accuracy', None),  # Get accuracy if it exists
-            'precision': metrics.get('precision', None),
-            'recall': metrics.get('recall', None),
-            'f1_score': metrics.get('f1_score', None)
+            **metrics
         }
         models_data.append(model_data)
 
-    # Group models by dataset
+    # Group models by dataset with safety checks
     dataset_results = {}
     for model_data in models_data:
         dataset_id = model_data['dataset_id']
@@ -521,11 +534,9 @@ def general_dashboard(request):
         'recent_activities': recent_activities,
         'trained_models': models_data,
         'dataset_results': dataset_results,
-        'trained_models': models_data,
     }
     
     return render(request, "general_dashboard.html", context)
-
 
 
 
@@ -1995,11 +2006,6 @@ from .models import Dataset
 import pandas as pd
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset  # Adjust based on your actual model import
-
-from django.shortcuts import render, get_object_or_404
-import pandas as pd
-from django.shortcuts import render, get_object_or_404
-from .models import Dataset
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
@@ -3789,9 +3795,10 @@ def delete_dataset(request, dataset_id):
     if request.method == 'POST':
         dataset.delete()
         messages.success(request, 'Dataset deleted successfully.')
-        return redirect('my_datasets')
+        return redirect('general_dashboard')
     
-    return redirect('my_datasets')
+    return redirect('general_dashboard')
+
 
 
 @login_required

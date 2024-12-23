@@ -219,9 +219,9 @@
     {% else %}
     <div class="text-center py-8">
         <p class="text-gray-500 mb-4">No trained models yet. Start by training your first model!</p>
-        <a href="{% url 'training_page' %}" class="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            Train Model
-        </a>
+        <button onclick="showDatasetModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            Train New Model
+        </button>
     </div>
     {% endif %}
 </div>
