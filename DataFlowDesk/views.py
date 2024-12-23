@@ -220,7 +220,6 @@ def signin(request):
 
 
 
-
 def general_dashboard(request):
     if not request.user.is_authenticated:
         return redirect('signin')
@@ -526,6 +525,8 @@ def general_dashboard(request):
     }
     
     return render(request, "general_dashboard.html", context)
+
+
 
 
 def fig_to_base64(fig):
@@ -1994,6 +1995,11 @@ from .models import Dataset
 import pandas as pd
 from django.shortcuts import render, get_object_or_404
 from .models import Dataset  # Adjust based on your actual model import
+
+from django.shortcuts import render, get_object_or_404
+import pandas as pd
+from django.shortcuts import render, get_object_or_404
+from .models import Dataset
 
 from django.shortcuts import render, get_object_or_404
 import pandas as pd
@@ -3783,10 +3789,9 @@ def delete_dataset(request, dataset_id):
     if request.method == 'POST':
         dataset.delete()
         messages.success(request, 'Dataset deleted successfully.')
-        return redirect('general_dashboard')
+        return redirect('my_datasets')
     
-    return redirect('general_dashboard')
-
+    return redirect('my_datasets')
 
 
 @login_required

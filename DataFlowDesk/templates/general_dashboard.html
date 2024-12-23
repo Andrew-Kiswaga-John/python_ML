@@ -144,9 +144,9 @@
     <div class="flex items-center justify-between mb-6">
         <h3 class="text-xl font-semibold text-gray-900">Recent Models</h3>
         <div class="space-x-4">
-            <a href="{% url 'upload' %}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button onclick="showDatasetModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 Train New Model
-            </a>
+            </button>
         </div>
     </div>
 
@@ -308,6 +308,85 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Dataset Selection Modal -->
+<div id="datasetModal" class="hidden fixed inset-0 z-50">
+    <!-- Backdrop with modern blur -->
+    <div class="absolute inset-0 bg-gray-900/30 backdrop-blur-md transition-all duration-300"></div>
+    
+    <!-- Modal Content -->
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white/80 backdrop-blur-xl w-full max-w-3xl rounded-2xl shadow-2xl border border-white/20 transform transition-all duration-300">
+            <!-- Header -->
+            <div class="p-6 border-b border-gray-100/30">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-2xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                            Select Dataset for Training
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-500">Choose a dataset to start training your model</p>
+                    </div>
+                    <button onclick="hideDatasetModal()" class="p-2 hover:bg-gray-100/50 rounded-xl transition-colors duration-200">
+                        <svg class="w-6 h-6 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dataset List -->
+            <div class="max-h-[60vh] overflow-y-auto p-6 space-y-4">
+                {% for dataset in available_datasets %}
+                <div class="group bg-white/60 hover:bg-white/90 p-5 rounded-xl border border-gray-100/50 hover:border-violet-200/50 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5"
+                     onclick="selectDataset('{{ dataset.id }}')">
+                    <div class="flex justify-between items-center">
+                        <div class="space-y-1">
+                            <h4 class="text-lg font-semibold text-gray-900 group-hover:text-violet-600 transition-colors">
+                                {{ dataset.name }}
+                            </h4>
+                            <p class="text-sm text-gray-500 group-hover:text-gray-600">
+                                {{ dataset.description|default:"No description" }}
+                            </p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1.5 text-sm rounded-full font-medium 
+                                {% if dataset.status == 'clean' %}
+                                    bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border border-emerald-200/50
+                                {% else %}
+                                    bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border border-amber-200/50
+                                {% endif %}">
+                                {{ dataset.status|title }}
+                            </span>
+                            <div class="flex flex-col items-end text-sm text-gray-400 group-hover:text-gray-600">
+                                <span class="font-medium">{{ dataset.uploaded_at|date:"M d" }}</span>
+                                <span>{{ dataset.uploaded_at|date:"Y" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-12 px-4">
+                    <div class="bg-gray-50/50 rounded-2xl p-8 border border-gray-100/50">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <h3 class="mt-4 text-lg font-medium text-gray-900">No datasets available</h3>
+                        <p class="mt-2 text-sm text-gray-500">Get started by uploading your first dataset</p>
+                        <a href="{% url 'upload' %}" 
+                           class="mt-6 inline-flex items-center px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-sm font-medium rounded-xl shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/35 transform hover:-translate-y-0.5 transition-all duration-300">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Upload Dataset
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
@@ -493,12 +572,18 @@
         modal.classList.add('hidden');
     }
 
-    // // Close modal when clicking outside
-    // window.onclick = function(event) {
-    //     const modal = document.getElementById('deleteModal');
-    //     if (event.target == modal) {
-    //         hideDeleteModal();
-    //     }
-    // }
+    function showDatasetModal() {
+        document.getElementById('datasetModal').classList.remove('hidden');
+    }
+
+    function hideDatasetModal() {
+        document.getElementById('datasetModal').classList.add('hidden');
+    }
+
+    function selectDataset(datasetId) {
+        window.location.href = `/model_training/${datasetId}`;
+    }
+
+
 </script>
 {% endblock %}

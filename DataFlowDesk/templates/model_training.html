@@ -216,7 +216,14 @@
         </div>
     </div>
 </div>
-
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-white/20 text-center">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-violet-500 border-t-transparent mb-4"></div>
+        <p class="text-lg font-semibold text-gray-700">Training Model...</p>
+        <p class="text-sm text-gray-500">This may take a few moments</p>
+    </div>
+</div>
 <!-- Previous Script Section Remains the Same -->
 <script>
     const datasetSelect = document.getElementById('dataset_id');
@@ -320,6 +327,7 @@
         if (modelSelect.value === 'neural_network') {
             url = '/train_model_nn/'; // Neural Network-specific URL
         }
+        document.getElementById('loadingOverlay').classList.remove('hidden');
 
         try {
             const response = await fetch(url, {
@@ -332,6 +340,7 @@
             if (result.success) {
                 // Format the results nicely
                 let metricsHtml = '<div class="space-y-4">';
+                document.getElementById('loadingOverlay').classList.add('hidden');
 
                 if (result.results.model_type === 'classification') {
                     metricsHtml += `
@@ -349,6 +358,7 @@
                             <p class="text-purple-700">Inertia: ${result.results.metrics.inertia.toFixed(4)}</p>
                         </div>`;
                 } else {
+                
                     metricsHtml += `
                         <div class="bg-blue-100 p-4 rounded-md">
                             <h4 class="font-bold text-blue-800">Regression Results</h4>
@@ -386,6 +396,8 @@
                 document.getElementById('results').classList.remove('hidden');
             } else {
                 alert('Training failed: ' + (result.error || 'Unknown error'));
+                document.getElementById('loadingOverlay').classList.add('hidden');
+
             }
         } catch (error) {
             console.error('Error:', error);
