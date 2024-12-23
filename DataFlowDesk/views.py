@@ -108,8 +108,6 @@ import pylightxl
 import pandas as pd
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
-
-
 import pandas as pd
 from django.shortcuts import get_object_or_404
 import matplotlib
@@ -3795,7 +3793,7 @@ def delete_dataset(request, dataset_id):
 def download_model(request):
     import logging
     logger = logging.getLogger(__name__)
-    if request.method == 'POST':
+    if request.method == 'GET' or request.method == 'POST':
         try:
             logger.info("Starting model download process")
             # Get the latest model for the user from the MLModel table

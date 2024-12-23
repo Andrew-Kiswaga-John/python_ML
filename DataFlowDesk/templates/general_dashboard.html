@@ -183,10 +183,15 @@
                         </p>
                     </div>
                     <div class="mt-4 flex space-x-3">
-                        <a href="{% url 'download_model' %}?model_id={{ model.id }}"
-                           class="flex-1 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded text-center hover:bg-indigo-700 transition-colors">
-                            Download
-                        </a>
+                        <button onclick="downloadModel('{{ model.id }}')"
+                            class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl
+                            hover:shadow-lg hover:shadow-emerald-500/20 transform hover:-translate-y-0.5 
+                            transition-all duration-300 flex items-center space-x-2 font-medium">
+                            <span>Download Model</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </button>
                         <a href="{% url 'predictions' %}"
                            class="flex-1 px-3 py-1.5 bg-gray-600 text-white text-sm rounded text-center hover:bg-gray-700 transition-colors">
                             Predict
@@ -327,6 +332,37 @@
 
 <!-- Charts Initialization -->
 <script>
+
+    // Handle model download
+    document.getElementById('downloadModelBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/download_model/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'trained_model.pkl';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } else {
+                throw new Error('Download failed');
+            }
+        } catch (error) {
+            console.error('Error downloading model:', error);
+            alert('Failed to download the model. Please try again.');
+        }
+    });
+
+
     // Set progress bar widths
     document.querySelectorAll('.progress-bar').forEach(bar => {
         const percentage = bar.getAttribute('data-percentage') || 0;
@@ -406,6 +442,32 @@
 </script>
 
 <script>
+    function downloadModel(modelId) {
+        fetch(`/download_model/?model_id=${modelId}`, {
+            method: 'GET',
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            }
+            throw new Error('Network response was not ok');
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `model_${modelId}.joblib`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(error => {
+            console.error('Error downloading model:', error);
+            alert('Error downloading model. Please try again.');
+        });
+    }
+
     function confirmDelete(datasetId) {
         const modal = document.getElementById('deleteModal');
         const form = document.getElementById('deleteForm');

@@ -80,6 +80,35 @@
 </div>
 
 <script>
+
+function downloadModel(modelId) {
+        fetch(`/download_model/?model_id=${modelId}`, {
+            method: 'GET',
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            }
+            throw new Error('Network response was not ok');
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `model_${modelId}.joblib`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(error => {
+            console.error('Error downloading model:', error);
+            alert('Error downloading model. Please try again.');
+        });
+    }
+
+
+
 document.addEventListener("DOMContentLoaded", function() {
     const modelsGrid = document.getElementById("modelsGrid");
     const loadingSpinner = document.getElementById("loadingSpinner");
@@ -161,10 +190,21 @@ document.addEventListener("DOMContentLoaded", function() {
                                 </svg>
                                 Visualize
                             </button>
+                            <button onclick="downloadModel('{{ model.id }}')"
+                            class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl
+                            hover:shadow-lg hover:shadow-emerald-500/20 transform hover:-translate-y-0.5 
+                            transition-all duration-300 flex items-center space-x-2 font-medium">
+                            <span>Download Model</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </button>
                         </div>
                     </div>
                 `;
 
+
+                
                 modelsGrid.appendChild(card);
                 
                 // Animate card appearance
@@ -182,7 +222,39 @@ document.addEventListener("DOMContentLoaded", function() {
                     <p class="text-red-600 text-center">Failed to load models. Please try again later.</p>
                 </div>`;
         });
+        
 });
+
+  // Handle model download
+  document.getElementById('downloadModelBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/download_model/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'trained_model.pkl';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } else {
+                throw new Error('Download failed');
+            }
+        } catch (error) {
+            console.error('Error downloading model:', error);
+            alert('Failed to download the model. Please try again.');
+        }
+    });
+
+
 
 function getAccuracyBadgeColor(accuracy) {
     if (!accuracy && accuracy !== 0) return 'bg-gray-100 text-gray-800';
