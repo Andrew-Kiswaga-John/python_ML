@@ -3039,6 +3039,8 @@ def train_model(request):
                 # Fetch the number of clusters
                 n_clusters = max(2, int(request.POST.get('nClusters', 3)))  # Ensure n_clusters >= 2
                 X = df
+
+                feature_columns = [col for col in df.columns]
                 # Ensure feature scaling
                 X_scaled = scaler.fit_transform(X)
 
