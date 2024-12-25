@@ -509,7 +509,8 @@ def general_dashboard(request):
                 'models': []
             }
         dataset_results[dataset_id]['models'].append(model_data)
-    
+    available_dataset = Dataset.objects.filter(user=request.user)
+
     context = {
         'datasets': datasets,
         'total_datasets': total_datasets,
@@ -534,6 +535,7 @@ def general_dashboard(request):
         'recent_activities': recent_activities,
         'trained_models': models_data,
         'dataset_results': dataset_results,
+        'available_dataset' : available_dataset
     }
     
     return render(request, "general_dashboard.html", context)
@@ -1575,6 +1577,7 @@ def upload_file(request):
             name = request.POST.get('name')
             description = request.POST.get('description')
             target_class = request.POST.get('target_class')
+            dataset_type = request.POST.get('dataset_type')
             source = request.POST.get('source')
 
             print(f"Name: {name}, Description: {description}, Target: {target_class}, Source: {source}")  # Debug log
@@ -1720,6 +1723,7 @@ def upload_file(request):
                 description=description,
                 file_path=file,
                 target_class=target_class,
+                dataset_type=dataset_type,
                 columns_info={
                     'columns': list(df.columns),
                     'dtypes': {col: str(df[col].dtype) for col in df.columns}
@@ -2232,14 +2236,16 @@ def train_model_nn(request):
 
     try:
         # Get form data
-        dataset_id = request.POST.get('datasetId')
+        dataset_id = request.POST.get('dataset_id')
         target_column = request.POST.get('targetColumn')
         model_type = request.POST.get('model', 'neural_network')
         train_split = float(request.POST.get('trainTestSplit', 80)) / 100
+        print(model_type)
         
         # Get the dataset
         try:
-            dataset = Dataset.objects.get(id=dataset_id)
+            dataset = get_object_or_404(Dataset, id=dataset_id)
+
         except Dataset.DoesNotExist:
             return JsonResponse({'error': 'Dataset not found.'}, status=404)
 

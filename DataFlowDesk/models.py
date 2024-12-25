@@ -23,6 +23,7 @@ class Dataset(models.Model):
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('processed', 'Processed')], default='pending')
     graphs = models.JSONField(default=list, blank=True)  # New column to store chart file paths
     target_class = models.CharField(max_length=255, null=True, blank=True)  # Store the target column name
+    dataset_type = models.CharField(max_length=255, null=True, blank=True)  # Store the target column name
 
     def __str__(self):
         return self.name

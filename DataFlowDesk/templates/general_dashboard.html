@@ -339,7 +339,7 @@
 
             <!-- Dataset List -->
             <div class="max-h-[60vh] overflow-y-auto p-6 space-y-4">
-                {% for dataset in available_datasets %}
+                {% for dataset in available_dataset %}
                 <div class="group bg-white/60 hover:bg-white/90 p-5 rounded-xl border border-gray-100/50 hover:border-violet-200/50 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5"
                      onclick="selectDataset('{{ dataset.id }}')">
                     <div class="flex justify-between items-center">
