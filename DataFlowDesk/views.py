@@ -13,6 +13,7 @@ from django.db import models
 import json
 import matplotlib.pyplot as plt
 import io
+import time
 import base64
 from matplotlib.backends.backend_agg import FigureCanvas
 from django.shortcuts import render
@@ -2518,6 +2519,10 @@ from sklearn.model_selection import train_test_split
 from kneed import KneeLocator
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.model_selection import cross_val_score
+from sklearn.decomposition import PCA
+import numpy as np
+import time
 
 
 # Model Training View
@@ -2686,48 +2691,104 @@ def train_model(request):
                     metric_value=results['metrics']['accuracy']
                 )
 
-
-
             elif model_name == 'svm':
-                # Fetch parameters for SVM
-                kernel = request.POST.get('kernel', 'rbf')
-                model = SVC(kernel=kernel)
+                # Create unique model identifier
+                import datetime
+                timestamp = int(datetime.datetime.now().timestamp())
+                model_identifier = f'svm_{dataset_id}_{timestamp}'
 
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+                # Scale the features
+                X_train_scaled = pd.DataFrame(
+                    scaler.fit_transform(X_train),
+                    columns=feature_columns,
+                    index=X_train.index
+                )
+                X_test_scaled = pd.DataFrame(
+                    scaler.transform(X_test),
+                    columns=feature_columns,
+                    index=X_test.index
+                )
 
-                model.fit(X_train, y_train)
+                # List of kernels to try
+                kernels = ['linear', 'poly', 'rbf', 'sigmoid']
+                kernel_scores = {}
+                kernel_predictions = {}
+                best_accuracy = 0
+                best_kernel = None
+                best_model = None
 
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
+                # Train and evaluate SVM with different kernels
+                for kernel in kernels:
+                    try:
+                        # Train SVM with current kernel
+                        svm_model = SVC(kernel=kernel, probability=True)
+                        svm_model.fit(X_train_scaled, y_train)
+                        
+                        # Make predictions
+                        y_pred = svm_model.predict(X_test_scaled)
+                        
+                        # Calculate accuracy
+                        accuracy = accuracy_score(y_test, y_pred)
+                        kernel_scores[kernel] = accuracy
+                        kernel_predictions[kernel] = y_pred
+
+                        # Keep track of best performing kernel
+                        if accuracy > best_accuracy:
+                            best_accuracy = accuracy
+                            best_kernel = kernel
+                            best_model = svm_model
+
+                    except Exception as e:
+                        print(f"Error training SVM with {kernel} kernel: {str(e)}")
+                        kernel_scores[kernel] = 0
+
+                # Use the best model for final predictions
+                model = best_model
+                y_pred = kernel_predictions[best_kernel]
+
+                # Create kernel comparison plot
+                kernel_comparison_path = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier, 'kernel_comparison.png')
+                os.makedirs(os.path.dirname(kernel_comparison_path), exist_ok=True)
+                
+                plt.figure(figsize=(10, 6))
+                bars = plt.bar(kernel_scores.keys(), kernel_scores.values())
+                plt.title('SVM Kernel Performance Comparison')
+                plt.xlabel('Kernel Type')
+                plt.ylabel('Accuracy Score')
+                
+                # Add value labels on top of bars
+                for bar in bars:
+                    height = bar.get_height()
+                    plt.text(bar.get_x() + bar.get_width()/2., height,
+                            f'{height:.3f}',
+                            ha='center', va='bottom')
+                
+                # Highlight best kernel
+                bars[list(kernel_scores.keys()).index(best_kernel)].set_color('green')
+                plt.savefig(kernel_comparison_path)
+                plt.close()
+
+                # Store feature names and ranges for the best model
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
 
-                y_pred = model.predict(X_test)
-                
-                try:
-                    # Generate Visualizations
-                    results = generate_visualizations(
-                        model_type='classification',
-                        model=model,  # Trained Naive Bayes model
-                        y_true=y_test,  # True labels from the test dataset
-                        y_pred=y_pred,  # Predicted labels
-                        X=X_test,  # Test dataset features
-                        model_identifier= f'svm_model_{dataset_id}'
-                    )
+                # Generate standard visualizations with the best model
+                results = generate_visualizations(
+                    model_type='classification',
+                    model=model,
+                    y_true=y_test,
+                    y_pred=y_pred,
+                    X=X_test_scaled,
+                    feature_names=feature_columns,
+                    model_identifier=model_identifier
+                )
 
-                except Exception as e:
-                    # If an exception occurs, calculate alternative metrics
-                    print(f"Accuracy score could not be calculated: {str(e)}")
-                    mse = mean_squared_error(y_test, y_pred)
-                    r2 = r2_score(y_test, y_pred)
-                    results = {
-                        'Error': f"Accuracy score could not be calculated: {str(e)}",
-                        'Mean Squared Error': mse,
-                        'R² Score': r2
-                    }
+                # Add kernel comparison to visualizations
+                results['visualizations']['kernel_comparison'] = f'/visualizations/{model_identifier}/kernel_comparison.png'
 
-                # Save the trained model as a .pkl file
+                # Save the best model
                 model_filename = f"svm_model_{dataset_id}.pkl"
                 models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
                 os.makedirs(models_dir, exist_ok=True)
@@ -2738,55 +2799,69 @@ def train_model(request):
                 # Save to MLModel table
                 ml_model = MLModel.objects.create(
                     dataset=dataset,
-                    algorithm='SVM',
+                    algorithm=f'SVM (kernel={best_kernel})',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
 
                 # Save results to ModelResult table
                 ModelResult.objects.create(
                     model=ml_model,
                     metric_name='accuracy',
-                    metric_value=results['metrics']['accuracy'],
-                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                    metric_value=best_accuracy,
                 )
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+
+
 
             elif model_name == 'random_forest':
                 # Fetch parameters for Random Forest
                 n_estimators = int(request.POST.get('nEstimators', 100))
+                
+                # Create unique model identifier using timestamp
+                import datetime
+                timestamp = int(datetime.datetime.now().timestamp())
+                model_identifier = f'random_forest_{dataset_id}_{timestamp}'
+
+                # Initialize and fit the model
                 model = RandomForestClassifier(n_estimators=n_estimators)
+                
+                # Scale the features while preserving feature names
+                X_train_scaled = pd.DataFrame(
+                    scaler.fit_transform(X_train),
+                    columns=feature_columns,
+                    index=X_train.index
+                )
+                X_test_scaled = pd.DataFrame(
+                    scaler.transform(X_test),
+                    columns=feature_columns,
+                    index=X_test.index
+                )
 
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+                # Fit the model with scaled data
+                model.fit(X_train_scaled, y_train)
 
-                model.fit(X_train, y_train)
-
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
+                # Store feature names and ranges
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
 
-                y_pred = model.predict(X_test)
-                # Generate Visualizations
+                # Make predictions
+                y_pred = model.predict(X_test_scaled)
+                
+                # Generate visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    model=model,  # Trained Naive Bayes model
-                    y_true=y_test,  # True labels from the test dataset
-                    y_pred=y_pred,  # Predicted labels
-                    X=X_test,  # Test dataset features
-                    model_identifier= f'random_forest_model_{dataset_id}'
+                    model=model,
+                    y_true=y_test,
+                    y_pred=y_pred,
+                    X=X_test_scaled,  # Pass scaled data with feature names
+                    feature_names=feature_columns,
+                    model_identifier=model_identifier
                 )
 
-
-                # Save the trained model as a .pkl file
+                # Save the trained model
                 model_filename = f"random_forest_model_{dataset_id}.pkl"
                 models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
                 os.makedirs(models_dir, exist_ok=True)
@@ -2797,7 +2872,7 @@ def train_model(request):
                 # Save to MLModel table
                 ml_model = MLModel.objects.create(
                     dataset=dataset,
-                    algorithm='Random Forest',
+                    algorithm=f'Random Forest (n_estimators={n_estimators})',
                     training_status='completed',
                     model_path=model_path
                 )
@@ -2807,76 +2882,119 @@ def train_model(request):
                     model=ml_model,
                     metric_name='accuracy',
                     metric_value=results['metrics']['accuracy'],
-                    # visualization_path=f'data:image/png;base64,{image_base64}',
                 )
 
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
+
 
             elif model_name == 'knn':
-                # Fetch parameters for k-Nearest Neighbors
-                n_neighbors = int(request.POST.get('nNeighbors', 5))
-                print('neighbors:', n_neighbors)
-
+                import time
+                # Scale the features
                 X_train = scaler.fit_transform(X_train)
                 X_test = scaler.transform(X_test)
-
-                model = KNeighborsClassifier(n_neighbors=n_neighbors)
+                
+                # Define a range of K values based on dataset size
+                max_k = min(15, len(X_train) // 2)  # Ensure k is not larger than half the training set
+                k_range = range(1, max_k + 1)
+                
+                # Perform k-fold cross validation for each k value
+                cv_scores = []
+                train_scores = []
+                
+                for k in k_range:
+                    knn = KNeighborsClassifier(n_neighbors=k)
+                    # Get cross-validation scores
+                    try:
+                        # Use smaller number of folds for small datasets
+                        n_folds = min(5, len(X_train) // 2)
+                        cv_score = cross_val_score(knn, X_train, y_train, cv=n_folds, scoring='accuracy').mean()
+                        cv_scores.append(cv_score)
+                        
+                        # Get training scores
+                        knn.fit(X_train, y_train)
+                        train_score = knn.score(X_train, y_train)
+                        train_scores.append(train_score)
+                    except ValueError as e:
+                        print(f"Error with k={k}: {str(e)}")
+                        continue
+                
+                # Find optimal k that balances performance and overfitting
+                if len(cv_scores) > 0:
+                    score_diff = np.array(train_scores) - np.array(cv_scores)
+                    optimal_k_idx = np.argmin(score_diff)
+                    optimal_k = k_range[optimal_k_idx]
+                else:
+                    optimal_k = 1  # fallback to 1 if no valid k found
+                
+                print(f"Selected optimal k: {optimal_k}")
+                
+                # Train final model with optimal k
+                model = KNeighborsClassifier(n_neighbors=optimal_k)
                 model.fit(X_train, y_train)
-
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
+                
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
+                
+                # Get predictions for both training and test sets
+                y_train_pred = model.predict(X_train)
+                y_test_pred = model.predict(X_test)
 
-                y_pred = model.predict(X_test)
-                # Generate Visualizations
+                # Create a unique model identifier
+                model_identifier = f"knn_{dataset_id}_{int(time.time())}"
+
+                # Create K selection plot
+                plt.figure(figsize=(10, 6))
+                plt.plot(k_range[:len(train_scores)], train_scores, label='Training Accuracy')
+                plt.plot(k_range[:len(cv_scores)], cv_scores, label='Cross-validation Accuracy')
+                plt.axvline(x=optimal_k, color='r', linestyle='--', label=f'Optimal k={optimal_k}')
+                plt.xlabel('k value')
+                plt.ylabel('Accuracy')
+                plt.title('K Selection Analysis')
+                plt.legend()
+                k_selection_path = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier, 'k_selection.png')
+                os.makedirs(os.path.dirname(k_selection_path), exist_ok=True)
+                plt.savefig(k_selection_path)
+                plt.close()
+
+                # Generate standard classification visualizations
                 results = generate_visualizations(
                     model_type='classification',
-                    model=model,  # Trained Naive Bayes model
-                    y_true=y_test,  # True labels from the test dataset
-                    y_pred=y_pred,  # Predicted labels
-                    X=X_test,  # Test dataset features
-                    model_identifier= f'knn_model_{dataset_id}'
+                    y_true=y_test,
+                    y_pred=y_test_pred,  # Use test predictions
+                    model=model,
+                    X=X_test,  # Use test data
+                    feature_names=feature_columns,
+                    model_identifier=model_identifier
                 )
 
-
-                # Save the trained model as a .pkl file
+                # Add K selection path to results
+                if 'visualizations' not in results:
+                    results['visualizations'] = {}
+                results['visualizations']['k_selection'] = k_selection_path
+                                
+                # Save the trained model
                 model_filename = f"knn_model_{dataset_id}.pkl"
                 models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
                 os.makedirs(models_dir, exist_ok=True)
                 model_path = os.path.join(models_dir, model_filename)
                 with open(model_path, 'wb') as f:
                     joblib.dump(model, f)
-
+                
                 # Save to MLModel table
                 ml_model = MLModel.objects.create(
                     dataset=dataset,
-                    algorithm='KNN',
+                    algorithm=f'KNN (k={optimal_k})',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
-
+                
                 # Save results to ModelResult table
                 ModelResult.objects.create(
                     model=ml_model,
                     metric_name='accuracy',
                     metric_value=results['metrics']['accuracy'],
-                    # visualization_path=f'data:image/png;base64,{image_base64}',
                 )
-
-                plt.plot(y_test[:50], label='True')  # Fixed
-                plt.plot(model.predict(X_test)[:50], label='Predicted')  # Fixed
-                plt.legend()
-                plt.title(f"{model_name.capitalize()} Results")
-                visualization_path = os.path.join('media/visualizations', f"{model_name}_{dataset_id}.png")
-                os.makedirs(os.path.dirname(visualization_path), exist_ok=True)
-                plt.savefig(visualization_path)
 
             elif model_name == 'polynomial_regression':
                 print("Polynomial Regression model selected.")
@@ -3207,8 +3325,8 @@ def generate_visualizations(
         class_names=None, X=None, clusters=None, 
         n_clusters=None, cluster_centers_pca=None, 
         pca_data=None, silhouette_score=None, inertia=None,
-        elbow_data=None):
-
+        elbow_data=None, knn_data=None):  
+    
     # Create a unique directory for the model's visualizations
     model_dir = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier or str(uuid.uuid4()))
     os.makedirs(model_dir, exist_ok=True)
@@ -3228,6 +3346,64 @@ def generate_visualizations(
         visualizations['confusion_matrix'] = cm_path
         plt.close()
 
+        # Add SVM-specific visualizations
+        if isinstance(model, SVC) and X is not None and X.shape[1] >= 2:
+            # Create decision boundary visualization if possible
+            decision_boundary_path = os.path.join(model_dir, 'decision_boundary.png')
+            
+            # Use PCA for high-dimensional data
+            if X.shape[1] > 2:
+                pca = PCA(n_components=2)
+                X_2d = pca.fit_transform(X)
+                
+                # Train a new SVM model on the 2D data for visualization
+                svm_2d = SVC(kernel=model.kernel)
+                svm_2d.fit(X_2d, y_true)
+                
+                # Create meshgrid
+                x_min, x_max = X_2d[:, 0].min() - 1, X_2d[:, 0].max() + 1
+                y_min, y_max = X_2d[:, 1].min() - 1, X_2d[:, 1].max() + 1
+                xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                                   np.arange(y_min, y_max, 0.1))
+                
+                # Make predictions using the 2D model
+                Z = svm_2d.predict(np.c_[xx.ravel(), yy.ravel()])
+                Z = Z.reshape(xx.shape)
+                
+                # Plot decision boundary
+                plt.figure(figsize=(10, 8))
+                plt.contourf(xx, yy, Z, alpha=0.4)
+                plt.scatter(X_2d[:, 0], X_2d[:, 1], c=y_true, alpha=0.8)
+                plt.title(f'SVM Decision Boundary (kernel={model.kernel}) - PCA Visualization')
+                plt.xlabel('First Principal Component')
+                plt.ylabel('Second Principal Component')
+                plt.savefig(decision_boundary_path, format='png', bbox_inches='tight')
+                visualizations['decision_boundary'] = decision_boundary_path
+                plt.close()
+            else:
+                # For 2D data, use original features
+                # Create meshgrid
+                x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+                y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+                xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                                   np.arange(y_min, y_max, 0.1))
+                
+                # Make predictions
+                Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+                Z = Z.reshape(xx.shape)
+                
+                # Plot decision boundary
+                plt.figure(figsize=(10, 8))
+                plt.contourf(xx, yy, Z, alpha=0.4)
+                plt.scatter(X[:, 0], X[:, 1], c=y_true, alpha=0.8)
+                plt.title(f'SVM Decision Boundary (kernel={model.kernel})')
+                plt.xlabel(feature_names[0] if feature_names else 'Feature 1')
+                plt.ylabel(feature_names[1] if feature_names else 'Feature 2')
+                plt.savefig(decision_boundary_path, format='png', bbox_inches='tight')
+                visualizations['decision_boundary'] = decision_boundary_path
+                plt.close()
+
+
         # Generate decision tree visualization (if applicable)
         if model and isinstance(model, DecisionTreeClassifier):
             tree_path = os.path.join(model_dir, 'decision_tree.png')
@@ -3244,6 +3420,127 @@ def generate_visualizations(
             plt.savefig(tree_path, format='png', bbox_inches='tight')
             visualizations['decision_tree'] = tree_path
             plt.close()
+
+        # Add Random Forest-specific visualizations
+        if isinstance(model, RandomForestClassifier):
+            # Feature Importance Plot (Enhanced)
+            importances = model.feature_importances_
+            std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
+            indices = np.argsort(importances)[::-1]
+
+            feature_importance_path = os.path.join(model_dir, 'feature_importance.png')
+            plt.figure(figsize=(12, 6))
+            plt.title("Feature Importances (Random Forest)")
+            plt.bar(range(X.shape[1]), importances[indices],
+                   color="b", yerr=std[indices], align="center")
+            plt.xticks(range(X.shape[1]), [feature_names[i] for i in indices], rotation=45, ha='right')
+            plt.tight_layout()
+            plt.savefig(feature_importance_path, format='png', bbox_inches='tight')
+            visualizations['feature_importance'] = feature_importance_path
+            plt.close()
+
+            # Tree Structure Visualization (sample tree)
+            sample_tree_path = os.path.join(model_dir, 'sample_tree.png')
+            plt.figure(figsize=(20, 10))
+            plot_tree(model.estimators_[0],
+                     feature_names=feature_names,
+                     filled=True,
+                     rounded=True,
+                     fontsize=10)
+            plt.title("Sample Decision Tree from Random Forest")
+            plt.savefig(sample_tree_path, format='png', bbox_inches='tight')
+            visualizations['sample_tree'] = sample_tree_path
+            plt.close()
+
+            # OOB Error Plot (if available)
+            if hasattr(model, 'oob_score_'):
+                oob_path = os.path.join(model_dir, 'oob_error.png')
+                plt.figure(figsize=(10, 6))
+                plt.title("Out-of-Bag Error Rate")
+                plt.plot(range(1, model.n_estimators + 1), 
+                        [1 - model.oob_score_] * model.n_estimators,
+                        'r--', label='OOB Error Rate')
+                plt.xlabel("Number of Trees")
+                plt.ylabel("Error Rate")
+                plt.legend()
+                plt.savefig(oob_path, format='png', bbox_inches='tight')
+                visualizations['oob_error'] = oob_path
+                plt.close()
+
+            # Feature Importance Heatmap
+            importance_heatmap_path = os.path.join(model_dir, 'importance_heatmap.png')
+            plt.figure(figsize=(12, 8))
+            importance_matrix = np.array([tree.feature_importances_ for tree in model.estimators_])
+            sns.heatmap(importance_matrix, xticklabels=feature_names, 
+                       yticklabels=False, cmap='YlOrRd')
+            plt.title("Feature Importance Across Trees")
+            plt.xlabel("Features")
+            plt.ylabel("Trees")
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.savefig(importance_heatmap_path, format='png', bbox_inches='tight')
+            visualizations['importance_heatmap'] = importance_heatmap_path
+            plt.close()
+        # Add KNN-specific visualizations
+        if isinstance(model, KNeighborsClassifier) and knn_data is not None:
+            # K Selection Analysis
+            k_selection_path = os.path.join(model_dir, 'k_selection.png')
+            plt.figure(figsize=(12, 6))
+            
+            if len(knn_data['cv_scores']) > 0:
+                plt.plot(knn_data['k_range'][:len(knn_data['train_scores'])], 
+                        knn_data['train_scores'], 
+                        label='Training Accuracy')
+                plt.plot(knn_data['k_range'][:len(knn_data['cv_scores'])], 
+                        knn_data['cv_scores'], 
+                        label='Cross-validation Accuracy')
+                plt.axvline(x=knn_data['optimal_k'], color='r', 
+                          linestyle='--', 
+                          label=f'Optimal k={knn_data["optimal_k"]}')
+            
+            plt.xlabel('k value')
+            plt.ylabel('Accuracy')
+            plt.title('K Selection Analysis')
+            plt.legend()
+            plt.savefig(k_selection_path, format='png', bbox_inches='tight')
+            visualizations['k_selection'] = k_selection_path
+            plt.close()
+
+            # Decision Boundary (if applicable)
+            if X is not None and X.shape[1] >= 2:
+                decision_boundary_path = os.path.join(model_dir, 'decision_boundary.png')
+                
+                # Create PCA if more than 2 dimensions
+                if X.shape[1] > 2:
+                    pca = PCA(n_components=2)
+                    X_2d = pca.fit_transform(X)
+                else:
+                    X_2d = X
+                
+                # Create meshgrid
+                x_min, x_max = X_2d[:, 0].min() - 1, X_2d[:, 0].max() + 1
+                y_min, y_max = X_2d[:, 1].min() - 1, X_2d[:, 1].max() + 1
+                xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                                   np.arange(y_min, y_max, 0.1))
+                
+                # Fit a new KNN model on 2D data
+                knn_2d = KNeighborsClassifier(n_neighbors=knn_data['optimal_k'])
+                knn_2d.fit(X_2d, y_true)
+                
+                # Make predictions
+                Z = knn_2d.predict(np.c_[xx.ravel(), yy.ravel()])
+                Z = Z.reshape(xx.shape)
+                
+                # Plot decision boundary
+                plt.figure(figsize=(10, 8))
+                plt.contourf(xx, yy, Z, alpha=0.4)
+                plt.scatter(X_2d[:, 0], X_2d[:, 1], c=y_true, alpha=0.8)
+                plt.title('KNN Decision Boundary')
+                plt.xlabel('Feature 1')
+                plt.ylabel('Feature 2')
+                plt.savefig(decision_boundary_path, format='png', bbox_inches='tight')
+                visualizations['decision_boundary'] = decision_boundary_path
+                plt.close()
 
         # ROC Curve
         if hasattr(model, 'predict_proba') and y_true is not None and y_pred is not None:
