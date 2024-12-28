@@ -2509,6 +2509,17 @@ def train_model_nn(request):
             'error': f'An error occurred during training: {str(e)}'
         }, status=500)
 
+
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+from sklearn.model_selection import train_test_split
+from kneed import KneeLocator
+import numpy as np
+import matplotlib.pyplot as plt
+
+
 # Model Training View
 def train_model(request):
     if request.method == 'POST':
@@ -3042,81 +3053,139 @@ def train_model(request):
                 )
 
             elif model_name == 'kmeans':
-                # Fetch the number of clusters
-                n_clusters = max(2, int(request.POST.get('nClusters', 3)))  # Ensure n_clusters >= 2
                 X = df
-
                 feature_columns = [col for col in df.columns]
-                # Ensure feature scaling
+
+                # Ensure feature scaling with StandardScaler
+                scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
 
-                # Train-test split on scaled features
-                X_train, X_test = train_test_split(X_scaled, test_size=1 - train_test_split_ratio, random_state=42)
+                # Elbow method to determine the optimal number of clusters
+                distortions = []
+                silhouette_scores = []
+                k_range = range(2, 11)  # Start from 2 for silhouette score calculation
 
-                # Initialize and train the KMeans model
-                model = KMeans(n_clusters=n_clusters, random_state=42)
-                model.fit(X_train)  # Fit on training data only
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
-                    feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
+                for k in k_range:
+                    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10, max_iter=300)
+                    cluster_labels = kmeans.fit_predict(X_scaled)
+                    
+                    # Calculate both metrics
+                    distortions.append(kmeans.inertia_)
+                    silhouette_avg = silhouette_score(X_scaled, cluster_labels)
+                    silhouette_scores.append(silhouette_avg)
+                    print(f"k={k}, silhouette={silhouette_avg:.3f}, inertia={kmeans.inertia_:.2f}")
+
+                # Calculate the elbow point using the kneedle algorithm
+                kn = KneeLocator(list(k_range), distortions, curve='convex', direction='decreasing')
+                elbow_k = kn.elbow if kn.elbow else k_range[0]
+
+                # Find k with maximum silhouette score
+                silhouette_k = k_range[np.argmax(silhouette_scores)]
+
+                # Combine both metrics to choose optimal k
+                # Normalize both metrics to [0,1] range for fair comparison
+                normalized_distortions = (max(distortions) - np.array(distortions)) / (max(distortions) - min(distortions))
+                normalized_silhouette = (np.array(silhouette_scores) - min(silhouette_scores)) / (max(silhouette_scores) - min(silhouette_scores))
+
+                # Calculate combined score for each k
+                combined_scores = []
+                for i, k in enumerate(k_range):
+                    combined_score = (normalized_silhouette[i] + normalized_distortions[i]) / 2
+                    combined_scores.append(combined_score)
+
+                # Choose k with highest combined score
+                optimal_k = k_range[np.argmax(combined_scores)]
+
+                print(f"Elbow method suggests k={elbow_k}")
+                print(f"Silhouette analysis suggests k={silhouette_k}")
+                print(f"Combined analysis suggests optimal_k={optimal_k}")
+
+                # Visualize both metrics
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+                # Plot elbow curve
+                ax1.plot(k_range, distortions, marker='o')
+                ax1.axvline(x=optimal_k, color='r', linestyle='--', label=f'Optimal k={optimal_k}')
+                ax1.set_xlabel('Number of Clusters (k)')
+                ax1.set_ylabel('Distortion (Inertia)')
+                ax1.set_title('Elbow Method')
+                ax1.legend()
+
+                # Plot silhouette scores
+                ax2.plot(k_range, silhouette_scores, marker='o')
+                ax2.axvline(x=optimal_k, color='r', linestyle='--', label=f'Optimal k={optimal_k}')
+                ax2.set_xlabel('Number of Clusters (k)')
+                ax2.set_ylabel('Silhouette Score')
+                ax2.set_title('Silhouette Analysis')
+                ax2.legend()
+
+                plt.tight_layout()
+                plt.show()
+
+                # Train-test split on scaled features
+                X_train, X_test = train_test_split(X_scaled, test_size=0.2, random_state=42)
+
+                # Initialize and train the KMeans model with optimal k
+                model = KMeans(
+                    n_clusters=optimal_k,
+                    random_state=42,
+                    n_init=10,
+                    max_iter=300
+                )
+
+                # Fit on the entire scaled dataset
+                model.fit(X_scaled)
+
+                # Store feature names and ranges
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
+                    feature: f"{X[feature].min():.2f} - {X[feature].max():.2f}"
+                    for feature in feature_columns
                 }
-                # Predict clusters for both training and test data
+
+                # Get predictions for both sets
                 y_train_pred = model.predict(X_train)
                 y_test_pred = model.predict(X_test)
 
                 # Evaluate clustering
                 try:
+                    # Calculate silhouette scores on the full dataset
+                    silhouette_full = silhouette_score(X_scaled, model.labels_)
                     silhouette_train = silhouette_score(X_train, y_train_pred)
                     silhouette_test = silhouette_score(X_test, y_test_pred)
+                    print(f"Final Silhouette scores - Full: {silhouette_full:.3f}, Train: {silhouette_train:.3f}, Test: {silhouette_test:.3f}")
                 except ValueError as e:
                     return JsonResponse({'error': f"Silhouette score calculation failed: {str(e)}"}, status=400)
 
                 # Visualization: Reduce to 2D using PCA
                 pca = PCA(n_components=2)
-                X_test_pca = pca.fit_transform(X_test)
+                X_pca = pca.fit_transform(X_scaled)  # Transform entire dataset
                 cluster_centers_pca = pca.transform(model.cluster_centers_)
 
-                # Call generate_visualizations
+                # Prepare elbow data for visualization
+                elbow_data = {
+                    'k_range': list(k_range),
+                    'distortions': distortions,
+                    'silhouette_scores': silhouette_scores,
+                    'optimal_k': optimal_k,
+                }
+
+                # Call generate_visualizations with full dataset visualization
                 results = generate_visualizations(
                     model_type='clustering',
                     model=model,
-                    X=X_test,
-                    clusters=y_test_pred,
-                    pca_data=X_test_pca,
+                    X=X_scaled,  # Pass full scaled dataset
+                    clusters=model.labels_,  # Use full dataset labels
+                    pca_data=X_pca,
                     cluster_centers_pca=cluster_centers_pca,
                     inertia=model.inertia_,
-                    n_clusters=n_clusters,
-                    silhouette_score=silhouette_test,
-                    model_identifier= f'kmeans_model_{dataset_id}'
+                    n_clusters=optimal_k,
+                    silhouette_score=silhouette_full,  # Use full dataset silhouette score
+                    model_identifier=f'kmeans_model_{dataset_id}',
+                    elbow_data=elbow_data
                 )
+                print(f"Final optimal_k: {optimal_k}, Inertia: {model.inertia_:.2f}")
 
-                # Save the trained model as a .pkl file
-                model_filename = f"kmeans_model_{dataset_id}.pkl"
-                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
-                os.makedirs(models_dir, exist_ok=True)
-                model_path = os.path.join(models_dir, model_filename)
-                with open(model_path, 'wb') as f:
-                    joblib.dump(model, f)
-
-                # Save to MLModel table
-                ml_model = MLModel.objects.create(
-                    dataset=dataset,
-                    algorithm='KMeans',
-                    training_status='completed',
-                    model_path=model_path
-                )
-
-                # Save results to ModelResult table
-                ModelResult.objects.create(
-                    model=ml_model,
-                    metric_name='Silhouette Score (Train)',
-                    metric_value=silhouette_train,
-                )
-                ModelResult.objects.create(
-                    model=ml_model,
-                    metric_name='Silhouette Score (Test)',
-                    metric_value=silhouette_test,
-                )
 
             else:
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
@@ -3137,7 +3206,8 @@ def generate_visualizations(
         feature_names=None, model_identifier=None,
         class_names=None, X=None, clusters=None, 
         n_clusters=None, cluster_centers_pca=None, 
-        pca_data=None, silhouette_score=None, inertia=None):
+        pca_data=None, silhouette_score=None, inertia=None,
+        elbow_data=None):
 
     # Create a unique directory for the model's visualizations
     model_dir = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier or str(uuid.uuid4()))
@@ -3322,6 +3392,22 @@ def generate_visualizations(
 
 
     elif model_type == 'clustering':
+        # Generate elbow curve
+        if elbow_data is not None:
+            elbow_plot_path = os.path.join(model_dir, 'elbow_plot.png')
+            plt.figure(figsize=(10, 6))
+            plt.plot(elbow_data['k_range'], elbow_data['distortions'], 'bx-')
+            plt.axvline(x=elbow_data['optimal_k'], color='r', linestyle='--', 
+                    label=f'Optimal k={elbow_data["optimal_k"]}')
+            plt.xlabel('Number of Clusters (k)')
+            plt.ylabel('Distortion (Inertia)')
+            plt.title('Elbow Method for Optimal k')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(elbow_plot_path, format='png', bbox_inches='tight')
+            visualizations['elbow_curve'] = elbow_plot_path
+            plt.close()
+
         # PCA Visualization for Clusters
         if pca_data is not None and clusters is not None and cluster_centers_pca is not None:
             clusters_path = os.path.join(model_dir, 'clusters_plot.png')
@@ -3341,14 +3427,14 @@ def generate_visualizations(
                 marker='X',
                 label='Centroids'
             )
-            plt.title('KMeans Clustering Visualization')
+            plt.title(f'KMeans Clustering Visualization (k={n_clusters})')
             plt.xlabel('PCA Component 1')
             plt.ylabel('PCA Component 2')
             plt.legend(title="Cluster")
             plt.savefig(clusters_path, format='png', bbox_inches='tight')
             visualizations['clusters_visual'] = clusters_path
             plt.close()
-
+            
         # Silhouette Score Plot
         if X is not None and clusters is not None and silhouette_score is not None and n_clusters is not None:
             from sklearn.metrics import silhouette_samples
