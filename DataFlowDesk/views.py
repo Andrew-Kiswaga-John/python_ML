@@ -2172,9 +2172,208 @@ def get_columns_target(request):
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
+from django.template.loader import render_to_string
+from django.conf import settings
+import tempfile
+import os
+from datetime import datetime
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+import pandas as pd
+import json
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from django.template.loader import render_to_string
+from django.conf import settings
+import tempfile
+import os
+from datetime import datetime
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+from .models import MLModel, ModelResult
+import pandas as pd
 
-### MODEL TRAINING PART ###
+@csrf_exempt
+def generate_model_report(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
+    try:
+        data = json.loads(request.body)
+        model_id = data.get('model_id')
+
+        # Get the model and related information
+        model = get_object_or_404(MLModel, id=model_id)
+        dataset = model.dataset
+        model_results = ModelResult.objects.filter(model=model)
+
+        # Get feature count and sample count
+        df = pd.read_csv(dataset.cleaned_file.path)
+        feature_count = len(df.columns) - 1  # Excluding target column
+        sample_count = len(df)
+
+        # Prepare metrics dictionary
+        metrics = {}
+        for result in model_results:
+            metrics[result.metric_name] = round(float(result.metric_value), 4)
+
+        # Create PDF using reportlab
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="model_report_{model_id}.pdf"'
+
+        # Create the PDF object using reportlab
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+        from reportlab.lib.utils import ImageReader
+        
+        doc = SimpleDocTemplate(response, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30
+        )
+        story.append(Paragraph("Model Training Report", title_style))
+        story.append(Spacer(1, 12))
+
+        # Timestamp
+        story.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+        story.append(Spacer(1, 12))
+
+        # Dataset Information
+        story.append(Paragraph("Dataset Information", styles['Heading2']))
+        dataset_data = [
+            ["Name:", dataset.name],
+            ["Description:", dataset.description],
+            ["Target Class:", dataset.target_class],
+            ["Dataset Type:", 'Classification' if 'class' in model.algorithm.lower() else 'Regression'],
+            ["Feature Count:", str(feature_count)],
+            ["Sample Count:", str(sample_count)]
+        ]
+        
+        t = Table(dataset_data, colWidths=[2*inch, 4*inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 20))
+
+        # Model Information
+        story.append(Paragraph("Model Information", styles['Heading2']))
+        model_data = [
+            ["Algorithm:", model.algorithm],
+            ["Training Status:", model.training_status],
+            ["Created At:", model.created_at.strftime('%Y-%m-%d %H:%M:%S')]
+        ]
+        
+        t = Table(model_data, colWidths=[2*inch, 4*inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 20))
+
+        # Metrics
+        if metrics:
+            story.append(Paragraph("Performance Metrics", styles['Heading2']))
+            metrics_data = [[key, str(value)] for key, value in metrics.items()]
+            t = Table(metrics_data, colWidths=[2*inch, 4*inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 20))
+
+        # Visualizations
+        # First try to find visualizations in model-specific directory
+        model_identifier = f'{model.algorithm.lower()}_{dataset.id}'
+        viz_dir = os.path.join(settings.MEDIA_ROOT, 'visualizations', model_identifier)
+        
+        # If not found, try to find any directory containing this pattern
+        if not os.path.exists(viz_dir):
+            base_viz_dir = os.path.join(settings.MEDIA_ROOT, 'visualizations')
+            if os.path.exists(base_viz_dir):
+                for dir_name in os.listdir(base_viz_dir):
+                    if model_identifier in dir_name:
+                        viz_dir = os.path.join(base_viz_dir, dir_name)
+                        break
+
+        if os.path.exists(viz_dir):
+            story.append(Paragraph("Model Visualizations", styles['Heading2']))
+            for f in os.listdir(viz_dir):
+                if f.endswith(('.png', '.jpg', '.jpeg')):
+                    img_path = os.path.join(viz_dir, f)
+                    try:
+                        # Get a nice title from the filename
+                        title = f.replace('_', ' ').replace('.png', '').replace('.jpg', '').replace('.jpeg', '').title()
+                        
+                        # Add title for the visualization
+                        story.append(Paragraph(title, styles['Heading3']))
+                        story.append(Spacer(1, 12))
+                        
+                        # Add the image with error handling
+                        try:
+                            # First try with PIL/Pillow
+                            img = Image(img_path)
+                            # Scale the image while maintaining aspect ratio
+                            aspect = img.imageWidth / float(img.imageHeight)
+                            if aspect > 1:
+                                img.drawWidth = 6*inch
+                                img.drawHeight = (6*inch) / aspect
+                            else:
+                                img.drawHeight = 4*inch
+                                img.drawWidth = 4*inch * aspect
+                        except:
+                            # Fallback to ImageReader
+                            img = Image(ImageReader(img_path))
+                            img.drawWidth = 6*inch
+                            img.drawHeight = 4*inch
+                        
+                        story.append(img)
+                        story.append(Spacer(1, 20))
+                    except Exception as e:
+                        error_msg = f"Error loading image {f}: {str(e)}"
+                        print(error_msg)  # Log the error
+                        story.append(Paragraph(error_msg, styles['Normal']))
+                        story.append(Spacer(1, 12))
+
+        # Build PDF
+        doc.build(story)
+        return response
+
+    except Exception as e:
+        print(f"Error generating report: {str(e)}")  # Log the error
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 class NeuralNetwork(nn.Module):
@@ -2636,6 +2835,12 @@ def train_model(request):
                     # visualization_path=f'data:image/png;base64,{image_base64}',
                 )
 
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
+
 
             elif model_name == 'decision_tree':
                 # Fetch parameters for Decision Tree
@@ -2690,6 +2895,12 @@ def train_model(request):
                     metric_name='accuracy',
                     metric_value=results['metrics']['accuracy']
                 )
+
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
             elif model_name == 'svm':
                 # Create unique model identifier
@@ -2810,7 +3021,11 @@ def train_model(request):
                     metric_name='accuracy',
                     metric_value=best_accuracy,
                 )
-
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
 
 
@@ -2884,6 +3099,11 @@ def train_model(request):
                     metric_value=results['metrics']['accuracy'],
                 )
 
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
 
             elif model_name == 'knn':
@@ -2995,6 +3215,12 @@ def train_model(request):
                     metric_name='accuracy',
                     metric_value=results['metrics']['accuracy'],
                 )
+
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
             elif model_name == 'polynomial_regression':
                 # Create unique model identifier
@@ -3144,12 +3370,11 @@ def train_model(request):
                     'best_r2_score': best_r2,
                     'degree_comparison': degree_scores
                 })
-
                 return JsonResponse({
                     'success': True,
-                    'results': results,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
                 })
-
             elif model_name == 'logistic_regression':
                 solver = request.POST.get('solver', 'lbfgs')
                 max_iter = int(request.POST.get('maxIter', 1000))
@@ -3198,6 +3423,11 @@ def train_model(request):
                     metric_value=results['metrics']['accuracy'],
                     # visualization_path=f'data:image/png;base64,{image_base64}',
                 )
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
             elif model_name == 'naive_bayes':
                 # Create unique model identifier
@@ -3320,6 +3550,11 @@ def train_model(request):
                     metric_name='accuracy',
                     metric_value=best_accuracy,
                 )
+                return JsonResponse({
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
+                })
 
 
             elif model_name == 'kmeans':
@@ -3461,8 +3696,9 @@ def train_model(request):
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
 
             return JsonResponse({
-                'success': True,
-                'results': results
+                    'success': True,
+                    'model_id': ml_model.id,  # Add this line
+                    'results': results
             })
 
         except Exception as e:

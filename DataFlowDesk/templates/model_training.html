@@ -31,10 +31,9 @@
             
             <form id="trainForm" method="post" enctype="multipart/form-data" class="space-y-8">
                 {% csrf_token %}
-                
+                <input type="hidden" id="model_id" name="model_id">
                 <!-- Dataset Selection -->
                 <input type="hidden" name="dataset_id" id="dataset_id" value="{{dataset_id}}">
-
                 <!-- Target Column Selection -->
                 <div class="transition-all duration-300 hover:translate-y-[-2px]">
                     <label for="targetColumn" class="block text-sm font-medium text-gray-700 mb-2">Select Target Column</label>
@@ -66,7 +65,6 @@
 
                         {% if dataset.dataset_type == 'clustering' %}
                         <optgroup label="Clustering" class="font-medium">
-
                             <option value="kmeans">K-Means</option>
                             {%endif %}
 
@@ -141,6 +139,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
                         </button>
+                        <button id="downloadReportBtn" class="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Download Report</span>
+                        </button>
+
                     </div>
                     
                     <!-- Metrics -->
@@ -226,12 +231,6 @@
         // Hide all parameter fields initially
         decisionTreeParams.classList.add('hidden');
         randomForestParams.classList.add('hidden');
-        knnParams.classList.add('hidden');
-        svmParams.classList.add('hidden');
-        polynomialRegressionParam.classList.add('hidden');
-        logisticRegressionParams.classList.add('hidden');
-        naiveBayesParams.classList.add('hidden');
-        kmeansParams.classList.add('hidden');
         neuralNetworkParams.classList.add('hidden');
 
         if (modelSelect.value === 'linear_regression') {
@@ -296,6 +295,16 @@
             const result = await response.json();
 
             if (result.success) {
+                // Store the model ID in a hidden input
+                const modelIdInput = document.getElementById('model_id');
+                if (!modelIdInput) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.id = 'model_id';
+                    form.appendChild(input);
+                }
+                document.getElementById('model_id').value = result.model_id;
+
                 // Format the results nicely
                 let metricsHtml = '<div class="space-y-4">';
                 document.getElementById('loadingOverlay').classList.add('hidden');
@@ -391,6 +400,62 @@
             alert('Failed to download the model. Please try again.');
         }
     });
+
+
+    // Function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Add event listener for the download report button
+document.getElementById('downloadReportBtn').addEventListener('click', async () => {
+    try {
+        const modelId = document.getElementById('model_id').value; // Make sure you have a hidden input with model_id
+        const response = await fetch('/generate_model_report/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                model_id: modelId
+            })
+        });
+
+        if (response.ok) {
+            // Create a blob from the PDF stream
+            const blob = await response.blob();
+            // Create a link element
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `model_report_${modelId}.pdf`;
+            // Append to the document and trigger the download
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            // Clean up the URL object
+            window.URL.revokeObjectURL(downloadUrl);
+        } else {
+            throw new Error('Failed to generate report');
+        }
+    } catch (error) {
+        console.error('Error generating report:', error);
+        alert('Failed to generate report. Please try again.');
+    }
+});
+
 </script>
 
 <style>

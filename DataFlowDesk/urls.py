@@ -26,7 +26,7 @@ urlpatterns = [
 
     path('model_training/<int:id>/', views.training_page, name='model_training'),
     path('train_model_nn/', views.train_model_nn, name='train_model_nn'),
-
+    path('generate_model_report/', views.generate_model_report, name='generate_model_report'),
     path('upload/', views.upload_file, name='upload'),
     path('my_datasets/', views.my_datasets, name='my_datasets'),
     path('save_graph/', views.save_graph, name='save_graph'),

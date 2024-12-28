@@ -1,0 +1,4 @@
+weasyprint==60.1
+html5lib==1.1
+cairocffi==1.6.1
+CairoSVG==2.7.1
