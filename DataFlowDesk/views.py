@@ -3675,6 +3675,36 @@ def train_model(request):
                     'optimal_k': optimal_k,
                 }
 
+
+                import datetime
+                timestamp = int(datetime.datetime.now().timestamp())
+                model_identifier = f'kmeans_{dataset_id}_{timestamp}'
+
+                # Save the model
+                model_filename = f"kmeans_model_{dataset_id}.pkl"
+                models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
+                os.makedirs(models_dir, exist_ok=True)
+                model_path = os.path.join(models_dir, model_filename)
+                with open(model_path, 'wb') as f:
+                    joblib.dump(model, f)
+
+                # Save to MLModel table
+                ml_model = MLModel.objects.create(
+                    dataset=dataset,
+                    algorithm=f'KMeans (n_clusters={optimal_k})',
+                    training_status='completed',
+                    model_path=model_path
+                )
+
+                # Save results to ModelResult table
+                ModelResult.objects.create(
+                    model=ml_model,
+                    metric_name='silhouette_score',
+                    metric_value=silhouette_full,
+                )
+
+
+
                 # Call generate_visualizations with full dataset visualization
                 results = generate_visualizations(
                     model_type='clustering',
@@ -3696,9 +3726,9 @@ def train_model(request):
                 return JsonResponse({'error': 'Invalid model selected.'}, status=400)
 
             return JsonResponse({
-                    'success': True,
-                    'model_id': ml_model.id,  # Add this line
-                    'results': results
+                'success': True,
+                'model_id': ml_model.id,
+                'results': results
             })
 
         except Exception as e:
@@ -4518,9 +4548,7 @@ def perform_predictions(request):
                 # Append predictions to dataset
                 dataset['Predicted'] = predictions
 
-            # Convert dataset to HTML for rendering
-            # results_html = dataset.to_html(classes='table-auto w-full text-center border-collapse')
-
+            
             # Return the results and metrics as JSON
             return JsonResponse({
                 # 'results': results_html,
