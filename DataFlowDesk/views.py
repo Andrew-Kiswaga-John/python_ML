@@ -2997,80 +2997,158 @@ def train_model(request):
                 )
 
             elif model_name == 'polynomial_regression':
-                print("Polynomial Regression model selected.")
+                # Create unique model identifier
+                import datetime
+                timestamp = int(datetime.datetime.now().timestamp())
+                model_identifier = f'polynomial_regression_{dataset_id}_{timestamp}'
 
-                # Fetch degree from request and log it
-                degree = int(request.POST.get('degree', 2))
-                print(f"Degree of polynomial: {degree}")
+                # Scale the features
+                X_train_scaled = scaler.fit_transform(X_train)
+                X_test_scaled = scaler.transform(X_test)
 
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+                # Test different polynomial degrees
+                max_degree = 10  # Maximum degree to test
+                degrees = range(1, max_degree + 1)
+                degree_scores = {}
+                degree_predictions = {}
+                degree_models = {}
+                best_r2 = float('-inf')
+                best_degree = None
+                best_model = None
+                best_y_pred = None
 
-                # Initialize PolynomialFeatures and transform training data
-                poly = PolynomialFeatures(degree=degree)
-                print("Transforming X_train into polynomial features...")
-                X_train_poly = poly.fit_transform(X_train)
-                print(f"Shape of X_train after transformation: {X_train_poly.shape}")
+                # Store MSE and R2 scores for each degree
+                mse_scores = []
+                r2_scores = []
 
-                # Transform test data and log its shape
-                print("Transforming X_test into polynomial features...")
-                X_test_poly = poly.transform(X_test)
-                print(f"Shape of X_test after transformation: {X_test_poly.shape}")
+                for degree in degrees:
+                    try:
+                        # Create polynomial features
+                        poly = PolynomialFeatures(degree=degree)
+                        X_train_poly = poly.fit_transform(X_train_scaled)
+                        X_test_poly = poly.transform(X_test_scaled)
 
-                # Train the Linear Regression model
-                print("Initializing and training LinearRegression model...")
-                model = LinearRegression()
-                model.fit(X_train_poly, y_train)
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
+                        # Train model
+                        lr_model = LinearRegression()
+                        lr_model.fit(X_train_poly, y_train)
+                        
+                        # Make predictions
+                        y_pred = lr_model.predict(X_test_poly)
+                        
+                        # Calculate metrics
+                        mse = mean_squared_error(y_test, y_pred)
+                        r2 = r2_score(y_test, y_pred)
+                        
+                        # Store scores and predictions
+                        degree_scores[degree] = {'mse': mse, 'r2': r2}
+                        degree_predictions[degree] = y_pred
+                        degree_models[degree] = (lr_model, poly)
+                        
+                        mse_scores.append(mse)
+                        r2_scores.append(r2)
+
+                        # Update best model if this one is better
+                        if r2 > best_r2:
+                            best_r2 = r2
+                            best_degree = degree
+                            best_model = lr_model
+                            best_y_pred = y_pred
+
+                    except Exception as e:
+                        print(f"Error training polynomial regression with degree {degree}: {str(e)}")
+                        degree_scores[degree] = {'mse': float('inf'), 'r2': float('-inf')}
+
+                # Create degree comparison plot
+                comparison_path = os.path.join(settings.MEDIA_ROOT, 'visualizations', 
+                                            model_identifier, 'degree_comparison.png')
+                os.makedirs(os.path.dirname(comparison_path), exist_ok=True)
+                
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+                
+                # Plot MSE scores
+                ax1.plot(degrees, mse_scores, 'bo-')
+                ax1.axvline(x=best_degree, color='r', linestyle='--', 
+                            label=f'Best degree={best_degree}')
+                ax1.set_title('Mean Squared Error vs Polynomial Degree')
+                ax1.set_xlabel('Polynomial Degree')
+                ax1.set_ylabel('Mean Squared Error')
+                ax1.grid(True)
+                ax1.legend()
+
+                # Plot R² scores
+                ax2.plot(degrees, r2_scores, 'go-')
+                ax2.axvline(x=best_degree, color='r', linestyle='--', 
+                            label=f'Best degree={best_degree}')
+                ax2.set_title('R² Score vs Polynomial Degree')
+                ax2.set_xlabel('Polynomial Degree')
+                ax2.set_ylabel('R² Score')
+                ax2.grid(True)
+                ax2.legend()
+
+                plt.tight_layout()
+                plt.savefig(comparison_path)
+                plt.close()
+
+                # Use the best model and its polynomial transformer
+                model, poly = degree_models[best_degree]
+                y_pred = degree_predictions[best_degree]
+
+                # Store feature names and ranges
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
-                # Predict on transformed test data
-                y_pred = model.predict(X_test_poly)
-                print(f"Shape of y_pred: {y_pred.shape}")
-                print(f"First 5 predictions: {y_pred[:5]}")
 
-                # Calculate metrics
-                print("Calculating metrics...")
-                # Generate Visualizations
+                # Generate visualizations
                 results = generate_visualizations(
                     model_type='regression',
-                    model=model,  # Trained regression model
-                    y_true=y_test,  # True target values
-                    y_pred=y_pred,  # Predicted values from the model
-                    X=X_test,  # Features used for predictions
-                    model_identifier= f'Polynomial_regression_model_{dataset_id}'
+                    model=model,
+                    y_true=y_test,
+                    y_pred=y_pred,
+                    X=X_test_scaled,
+                    feature_names=feature_columns,
+                    model_identifier=model_identifier
                 )
 
-                # Save the trained model as a .pkl file
-                model_filename = f"Polynomial_regression_model_{dataset_id}.pkl"
+                # Add degree comparison to visualizations
+                results['visualizations']['degree_comparison'] = f'/visualizations/{model_identifier}/degree_comparison.png'
+
+                # Save both the model and polynomial transformer
+                model_filename = f"polynomial_regression_model_{dataset_id}.pkl"
                 models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
                 os.makedirs(models_dir, exist_ok=True)
                 model_path = os.path.join(models_dir, model_filename)
+                
+                # Save as a tuple of (model, poly_transformer)
                 with open(model_path, 'wb') as f:
-                    joblib.dump(model, f)
+                    joblib.dump((model, poly), f)
 
                 # Save to MLModel table
                 ml_model = MLModel.objects.create(
                     dataset=dataset,
-                    algorithm='Polynomial Regression',
+                    algorithm=f'Polynomial Regression (degree={best_degree})',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
 
                 # Save results to ModelResult table
                 ModelResult.objects.create(
                     model=ml_model,
-                    metric_name='mean_squared_error',
-                    metric_value=results['metrics']['mean_squared_error'],
-                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                    metric_name='r2_score',
+                    metric_value=best_r2,
                 )
 
-                return JsonResponse({
-                        'success': True,
-                        'results': results,
+                # Add polynomial-specific metrics to results
+                results['metrics'].update({
+                    'best_degree': best_degree,
+                    'best_r2_score': best_r2,
+                    'degree_comparison': degree_scores
                 })
 
+                return JsonResponse({
+                    'success': True,
+                    'results': results,
+                })
 
             elif model_name == 'logistic_regression':
                 solver = request.POST.get('solver', 'lbfgs')
@@ -3122,31 +3200,105 @@ def train_model(request):
                 )
 
             elif model_name == 'naive_bayes':
-                var_smoothing = float(request.POST.get('varSmoothing', 1e-9))
-                model = GaussianNB(var_smoothing=var_smoothing)
+                # Create unique model identifier
+                import datetime
+                timestamp = int(datetime.datetime.now().timestamp())
+                model_identifier = f'naive_bayes_{dataset_id}_{timestamp}'
 
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+                # Scale the features
+                X_train_scaled = pd.DataFrame(
+                    scaler.fit_transform(X_train),
+                    columns=feature_columns,
+                    index=X_train.index
+                )
+                X_test_scaled = pd.DataFrame(
+                    scaler.transform(X_test),
+                    columns=feature_columns,
+                    index=X_test.index
+                )
 
-                model.fit(X_train, y_train)
+                # Define range of var_smoothing values to test (logarithmic scale)
+                var_smoothing_values = np.logspace(-12, 0, 13)  # Test from 1e-12 to 1e0
+                smoothing_scores = {}
+                smoothing_predictions = {}
+                best_accuracy = 0
+                best_var_smoothing = None
+                best_model = None
 
-                model.feature_names_in_ = feature_columns  # Add feature names
-                model.suggested_ranges = {  # Add suggested input ranges
+                # Train and evaluate Naive Bayes with different var_smoothing values
+                for var_smoothing in var_smoothing_values:
+                    try:
+                        # Train Naive Bayes with current var_smoothing
+                        nb_model = GaussianNB(var_smoothing=var_smoothing)
+                        nb_model.fit(X_train_scaled, y_train)
+                        
+                        # Make predictions
+                        y_pred = nb_model.predict(X_test_scaled)
+                        
+                        # Calculate accuracy
+                        accuracy = accuracy_score(y_test, y_pred)
+                        smoothing_scores[var_smoothing] = accuracy
+                        smoothing_predictions[var_smoothing] = y_pred
+
+                        # Keep track of best performing var_smoothing
+                        if accuracy > best_accuracy:
+                            best_accuracy = accuracy
+                            best_var_smoothing = var_smoothing
+                            best_model = nb_model
+
+                    except Exception as e:
+                        print(f"Error training Naive Bayes with var_smoothing={var_smoothing}: {str(e)}")
+                        smoothing_scores[var_smoothing] = 0
+
+                # Use the best model for final predictions
+                model = best_model
+                y_pred = smoothing_predictions[best_var_smoothing]
+
+                # Create var_smoothing comparison plot
+                smoothing_comparison_path = os.path.join(settings.MEDIA_ROOT, 'visualizations', 
+                                                    model_identifier, 'smoothing_comparison.png')
+                os.makedirs(os.path.dirname(smoothing_comparison_path), exist_ok=True)
+                
+                plt.figure(figsize=(12, 6))
+                plt.semilogx(list(smoothing_scores.keys()), list(smoothing_scores.values()), 'bo-')
+                plt.axvline(x=best_var_smoothing, color='r', linestyle='--', 
+                            label=f'Best var_smoothing={best_var_smoothing:.2e}')
+                plt.title('Naive Bayes Variance Smoothing Parameter Optimization')
+                plt.xlabel('Variance Smoothing Parameter (log scale)')
+                plt.ylabel('Accuracy Score')
+                plt.grid(True)
+                plt.legend()
+                
+                # Add value labels for best point
+                plt.plot(best_var_smoothing, best_accuracy, 'ro')
+                plt.annotate(f'Best Accuracy: {best_accuracy:.3f}',
+                            xy=(best_var_smoothing, best_accuracy),
+                            xytext=(10, 10), textcoords='offset points')
+                
+                plt.savefig(smoothing_comparison_path)
+                plt.close()
+
+                # Store feature names and ranges for the best model
+                model.feature_names_in_ = feature_columns
+                model.suggested_ranges = {
                     feature: f"{X[feature].min()} - {X[feature].max()}" for feature in feature_columns
                 }
 
-                y_pred = model.predict(X_test)
-                # Generate Visualizations
+                # Generate standard visualizations with the best model
                 results = generate_visualizations(
                     model_type='classification',
-                    model=model,  # Trained Naive Bayes model
-                    y_true=y_test,  # True labels from the test dataset
-                    y_pred=y_pred,  # Predicted labels
-                    X=X_test,  # Test dataset features
-                    model_identifier= f'naive_bayes_model_{dataset_id}'
+                    model=model,
+                    y_true=y_test,
+                    y_pred=y_pred,
+                    X=X_test_scaled,
+                    feature_names=feature_columns,
+                    model_identifier=model_identifier
                 )
 
-                # Save the trained model as a .pkl file
+                # Add smoothing comparison to visualizations
+                results['visualizations']['smoothing_comparison'] = f'/visualizations/{model_identifier}/smoothing_comparison.png'
+
+                # Save the best model
                 model_filename = f"naive_bayes_model_{dataset_id}.pkl"
                 models_dir = os.path.join(settings.MEDIA_ROOT, 'models')
                 os.makedirs(models_dir, exist_ok=True)
@@ -3157,18 +3309,18 @@ def train_model(request):
                 # Save to MLModel table
                 ml_model = MLModel.objects.create(
                     dataset=dataset,
-                    algorithm='Naive Bayes',
+                    algorithm=f'Naive Bayes (var_smoothing={best_var_smoothing:.2e})',
                     training_status='completed',
-                    model_path = model_path
+                    model_path=model_path
                 )
 
                 # Save results to ModelResult table
                 ModelResult.objects.create(
                     model=ml_model,
                     metric_name='accuracy',
-                    metric_value=results['metrics']['accuracy'],
-                    # visualization_path=f'data:image/png;base64,{image_base64}',
+                    metric_value=best_accuracy,
                 )
+
 
             elif model_name == 'kmeans':
                 X = df
