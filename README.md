@@ -1,102 +1,179 @@
-# DataFlowDesk - Machine Learning Platform
+# ru2ya.ai 🚀
 
-DataFlowDesk is a comprehensive web-based machine learning platform built with Django that enables users to manage datasets, train ML models, and visualize results through an intuitive interface.
+<div align="center">
 
-## Features
+![ru2ya.ai Logo](https://img.shields.io/badge/ru2ya.ai-ML%20Platform-blue?style=for-the-badge&logo=python)
 
-- **Dataset Management**
-  - Upload and manage datasets
-  - Automated data cleaning and preprocessing
-  - Data visualization and analysis tools
-  - Download cleaned datasets
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Django](https://img.shields.io/badge/django-4.0+-green.svg)](https://www.djangoproject.com/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **Machine Learning**
-  - Support for multiple ML algorithms
-  - Neural Network implementation with PyTorch
-  - Automated model training and evaluation
-  - Model performance visualization
-  - Model export functionality
+*A powerful, intuitive machine learning platform for the modern data scientist*
 
-- **Visualization**
-  - Interactive data visualizations
-  - Model performance metrics
-  - Training progress tracking
-  - Cluster analysis visualization
+[Features](#features) • [Installation](#installation) • [Documentation](#features-in-detail) • [Contributing](#contributing)
 
-- **User Management**
-  - User authentication and profiles
-  - Personal dataset and model management
-  - Tutorial system for platform guidance
+![Platform Preview](https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/platform-preview.png)
 
-## Technology Stack
+</div>
 
-- **Backend**: Django
-- **Frontend**: HTML, TailwindCSS
-- **Machine Learning**: 
-  - PyTorch (Deep Learning)
-  - Scikit-learn (Traditional ML)
-  - Pandas (Data Processing)
-  - Matplotlib/Seaborn (Visualization)
+## 🌟 Overview
 
-## Installation
+ru2ya.ai is a comprehensive web-based machine learning platform that revolutionizes the way data scientists work. Built with Django and modern ML frameworks, it provides an intuitive interface for dataset management, model training, and result visualization.
 
-1. Clone the repository
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   npm install
-   ```
-4. Run migrations:
-   ```bash
-   python manage.py migrate
-   ```
-5. Start the development server:
-   ```bash
-   python manage.py runserver
-   ```
+<div align="center">
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/workflow.png" alt="Workflow" width="800"/>
+</div>
 
-## Project Structure
+## ✨ Features
 
-- `DataFlowDesk/` - Main Django application
-  - `models.py` - Database models for datasets, ML models, and user profiles
-  - `views.py` - Core logic for ML operations and web interface
-  - `templates/` - HTML templates
-  - `static/` - Static files (CSS, JS, images)
-  - `templatetags/` - Custom template tags
+<table>
+<tr>
+<td width="50%">
 
-## Features in Detail
-
-### Data Processing
+### 📊 Dataset Management
+- Upload and manage datasets
 - Automated data cleaning
-- Missing value handling
-- Outlier detection
-- Feature scaling and normalization
-- Data visualization tools
+- Advanced preprocessing
+- Interactive visualizations
 
-### Machine Learning Models
-- Classification algorithms
-- Regression algorithms
-- Clustering (K-means)
-- Neural Networks
-- Model evaluation metrics
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/dataset-management.png" alt="Dataset Management"/>
 
-### Visualization Tools
-- Data distribution plots
-- Correlation matrices
-- Learning curves
-- ROC curves
-- Confusion matrices
-- Cluster visualizations
+</td>
+<td width="50%">
 
-## Contributing
+### 🤖 Machine Learning
+- Multiple ML algorithms
+- PyTorch Neural Networks
+- Automated training
+- Performance metrics
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/ml-training.png" alt="ML Training"/>
 
-## License
+</td>
+</tr>
+<tr>
+<td width="50%">
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+### 📈 Visualization
+- Interactive plots
+- Real-time metrics
+- Training progress
+- Cluster analysis
+
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/visualization.png" alt="Visualization"/>
+
+</td>
+<td width="50%">
+
+### 👥 User Experience
+- Intuitive interface
+- Profile management
+- Interactive tutorials
+- Model sharing
+
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/user-interface.png" alt="User Interface"/>
+
+</td>
+</tr>
+</table>
+
+## 🛠️ Technology Stack
+
+<div align="center">
+
+| Category | Technologies |
+|----------|-------------|
+| **Backend** | ![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white) |
+| **Frontend** | ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) |
+| **ML & Data** | ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white) ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white) |
+| **Visualization** | ![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=python&logoColor=white) ![Seaborn](https://img.shields.io/badge/Seaborn-3776AB?style=for-the-badge&logo=python&logoColor=white) |
+
+</div>
+
+## 🚀 Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/username/ru2ya.ai.git
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+npm install
+
+# Run migrations
+python manage.py migrate
+
+# Start the server
+python manage.py runserver
+```
+
+## 📁 Project Structure
+
+```
+ru2ya.ai/
+├── DataFlowDesk/          # Main application
+│   ├── models.py          # Database models
+│   ├── views.py           # Core logic
+│   ├── templates/         # HTML templates
+│   ├── static/           # Static files
+│   └── templatetags/     # Custom tags
+├── datasets/             # Dataset storage
+├── media/               # User uploads
+└── manage.py           # Django management
+```
+
+## 🔍 Features in Detail
+
+### 🔮 Data Processing
+- **Automated Cleaning**: Smart detection and handling of data issues
+- **Preprocessing**: Feature scaling, encoding, and normalization
+- **Quality Checks**: Outlier detection and missing value handling
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/data-processing.png" alt="Data Processing" width="800"/>
+</div>
+
+### 🧠 Machine Learning Models
+- **Classification**: Support for binary and multi-class problems
+- **Regression**: Linear, non-linear, and ensemble methods
+- **Clustering**: K-means and hierarchical clustering
+- **Deep Learning**: Custom neural network architectures
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/ml-models.png" alt="ML Models" width="800"/>
+</div>
+
+### 📊 Visualization Tools
+- **Distribution Analysis**: Histograms and density plots
+- **Relationship Studies**: Correlation matrices and scatter plots
+- **Model Insights**: ROC curves and confusion matrices
+- **Interactive Dashboards**: Real-time performance monitoring
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/visualization-tools.png" alt="Visualization Tools" width="800"/>
+</div>
+
+## 👥 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+<div align="center">
+
+[![Contributors](https://img.shields.io/github/contributors/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/graphs/contributors)
+[![Issues](https://img.shields.io/github/issues/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/pulls)
+
+</div>
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+<div align="center">
+Made with ❤️ by the ru2ya.ai team
+</div>
