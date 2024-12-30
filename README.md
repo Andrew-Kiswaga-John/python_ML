@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![ru2ya.ai Logo](https://img.shields.io/badge/ru2ya.ai-ML%20Platform-blue?style=for-the-badge&logo=python)
+<img src="docs/images/ru2ya-logo.svg" alt="ru2ya.ai Logo" width="400"/>
 
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Django](https://img.shields.io/badge/django-4.0+-green.svg)](https://www.djangoproject.com/)
@@ -13,7 +13,7 @@
 
 [Features](#features) • [Installation](#installation) • [Documentation](#features-in-detail) • [Contributing](#contributing)
 
-![Platform Preview](https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/platform-preview.png)
+<img src="docs/images/platform-preview.png" alt="Platform Preview" width="800"/>
 
 </div>
 
@@ -22,7 +22,7 @@
 ru2ya.ai is a comprehensive web-based machine learning platform that revolutionizes the way data scientists work. Built with Django and modern ML frameworks, it provides an intuitive interface for dataset management, model training, and result visualization.
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/workflow.png" alt="Workflow" width="800"/>
+<img src="docs/images/workflow.png" alt="Workflow" width="800"/>
 </div>
 
 ## ✨ Features
@@ -37,7 +37,7 @@ ru2ya.ai is a comprehensive web-based machine learning platform that revolutioni
 - Advanced preprocessing
 - Interactive visualizations
 
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/dataset-management.png" alt="Dataset Management"/>
+<img src="docs/images/dataset-management.png" alt="Dataset Management"/>
 
 </td>
 <td width="50%">
@@ -48,7 +48,7 @@ ru2ya.ai is a comprehensive web-based machine learning platform that revolutioni
 - Automated training
 - Performance metrics
 
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/ml-training.png" alt="ML Training"/>
+<img src="docs/images/ml-training.png" alt="ML Training"/>
 
 </td>
 </tr>
@@ -61,7 +61,7 @@ ru2ya.ai is a comprehensive web-based machine learning platform that revolutioni
 - Training progress
 - Cluster analysis
 
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/visualization.png" alt="Visualization"/>
+<img src="docs/images/visualization.png" alt="Visualization"/>
 
 </td>
 <td width="50%">
@@ -72,7 +72,7 @@ ru2ya.ai is a comprehensive web-based machine learning platform that revolutioni
 - Interactive tutorials
 - Model sharing
 
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/user-interface.png" alt="User Interface"/>
+<img src="docs/images/user-interface.png" alt="User Interface"/>
 
 </td>
 </tr>
@@ -135,7 +135,7 @@ ru2ya.ai/
 - **Quality Checks**: Outlier detection and missing value handling
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/data-processing.png" alt="Data Processing" width="800"/>
+<img src="docs/images/data-processing.png" alt="Data Processing" width="800"/>
 </div>
 
 ### 🧠 Machine Learning Models
@@ -145,7 +145,7 @@ ru2ya.ai/
 - **Deep Learning**: Custom neural network architectures
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/ml-models.png" alt="ML Models" width="800"/>
+<img src="docs/images/ml-models.png" alt="ML Models" width="800"/>
 </div>
 
 ### 📊 Visualization Tools
@@ -155,7 +155,7 @@ ru2ya.ai/
 - **Interactive Dashboards**: Real-time performance monitoring
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/username/ru2ya.ai/main/docs/images/visualization-tools.png" alt="Visualization Tools" width="800"/>
+<img src="docs/images/visualization-tools.png" alt="Visualization Tools" width="800"/>
 </div>
 
 ## 👥 Contributing
@@ -164,9 +164,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 <div align="center">
 
-[![Contributors](https://img.shields.io/github/contributors/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/graphs/contributors)
-[![Issues](https://img.shields.io/github/issues/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/username/ru2ya.ai?style=for-the-badge)](https://github.com/username/ru2ya.ai/pulls)
+[![Contributors](https://img.shields.io/badge/contributors-1-success.svg?style=for-the-badge)](https://github.com/username/ru2ya.ai/graphs/contributors)
+[![Issues](https://img.shields.io/badge/issues-0-blue.svg?style=for-the-badge)](https://github.com/username/ru2ya.ai/issues)
+[![Pull Requests](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](https://github.com/username/ru2ya.ai/pulls)
 
 </div>
 
