@@ -8,9 +8,9 @@
     <title>{% block title %}ML Analyzer{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-            .content-with-sidebar {
-        margin-left: 16rem; /* 256px = 16rem (w-64 from sidebar) */
-    }
+        .content-with-sidebar {
+            margin-left: 16rem;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -32,47 +32,43 @@
     </footer>
 
     <script>
-
-    // Modal functions with animations
-    function openModal(modalId) {
-        const modal = document.getElementById(modalId);
-        modal.classList.remove('hidden');
-        
-        // Trigger a reflow to ensure the transitions work
-        void modal.offsetWidth;
-        
-        // Add the visible classes
-        modal.classList.remove('opacity-0');
-        modal.classList.add('opacity-100');
-        
-        const modalContent = modal.querySelector('.modal-content');
-        if (modalContent) {
-            modalContent.classList.remove('scale-95', 'translate-y-4');
-            modalContent.classList.add('scale-100', 'translate-y-0');
+        // Modal functions with animations
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('hidden');
+            
+            // Trigger a reflow to ensure the transitions work
+            void modal.offsetWidth;
+            
+            // Add the visible classes
+            modal.classList.remove('opacity-0');
+            modal.classList.add('opacity-100');
+            
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.classList.remove('scale-95', 'translate-y-4');
+                modalContent.classList.add('scale-100', 'translate-y-0');
+            }
         }
-    }
 
-    function closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        
-        // Start the closing animation
-        modal.classList.remove('opacity-100');
-        modal.classList.add('opacity-0');
-        
-        const modalContent = modal.querySelector('.modal-content');
-        if (modalContent) {
-            modalContent.classList.remove('scale-100', 'translate-y-0');
-            modalContent.classList.add('scale-95', 'translate-y-4');
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            
+            // Start the closing animation
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0');
+            
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.classList.remove('scale-100', 'translate-y-0');
+                modalContent.classList.add('scale-95', 'translate-y-4');
+            }
+            
+            // Hide the modal after the animation completes
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
         }
-        
-        // Hide the modal after the animation completes
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
-    }
-
-
- 
     </script>
 
     {% block extra_js %}{% endblock %}

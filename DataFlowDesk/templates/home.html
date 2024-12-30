@@ -545,15 +545,26 @@
                     placeholder="Enter a name for your dataset">
             </div>
 
-            <!-- Target Class Selection -->
-            <div id="targetClassSection" class="hidden space-y-4">
-                <label for="target_class" class="block text-sm font-medium text-gray-700">Target Class</label>
-                <select name="target_class" id="target_class" 
-                    class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
-                    <option value="">Select a column</option>
-                </select>
-                <p id="target-class-help" class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
-            </div>
+            <!-- Dataset Type Selection --> <div class="space-y-4">
+                <label for="dataset_type" class="block text-sm font-medium text-gray-700">Dataset Type</label>
+                <select name="dataset_type" id="dataset_type" required class="block w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"> 
+                  <option value="">Select dataset type</option>
+                   <option value="classification">Classification</option>
+                    <option value="regression">Regression</option> 
+                    <option value="clustering">Clustering</option> 
+                  </select> 
+              </div>
+
+          <!-- Target Class Selection -->
+          <div id="targetClassSection" class="hidden space-y-4">
+              <label for="target_class" class="block text-sm font-medium text-gray-700">Target Class</label>
+              <select name="target_class" id="target_class" 
+                  class="block w-full px-4 py-3 rounded-xl border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                  <option value="">Select a column</option>
+              </select>
+              <p id="target-class-help" class="mt-2 text-sm text-gray-500">This will be used for analysis and model training</p>
+          </div>
+
 
             <!-- Description -->
             <div class="space-y-4">
@@ -1091,6 +1102,15 @@ document.getElementById('step1-form').addEventListener('submit', async function(
             </select>
             <p class="mt-2 text-sm text-gray-600">This column will be used as the target variable for your analysis</p>
         </div>
+                 <label for="dataset_type" class="block text-sm font-medium text-gray-700">Dataset Type</label>
+                  <select name="dataset_type" id="dataset_type" required class="block w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"> 
+                    <option value="">Select dataset type</option>
+                     <option value="classification">Classification</option>
+                      <option value="regression">Regression</option> 
+                      <option value="clustering">Clustering</option> 
+                    </select> 
+                </div>
+
         <h2 class="text-2xl font-bold mb-6 text-gray-800">Enter Data for ${datasetMeta.name}</h2>
         <div class="overflow-x-auto">
             <table class="min-w-full table-auto border-collapse border border-gray-300">
